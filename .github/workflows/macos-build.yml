@@ -66,6 +66,7 @@ jobs:
            debug: none
            extensions: ""
            variation: ""
+           checked: false
 
          - os-id: 0.2.40  # 64-bit Target (built on this 64-bit platform)
            config-file: generic.r
@@ -73,6 +74,7 @@ jobs:
            debug: normal
            extensions: "ODBC +"
            variation: "-debug"  # !!! Maybe -debug-odbc ?
+           checked: true
 
         # MacOS has fully deprecated 32-bit targets...we'll assume that the
         # Windows/Linux/ARM 32-bit variants cover testing of 32-bit enough.
@@ -91,6 +93,7 @@ jobs:
       DEBUG: ${{ matrix.debug }}
       EXTENSIONS: ${{ matrix.extensions }}
       VARIATION: ${{ matrix.variation }}
+      CHECKED: ${{ matrix.checked }}
 
 
     # Steps are a sequence of tasks that will be executed within a single VM
@@ -210,42 +213,18 @@ jobs:
         path: build/prep/include/tmp-internals.h
 
 
-    - name: Compile and Link the C Files to into R3BUILT
+    - name: Compile and Link the C Files
       run: |
         cd build
         make
-        echo "R3BUILT=$(pwd)/r3" >> $GITHUB_ENV
 
 
-    # See README: Ren-C Code As Step
-    #
-    - name: Copy Built R3 To Where It Can Be Used As A Shell
+    - name: Quick Smoke Test (Print A Message And Quit)
       run: |
-        sudo cp build/r3 /usr/bin/r3built
+        build/r3 --do "print {hi}"
 
 
-  #====# TESTING STEPS #======================================================#
-
-
-    - name: Basic Smoke Test (Print A Message And Quit)
-      run: |
-        "$R3BUILT" --do "print {hi}"
-
-
-    - name: HTTPS Read Test (If This Works, A Lot Of Things Are Working)
-      shell: r3built --fragment {0}  # See README: Ren-C Code As Step
-      run: |
-        print {== Hello From R3 HTTPS Read Test! ==}
-        parse as text! read https://example.com [
-            thru <h1> copy header: to </h1> to end
-        ] else [
-            fail "Couldn't Capture Page Title"
-        ]
-        assert [header = "Example Domain"]
-        print ["Succeeded:" header]
-
-
-  #====# DEPLOY STEPS #=======================================================#
+  #====# UPLOAD STEP #========================================================#
 
 
     # This action configures the AWS keys stored in GitHub's "Secrets" for
@@ -278,11 +257,41 @@ jobs:
       run: |
         cd build
         NEW_NAME="r3-${GIT_COMMIT_SHORT}${VARIATION}"
-        OPT_TYPE=""  # e.g. "--content-type application/wasm"
+        MIME_TYPE="application/x-executable"
 
         local=r3
         remote=s3://${AWS_S3_BUCKET_NAME}/travis-builds/${OS_ID}/${NEW_NAME}
-        aws s3 cp $local $remote $OPT_TYPE
+        aws s3 cp $local $remote --content-type $MIME_TYPE
+
+
+  #====# TESTING STEPS #======================================================#
+
+
+    - name: HTTPS Read Test (If This Works, A Lot Of Things Are Working)
+      uses: metaeducation/ren-c-action@release
+      with:
+        commit: ${{ env.GIT_COMMIT_SHORT }}
+        checked: ${{ env.CHECKED }}
+        script: |
+          print {== Hello From R3 HTTPS Read Test! ==}
+          parse as text! read https://example.com [
+              thru <h1> copy header: to </h1> to end
+          ] else [
+              fail "Couldn't Capture Page Title"
+          ]
+          assert [header = "Example Domain"]
+          print ["Succeeded:" header]
+
+
+  #====# BOOTSTRAP STEP #=====================================================#
+
+
+    # We should check for bootstrap capability in at least some cases.
+    # Since it slows things down significantly, perhaps only periodically.
+    # (based on random number?)
+
+
+  #====# GREENLIGHT STEP #====================================================#
 
 
     - name: Greenlight Build
@@ -299,9 +308,3 @@ jobs:
 
         remote=s3://${AWS_S3_BUCKET_NAME}/travis-builds/${OS_ID}/$local
         aws s3 cp $local $remote  # upload
-
-
-  #====# BOOTSTRAP STEP #=====================================================#
-
-
-    # We should check for bootstrap capability
