@@ -238,7 +238,7 @@ static void kill_process(pid_t pid, int signal);
 #endif
 
 //
-//  terminate: native [
+//  export terminate: native [
 //
 //  "Terminate a process (not current one)"
 //
