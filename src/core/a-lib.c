@@ -323,7 +323,6 @@ REBVAL *RL_rebRepossess(void *ptr, size_t size)
 }
 
 
-
 //
 //  Startup_Api: C
 //
@@ -679,7 +678,7 @@ REBVAL *RL_rebLengthedTextWide(const REBWCHAR *wstr, unsigned int num_chars)
 //
 //  rebTextWide: RL_API
 //
-// Imports a TEXT! from UTF-16 (potentially multi-wchar-per-codepint encoding)
+// Imports a TEXT! from UTF-16 (potentially multi-wchar-per-codepoint encoding)
 //
 REBVAL *RL_rebTextWide(const REBWCHAR *wstr)
 {
@@ -690,10 +689,12 @@ REBVAL *RL_rebTextWide(const REBWCHAR *wstr)
 
     while (*wstr != 0) {
         if (*wstr >= UNI_SUR_HIGH_START and *wstr <= UNI_SUR_HIGH_END) {
-            assert (
+            if (not (
                 *(wstr + 1) >= UNI_SUR_LOW_START
                 and *(wstr + 1) <= UNI_SUR_LOW_END
-            );
+            )){
+                fail ("Invalid UTF-16 surrogate pair passed to rebTextWide()");
+            }
             Append_Codepoint(mo->series, Decode_UTF16_Pair(wstr));
             wstr += 2;
         }
