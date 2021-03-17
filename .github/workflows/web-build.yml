@@ -19,7 +19,7 @@
 # https://github.com/metaeducation/ren-c/blob/master/.github/workflows/README.md
 #
 
-name: Web Build
+name: Emscripten Web
 
 
 # See README: When To Trigger Builds

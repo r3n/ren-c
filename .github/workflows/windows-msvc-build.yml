@@ -19,7 +19,7 @@
 # https://github.com/metaeducation/ren-c/blob/master/.github/workflows/README.md
 #
 
-name: Windows Build
+name: Windows MSVC
 
 
 # See README: When To Trigger Builds
@@ -27,7 +27,8 @@ name: Windows Build
 on:
   push:
     branches: [
-      windows  # pushing to windows won't build other workflows, use to debug
+      msvc,  # pushing to msvc won't build other workflows, use to debug
+      windows  # pushing to windows builds this and mingw, use to debug
     ]
   pull_request:
     branches: [
@@ -51,7 +52,7 @@ defaults:
 # See README: Jobs
 #
 jobs:
-  windows-build:  # Name of this workflow's only job
+  windows-msvc-build:  # Name of this workflow's only job
 
     # https://github.com/actions/virtual-environments#available-environments
     #

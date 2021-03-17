@@ -1,5 +1,5 @@
 #
-# File: %linux-build.yml
+# File: %linux-gcc-build.yml
 #
 #=============================================================================#
 #
@@ -14,7 +14,7 @@
 # https://github.com/metaeducation/ren-c/blob/master/.github/workflows/README.md
 #
 
-name: Linux Build
+name: Linux GCC
 
 
 # See README: When To Trigger Builds
@@ -47,7 +47,7 @@ defaults:
 # See README: Jobs
 #
 jobs:
-  linux-build:  # Name of this workflow's only job
+  linux-gcc-build:  # Name of this workflow's only job
 
     # https://github.com/actions/virtual-environments#available-environments
     #

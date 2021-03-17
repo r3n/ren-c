@@ -1,5 +1,5 @@
 #
-# File: %tcc-build.yml
+# File: %linux-tcc-build.yml
 #
 #=============================================================================#
 #
@@ -22,7 +22,7 @@
 # https://github.com/metaeducation/ren-c/blob/master/.github/workflows/README.md
 #
 
-name: TCC Build
+name: Linux TCC
 
 
 # See README: When To Trigger Builds
@@ -55,7 +55,7 @@ defaults:
 # See README: Jobs
 #
 jobs:
-  tcc-build:  # Name of this workflow's only job
+  linux-tcc-build:  # Name of this workflow's only job
 
     # https://github.com/actions/virtual-environments#available-environments
     #
