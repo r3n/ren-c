@@ -96,9 +96,9 @@ inline static REBVAL *Init_Any_Word_Core(
     const REBSYM *sym
 ){
     RESET_VAL_HEADER(out, kind, CELL_FLAG_FIRST_IS_NODE);
-    mutable_BINDING(out) = sym;
     VAL_WORD_INDEXES_U32(out) = 0;
-    INIT_VAL_WORD_CACHE(out, SPECIFIED);
+    mutable_BINDING(out) = nullptr;
+    INIT_VAL_WORD_SYMBOL(out, sym);
 
     return cast(REBVAL*, out);
 }
@@ -111,21 +111,25 @@ inline static REBVAL *Init_Any_Word_Core(
 #define Init_Set_Word(out,str)      Init_Any_Word((out), REB_SET_WORD, (str))
 #define Init_Sym_Word(out,str)      Init_Any_Word((out), REB_SYM_WORD, (str))
 
+inline static const REBKEY *CTX_KEY(REBCTX *c, REBLEN n);
+
 inline static REBVAL *Init_Any_Word_Bound_Core(
     RELVAL *out,
     enum Reb_Kind type,
     REBARR *binding,  // spelling determined by linked-to thing
     REBLEN index  // must be 1 if LET patch
 ){
-    assert(
-        IS_VARLIST(binding)
-        or (GET_SUBCLASS_FLAG(PATCH, binding, LET) and index == 1)
-    );
-
     RESET_VAL_HEADER(out, type, CELL_FLAG_FIRST_IS_NODE);
     mutable_BINDING(out) = binding;
     VAL_WORD_INDEXES_U32(out) = index;
-    INIT_VAL_WORD_CACHE(out, SPECIFIED);
+
+    if (IS_VARLIST(binding)) {
+        INIT_VAL_WORD_SYMBOL(out, *CTX_KEY(CTX(binding), index));
+    } else {
+        assert(GET_SUBCLASS_FLAG(PATCH, binding, LET));
+        assert(index == 1);
+        INIT_VAL_WORD_SYMBOL(out, LINK(PatchSymbol, binding));
+    }
 
     return cast(REBVAL*, out);
 }

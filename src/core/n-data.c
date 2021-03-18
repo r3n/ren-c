@@ -981,7 +981,7 @@ REBNATIVE(free_q)
     // !!! Technically speaking a PAIR! could be freed as an array could, it
     // would mean converting the node.  Review.
     //
-    if (n == nullptr or Is_Node_Cell(n))  // VAL_WORD_CACHE() can be null
+    if (n == nullptr or Is_Node_Cell(n))
         return Init_False(D_OUT);
 
     return Init_Logic(D_OUT, GET_SERIES_FLAG(SER(n), INACCESSIBLE));

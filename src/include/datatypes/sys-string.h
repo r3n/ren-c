@@ -535,7 +535,6 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
       { return STR_AT(m_cast(REBSTR*, s), at); }
 #endif
 
-inline static const REBSYM *VAL_WORD_SYMBOL(REBCEL(const*) v);
 
 inline static const REBSTR *VAL_STRING(REBCEL(const*) v) {
     if (ANY_STRING_KIND(CELL_HEART(v)))

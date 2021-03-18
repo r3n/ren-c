@@ -331,7 +331,7 @@ inline static void INIT_BINDING_MAY_MANAGE(
 //
 inline static bool IS_WORD_UNBOUND(const RELVAL *v) {
     assert(ANY_WORD_KIND(CELL_HEART(VAL_UNESCAPED(v))));
-    return IS_SYMBOL(BINDING(v));
+    return BINDING(v) == UNBOUND;
 }
 
 #define IS_WORD_BOUND(v) \
@@ -347,20 +347,16 @@ inline static REBLEN VAL_WORD_INDEX(const RELVAL *v) {
 
 inline static REBARR *VAL_WORD_BINDING(const RELVAL *v) {
     assert(ANY_WORD_KIND(CELL_HEART(VAL_UNESCAPED(v))));
-    REBSER *binding = BINDING(v);  // Note: is const if REBSTR...
-    if (IS_SYMBOL(binding))
-        return UNBOUND;
-    return ARR(binding);
+    return ARR(BINDING(v));  // could be nullptr / UNBOUND
 }
 
 inline static void INIT_VAL_WORD_BINDING(RELVAL *v, const REBSER *binding) {
     assert(ANY_WORD_KIND(CELL_HEART(VAL_UNESCAPED(v))));
 
-    assert(binding);  // can't set word bindings to nullptr
     mutable_BINDING(v) = binding;
 
   #if !defined(NDEBUG)
-    if (IS_SYMBOL(binding))
+    if (binding == nullptr)
         return;  // e.g. UNBOUND (words use strings to indicate unbounds)
 
     if (binding->leader.bits & NODE_FLAG_MANAGED) {
@@ -403,9 +399,8 @@ inline static REBVAL* Unrelativize(RELVAL* out, const RELVAL* v) {
     Unrelativize(Alloc_Value(), (v))
 
 inline static void Unbind_Any_Word(RELVAL *v) {
-    const REBSTR *spelling = VAL_WORD_SYMBOL(VAL_UNESCAPED(v));
-    INIT_VAL_WORD_BINDING(v, spelling);
     INIT_VAL_WORD_PRIMARY_INDEX(v, 0);
+    INIT_VAL_WORD_BINDING(v, nullptr);
 }
 
 inline static REBCTX *VAL_WORD_CONTEXT(const REBVAL *v) {
@@ -420,35 +415,6 @@ inline static REBCTX *VAL_WORD_CONTEXT(const REBVAL *v) {
     REBCTX *c = CTX(binding);
     FAIL_IF_INACCESSIBLE_CTX(c);
     return c;
-}
-
-// When a word is bound, its spelling is derived from the context it is bound
-// to.  This means getting at the spelling will cost slightly more, but frees
-// up space in word cell for other features.  Note that this means if a
-// context is freed, its keylist must be retained to provide the words.
-//
-inline static const REBSYM *VAL_WORD_SYMBOL(REBCEL(const*) cell) {
-    assert(ANY_WORD_KIND(CELL_HEART(cell)));
-
-    if (IS_SYMBOL(BINDING(cell)))
-        return SYM(BINDING(cell));
-
-    REBARR *binding = ARR(BINDING(cell));
-
-    // Note: inside QUOTED! cells, all words should be bound to strings.  This
-    // is because different bindings can be made at each reference site.
-    // So at this point, we can be certain the cell is a RELVAL.
-
-    const RELVAL *v = CELL_TO_VAL(cell);
-
-    if (IS_DETAILS(binding))  // relative
-        return KEY_SYMBOL(ACT_KEY(ACT(binding), VAL_WORD_INDEX(v)));
-
-    if (IS_PATCH(binding))  // let
-        return LINK(PatchSymbol, binding);
-
-    assert(IS_VARLIST(binding));  // specific
-    return KEY_SYMBOL(CTX_KEY(CTX(binding), VAL_WORD_INDEX(v)));
 }
 
 
@@ -510,97 +476,13 @@ inline static option(REBARR*) Get_Word_Container(
     if (specifier == SPECIFIED or not IS_PATCH(specifier))
         goto not_virtually_bound;
 
-    // Virtual binding shortcut; if a virtual binding is in effect and it
-    // matches the cache in the word, then trust the information in it...
-    // whether that's a hit or a miss.
+  blockscope {
     //
-    if (specifier == VAL_WORD_CACHE(any_word)) {
-        //
-        // Since the number of bits available in a virtual bind is limited,
-        // the value stored is the index modulo MONDEX_MOD.  A miss is
-        // recorded with the actual value MONDEX_MOD (since 0 can be an
-        // actual modulus result).
-        //
-        REBLEN mondex = VAL_WORD_VIRTUAL_MONDEX_UNCHECKED(any_word);
-        if (mondex == MONDEX_MOD)
-            goto virtual_miss;
-
-      blockscope {
-        const REBSTR *spelling = VAL_WORD_SYMBOL(VAL_UNESCAPED(any_word));
-
-        // We have the primary binding's spelling to check against, so we
-        // can recognize when the lossy index matches up.  It needs to match
-        // one of the virtual overriding contexts...we don't have enough bits
-        // to say which one so check them all.
-        //
-        // !!! To improve locality it might be better to take a couple of
-        // mondex bits to use as the mod of the chain length.
-        //
-        do {
-            assert(IS_PATCH(specifier));
-
-            if (GET_SUBCLASS_FLAG(PATCH, specifier, LET)) {
-                if (LINK(PatchSymbol, specifier) == spelling) {
-                    *index_out = 1;  // !!! lie, review
-                    return specifier;
-                }
-                goto skip_hit_patch;
-            }
-
-            REBARR *overbind;  // avoid goto-past-initialization warning
-            overbind = ARR(BINDING(ARR_SINGLE(specifier)));
-            if (not IS_VARLIST(overbind)) {  // a patch-formed LET overload
-                if (LINK(PatchSymbol, overbind) == spelling) {
-                    *index_out = 1;
-                    return overbind;  // don't update mondex, useless
-                }
-                goto skip_hit_patch;
-            }
-
-            if (
-                IS_SET_WORD(ARR_SINGLE(specifier))
-                and REB_SET_WORD != CELL_KIND(VAL_UNESCAPED(any_word))
-            ){
-                goto skip_hit_patch;
-            }
-
-          blockscope {
-            REBCTX *overload = CTX(overbind);
-
-            // Length at time of virtual bind is cached by index.  This avoids
-            // allowing untrustworthy cache states.
-            //
-            REBLEN cached_len = VAL_WORD_INDEX(ARR_SINGLE(specifier));
-
-            REBLEN index = mondex;
-            for (; index <= cached_len; index += MONDEX_MOD) {
-                if (spelling != KEY_SYMBOL(CTX_KEY(overload, mondex)))
-                    continue;
-
-                *index_out = mondex;
-                return CTX_VARLIST(overload);
-            }
-          }
-
-          skip_hit_patch:
-            specifier = NextPatch(specifier);
-        } while (
-            specifier and not IS_VARLIST(specifier)
-        );
-
-        panic (any_word);  // bad cache in value
-      }
-    }
-
-  virtual_miss: {
-    //
-    // Bad news: We have a virtual bind in effect, but not the virtual
-    // bind that is cached in the word.  We have no way of knowing if
+    // There was caching to assist with this previously...but it was complex
+    // and needs to be rethought.  Hence we have no way of knowing if
     // this word is overridden without doing a linear search.  Do it
     // and then save the hit or miss information in the word for next use.
     //
-    INIT_VAL_WORD_CACHE(any_word, specifier);  // we're updating it
-
     const REBSTR *spelling = VAL_WORD_SYMBOL(VAL_UNESCAPED(any_word));
 
     // !!! Virtual binding could use the bind table as a kind of next
@@ -621,7 +503,7 @@ inline static option(REBARR*) Get_Word_Container(
         if (not IS_VARLIST(overbind)) {  // a patch-formed LET overload
             if (LINK(PatchSymbol, overbind) == spelling) {
                 *index_out = 1;
-                return overbind;  // don't update mondex, useless
+                return overbind;
             }
             goto skip_miss_patch;
         }
@@ -633,7 +515,7 @@ inline static option(REBARR*) Get_Word_Container(
             goto skip_miss_patch;
         }
 
-        blockscope {
+      blockscope {
         REBCTX *overload = CTX(overbind);
 
         // Length at time of virtual bind is cached by index.  This avoids
@@ -664,8 +546,8 @@ inline static option(REBARR*) Get_Word_Container(
             *index_out = index;
             return CTX_VARLIST(overload);
         }
-        }
-        skip_miss_patch:
+      }
+      skip_miss_patch:
         specifier = NextPatch(specifier);
     } while (
         specifier and not IS_VARLIST(specifier)
@@ -939,7 +821,6 @@ inline static REBVAL *Derelativize(
         // We don't want to do this with REB_QUOTED since the cache is shared.
         //
         if (KIND3Q_BYTE_UNCHECKED(v) != REB_QUOTED) {
-            INIT_VAL_WORD_CACHE(out, UNSPECIFIED);
             INIT_VAL_WORD_VIRTUAL_MONDEX(out, MONDEX_MOD);  // necessary?
         }
         return cast(REBVAL*, out);

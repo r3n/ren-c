@@ -594,7 +594,7 @@ void For_Each_Unspecialized_Param(
 
     if (partials) {
         assert(ARR_LEN(unwrap(partials)) > 0);  // no partials means no array
- 
+
         // the highest priority are at *top* of stack, so we have to go
         // "downward" in the push order...e.g. the reverse of the array.
 
@@ -707,7 +707,7 @@ const REBPAR *First_Unspecialized_Param(const REBKEY ** key, REBACT *act)
     For_Each_Unspecialized_Param(act, &First_Param_Hook, &s);
 
     if (key)
-        *key = s.key; 
+        *key = s.key;
     return s.param;  // may be nullptr
 }
 

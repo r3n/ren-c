@@ -652,12 +652,9 @@ bool Eval_Path_Throws_Core(
             assert(IS_WORD(bottom) and not IS_WORD_BOUND(bottom));
             assert(IS_WORD(top) and not IS_WORD_BOUND(top));
 
-            // Optimize the swap here so that it just swaps the spellings of
-            // the words (unbound words keep their spelling in the binding).
-            //
-            const REBSTR *spelling = STR(BINDING(bottom));
-            mutable_BINDING(bottom) = STR(BINDING(top));
-            mutable_BINDING(top) = spelling;
+            Move_Cell(f_spare, bottom);
+            Move_Cell(bottom, top);
+            Move_Cell(top, f_spare);
 
             top--;
             bottom++;

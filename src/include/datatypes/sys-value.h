@@ -542,7 +542,7 @@ inline static RELVAL *Prep_Cell_Core(RELVAL *c) {
 inline static bool IS_RELATIVE(const RELVAL *v) {
     if (not Is_Bindable(v))
         return false;  // may use extra for non-GC-marked uintptr_t-size data
-        
+
     REBSER *binding = BINDING(v);
     if (not binding)
         return false;  // INTEGER! and other types are inherently "specific"
@@ -639,11 +639,13 @@ inline static REBVAL *SPECIFIC(const_if_c RELVAL *v) {
 #define UNSPECIFIED nullptr
 
 
-#define VAL_WORD_CACHE(v) \
-    cast(REBSPC*, VAL_NODE1(v))
+inline static void INIT_VAL_WORD_SYMBOL(RELVAL *v, const REBSYM *symbol)
+  { INIT_VAL_NODE1(v, symbol); }
 
-inline static void INIT_VAL_WORD_CACHE(const RELVAL *v, REBSPC *specifier)
-  { INIT_VAL_NODE1(m_cast(RELVAL*, v), specifier); }
+inline static const REBSYM *VAL_WORD_SYMBOL(REBCEL(const*) cell) {
+    assert(ANY_WORD_KIND(CELL_HEART(cell)));
+    return SYM(VAL_NODE1(cell));
+}
 
 #define MONDEX_MOD 4095  // modulus for the cached index modulus ("mondex")
 #define VAL_WORD_INDEXES_U32(v)         PAYLOAD(Any, (v)).second.u32
