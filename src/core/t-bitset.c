@@ -248,6 +248,7 @@ void Set_Bit(REBBIN *bset, REBLEN n, bool set)
         if (!set) return; // no need to expand
         Expand_Series(bset, tail, (i - tail) + 1);
         memset(BIN_AT(bset, tail), 0, (i - tail) + 1);
+        TERM_SERIES_IF_NECESSARY(bset);
     }
 
     bit = 1 << (7 - ((n) & 7));

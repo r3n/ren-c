@@ -131,6 +131,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_BITSET: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
         REBSER *s = SER(VAL_NODE1(v));
+        Assert_Series_Term_Core(s);
         if (GET_SERIES_FLAG(s, INACCESSIBLE))
             assert(Is_Marked(s));  // TBD: clear out reference and GC `s`?
         else
