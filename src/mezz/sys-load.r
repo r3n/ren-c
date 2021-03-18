@@ -40,16 +40,6 @@ REBOL [
 ; init them.
 
 
-bind-lib: func [
-    {Bind only the top words of the block to the lib context (mezzanine load)}
-    block [block!]
-][
-    bind/only/set block lib  ; Note: not BIND/NEW !
-    bind block lib
-    block
-]
-
-
 export-words: func [
     {Exports words of a context into both the system lib and user contexts.}
 

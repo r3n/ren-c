@@ -55,6 +55,7 @@ PVAR const REBSYM *PG_Bar_Canon;  // fast canon value for testing for `|`
 
 PVAR REBVAL *Lib_Context;
 PVAR REBVAL *Sys_Context;
+PVAR REBVAL *User_Context;
 
 //-- Various char tables:
 PVAR REBYTE *White_Chars;
