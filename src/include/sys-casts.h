@@ -79,6 +79,10 @@
 
 #else
 
+  #if !defined(CPLUSPLUS_11)
+    #error "DEBUG_CHECK_CASTS requires C++11 (or later)"
+  #endif
+
     // The C++ variants are more heavyweight, and beyond the scope of writing
     // a long explanation here.  Suffice to say that these are templates
     // which enforce that a const base-class pointer input will result in

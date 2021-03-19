@@ -70,7 +70,7 @@ void Bind_Values_Inner_Loop(
                 // We're overwriting any previous binding, which may have
                 // been relative.
 
-                INIT_VAL_WORD_BINDING(v, CTX_VARLIST(context));
+                INIT_VAL_WORD_BINDING(v, context);
                 INIT_VAL_WORD_PRIMARY_INDEX(v, n);
             }
             else if (type_bit & add_midstream_types) {
@@ -186,10 +186,7 @@ void Unbind_Values_Core(
 
         if (
             ANY_WORD_KIND(heart)
-            and (
-                not context
-                or VAL_WORD_BINDING(v) == CTX_VARLIST(unwrap(context))
-            )
+            and (not context or BINDING(v) == unwrap(context))
         ){
             Unbind_Any_Word(v);
         }
@@ -217,7 +214,7 @@ REBLEN Try_Bind_Word(const RELVAL *context, REBVAL *word)
         strict
     );
     if (n != 0) {
-        INIT_VAL_WORD_BINDING(word, CTX_VARLIST(VAL_CONTEXT(context)));
+        INIT_VAL_WORD_BINDING(word, VAL_CONTEXT(context));
         INIT_VAL_WORD_PRIMARY_INDEX(word, n);  // ^-- may have been relative
     }
     return n;
@@ -672,7 +669,7 @@ static void Clonify_And_Bind_Relative(
             // Word' symbol is in frame.  Relatively bind it.  Note that the
             // action bound to can be "incomplete" (LETs still gathering)
             //
-            INIT_VAL_WORD_BINDING(v, ACT_DETAILS(relative));
+            INIT_VAL_WORD_BINDING(v, relative);
             INIT_VAL_WORD_PRIMARY_INDEX(v, n);
         }
     }
@@ -798,8 +795,8 @@ void Rebind_Values_Deep(
             RELVAL *sub_at = VAL_ARRAY_AT_MUTABLE_HACK(&sub_tail, v);
             Rebind_Values_Deep(sub_at, sub_tail, from, to, binder);
         }
-        else if (ANY_WORD(v) and VAL_WORD_BINDING(v) == CTX_VARLIST(from)) {
-            INIT_VAL_WORD_BINDING(v, CTX_VARLIST(to));
+        else if (ANY_WORD(v) and BINDING(v) == from) {
+            INIT_VAL_WORD_BINDING(v, to);
 
             if (binder) {
                 INIT_VAL_WORD_PRIMARY_INDEX(

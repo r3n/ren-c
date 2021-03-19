@@ -126,14 +126,6 @@ typedef struct Reb_Pool_Unit REBPLU;
 struct Reb_Series;
 typedef struct Reb_Series REBSER;
 
-struct Reb_Context;
-typedef struct Reb_Context REBCTX;
-
-struct Reb_Action;
-typedef struct Reb_Action REBACT;
-
-struct Reb_Map;
-typedef struct Reb_Map REBMAP;
 
 struct Reb_Bookmark {
     REBLEN index;

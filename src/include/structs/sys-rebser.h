@@ -749,7 +749,7 @@ union Reb_Series_Info {
 
 
 #ifdef CPLUSPLUS_11
-    struct Reb_Series_Base
+    struct Reb_Series : public Reb_Node
 #else
     struct Reb_Series
 #endif
@@ -830,8 +830,6 @@ union Reb_Series_Info {
 // https://stackoverflow.com/q/2159390/
 //
 #ifdef __cplusplus
-    struct Reb_Series : public Reb_Node, public Reb_Series_Base {};
-
     struct Reb_Binary : public Reb_Series {};
     typedef struct Reb_Binary REBBIN;
 
@@ -844,11 +842,22 @@ union Reb_Series_Info {
     struct Reb_Bookmark_List : public Reb_Series {};
     typedef struct Reb_Bookmark_List REBBMK;  // list of UTF-8 index=>offsets
 
+    struct Reb_Action : public Reb_Series {};
+    typedef struct Reb_Action REBACT;  // the "details" array is the identity
+
+    struct Reb_Context : public Reb_Series {};
+    typedef struct Reb_Context REBCTX;  // the "varlist" is the identity
+
+    struct Reb_Map : public Reb_Series {};
+    typedef struct Reb_Map REBMAP;  // the "pairlist" is the identity
 #else
     typedef struct Reb_Series REBBIN;
     typedef struct Reb_Series REBSTR;
     typedef struct Reb_Series REBSYM;
     typedef struct Reb_Series REBBMK;
+    typedef struct Reb_Series REBACT;
+    typedef struct Reb_Series REBCTX;
+    typedef struct Reb_Series REBMAP;
 #endif
 
 

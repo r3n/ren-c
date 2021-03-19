@@ -101,7 +101,7 @@ inline static bool Is_Overriding_Context(REBCTX *stored, REBCTX *override)
     // For now, deriving from FRAME! is just disabled.
     //
     // Use a faster check for REB_FRAME than CTX_TYPE() == REB_FRAME, since
-    // we were extracting keysources anyway. 
+    // we were extracting keysources anyway.
     //
     // !!! Note that in virtual binding, something like a FOR-EACH would
     // wind up overriding words bound to FRAME!s, even though not "derived".
@@ -722,7 +722,7 @@ inline static option(REBARR*) Get_Word_Container(
             REBSER *f_binding = SPC_BINDING(specifier); // can't fail()
             if (f_binding and Is_Overriding_Context(c, CTX(f_binding))) {
                 //
-                // The specifier binding overrides--because what's happening 
+                // The specifier binding overrides--because what's happening
                 // is that this cell came from a METHOD's body, where the
                 // particular ACTION! value cell triggering it held a binding
                 // of a more derived version of the object to which the

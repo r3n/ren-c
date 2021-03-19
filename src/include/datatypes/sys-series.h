@@ -927,13 +927,13 @@ inline static const RELVAL *ENSURE_MUTABLE(const RELVAL *v) {
 #define PUSH_GC_GUARD(node) \
     Push_Guard_Node(node)
 
-inline static void DROP_GC_GUARD(const void *p) {
+inline static void DROP_GC_GUARD(const REBNOD *node) {
   #if defined(NDEBUG)
-    UNUSED(p);
+    UNUSED(node);
   #else
-    if (NOD(p) != *SER_LAST(REBNOD*, GC_Guarded)) {
+    if (node != *SER_LAST(const REBNOD*, GC_Guarded)) {
         printf("DROP_GC_GUARD() pointer that wasn't last PUSH_GC_GUARD()\n");
-        panic (p);  // should show current call stack AND where node allocated
+        panic (node);
     }
   #endif
 
@@ -981,7 +981,7 @@ inline static const REBSER *VAL_SERIES(REBCEL(const*) v) {
     //
     // uses "evil macro" variants because the cost of this basic operation
     // becomes prohibitive when the functions aren't inlined and checks wind
-    // up getting done 
+    // up getting done
     //
     inline static REBIDX VAL_INDEX_UNBOUNDED(REBCEL(const*) v) {
         enum Reb_Kind k = CELL_HEART(v);  // only const access if heart!

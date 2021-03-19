@@ -501,7 +501,7 @@ REBNOD *Try_Find_Containing_Node_Debug(const void *p)
             if (nodebyte & NODE_BYTEMASK_0x01_CELL) { // a "pairing"
                 REBVAL *pairing = VAL(cast(void*, unit));
                 if (p >= cast(void*, pairing) and p < cast(void*, pairing + 1))
-                    return NOD(pairing);  // REBSER is actually REBVAL[2]
+                    return pairing;  // REBSER is actually REBVAL[2]
                 continue;
             }
 

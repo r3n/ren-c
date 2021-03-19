@@ -89,15 +89,5 @@
         | SERIES_FLAG_LINK_NODE_NEEDS_MARK  /* ancestor */ )
 
 
-#ifdef CPLUSPLUS_11
-    struct Reb_Context : public Reb_Node {
-        struct Reb_Series_Base varlist;  // keylist in ->link.keysource
-    };
-#else
-    struct Reb_Context {
-        struct Reb_Series varlist;
-    };
-#endif
-
-#define CTX_VARLIST(c) \
-    cast(REBARR*, &(c)->varlist)
+inline static REBARR *CTX_VARLIST(REBCTX *ctx)
+  { return x_cast(REBARR*, ctx); }  // ARR() has debug cost, not defined yet

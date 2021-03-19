@@ -188,7 +188,7 @@ REBVAL *Append_Context(
         assert(not symbol);
 
         REBLEN len = CTX_LEN(context); // length we just bumped
-        INIT_VAL_WORD_BINDING(unwrap(any_word), CTX_VARLIST(context));
+        INIT_VAL_WORD_BINDING(unwrap(any_word), context);
         INIT_VAL_WORD_PRIMARY_INDEX(unwrap(any_word), len);
     }
 
@@ -367,7 +367,7 @@ REBSER *Collect_Keylist_Managed(
             num_collected,  // no terminator
             SERIES_MASK_KEYLIST | NODE_FLAG_MANAGED
         );
-        
+
         STKVAL(*) word = DS_AT(cl->dsp_orig) + 1;
         REBKEY* key = SER_HEAD(REBKEY, keylist);
         for (; word != DS_TOP + 1; ++word, ++key)
