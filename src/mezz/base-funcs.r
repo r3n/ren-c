@@ -1147,14 +1147,14 @@ read-lines: func [
     let pos
     let rule: compose/deep/only either delimiter [
         either keep
-        [ [thru (delimiter) pos:] ]
-        [ [to (delimiter) remove (delimiter) pos:] ]
+        [ [thru (delimiter) pos: here] ]
+        [ [to (delimiter) remove (delimiter) pos: here] ]
     ][
         [
             to crlf any [
                 ["^M" and not "^/"]
                 to crlf
-            ] (if not keep ['remove]) ["^/" | "^M^/"] pos:
+            ] (if not keep ['remove]) ["^/" | "^M^/"] pos: here
         ]
     ]
 
@@ -1166,7 +1166,7 @@ read-lines: func [
         let data: _
         let eof: false
         cycle [
-            let pos: _
+            pos: _
             parse buffer (rule)
             if pos [break]
             ((if same? src system/ports/input
