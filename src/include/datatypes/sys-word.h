@@ -58,7 +58,7 @@
 // a union and then read from another.
 //
 #define LINK_KeySource_TYPE         REBNOD*
-#define LINK_KeySource_CAST         NOD
+#define LINK_KeySource_CAST         // none, just use node (NOD() complains)
 #define HAS_LINK_KeySource          FLAVOR_VARLIST
 
 inline static void INIT_LINK_KEYSOURCE(REBARR *varlist, REBNOD *keysource) {

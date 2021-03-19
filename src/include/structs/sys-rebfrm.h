@@ -408,7 +408,13 @@ STATIC_ASSERT(31 < 32);  // otherwise EVAL_FLAG_XXX too high
 // If modifying the structure, be sensitive to this issue--and that the
 // layout of this structure is mirrored in Ren-Cpp.
 //
-struct Reb_Frame {
+
+#ifdef __cplusplus
+    struct Reb_Frame : public Reb_Node
+#else
+    struct Reb_Frame
+#endif
+{
     //
     // These are EVAL_FLAG_XXX or'd together--see their documentation above.
     // A Reb_Header is used so that it can implicitly terminate `cell`, if

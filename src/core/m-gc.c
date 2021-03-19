@@ -1039,7 +1039,7 @@ REBLEN Fill_Sweeplist(REBSER *sweeplist)
                     pairing->header.bits &= ~NODE_FLAG_MARKED;
                 else {
                     EXPAND_SERIES_TAIL(sweeplist, 1);
-                    *SER_AT(REBNOD*, sweeplist, count) = NOD(pairing);
+                    *SER_AT(REBNOD*, sweeplist, count) = pairing;
                     ++count;
                 }
                 break; }

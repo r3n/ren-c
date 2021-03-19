@@ -104,18 +104,13 @@
         >::type
     >
     inline static N *NOD(T *p) {
-        constexpr bool derived =
-            std::is_same<T0, REBNOD>::value
-            or std::is_base_of<REBRAW, T0>::value
-            or std::is_same<T0, REBFRM>::value;
-
         constexpr bool base =
             std::is_same<T0, void>::value
             or std::is_same<T0, REBYTE>::value;
 
         static_assert(
-            derived or base,
-            "NOD() works on void* or REBFRM*"
+            base,
+            "NOD() works on void* or REBYTE*"
         );
 
         if (not p)

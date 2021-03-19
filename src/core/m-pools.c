@@ -617,7 +617,7 @@ void Unmanage_Pairing(REBVAL *paired) {
 //
 void Free_Pairing(REBVAL *paired) {
     assert(NOT_CELL_FLAG(paired, MANAGED));
-    Free_Node(SER_POOL, NOD(paired));
+    Free_Node(SER_POOL, paired);
 
   #if defined(DEBUG_COUNT_TICKS)
     //

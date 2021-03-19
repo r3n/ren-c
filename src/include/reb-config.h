@@ -340,7 +340,7 @@ Special internal defines used by RT, not Host-Kit developers:
     // you can change this in the compiler settings.  We should either sync
     // with that setting or just skip it, and assume that we do enough
     // checking on the 64-bit builds.
-    // 
+    //
     // https://stackoverflow.com/q/14893802/
     //
     // !!! We are overpaying for the ALIGN_SIZE if it's not needed for double,

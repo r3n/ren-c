@@ -121,7 +121,7 @@ inline static const char* FRM_FILE_UTF8(REBFRM *f) {
     // !!! Note: Too early in boot at the moment to use Canon(__ANONYMOUS__).
     //
     const REBSTR *str = FRM_FILE(f);
-    return str ? STR_UTF8(str) : "(anonymous)"; 
+    return str ? STR_UTF8(str) : "(anonymous)";
 }
 
 inline static int FRM_LINE(REBFRM *f) {
@@ -279,7 +279,7 @@ inline static bool Did_Reuse_Varlist_Of_Unknown_Size(
     f->varlist = TG_Reuse;
     TG_Reuse = LINK(ReuseNext, TG_Reuse);
     f->rootvar = cast(REBVAL*, f->varlist->content.dynamic.data);
-    mutable_LINK(KeySource, f->varlist) = NOD(f);
+    mutable_LINK(KeySource, f->varlist) = f;
     assert(NOT_SERIES_FLAG(f->varlist, MANAGED));
     assert(SER_FLAVOR(f->varlist) == FLAVOR_VARLIST);
     return true;
@@ -429,7 +429,7 @@ inline static void Push_Frame(
     assert(f->varlist == nullptr);  // Prep_Frame_Core() set to nullptr
 
     assert(IS_POINTER_TRASH_DEBUG(f->alloc_value_list));
-    f->alloc_value_list = NOD(f);  // doubly link list, terminates in `f`
+    f->alloc_value_list = f;  // doubly link list, terminates in `f`
 }
 
 
@@ -447,7 +447,7 @@ inline static void Abort_Frame(REBFRM *f) {
     // If a frame is aborted, then we allow its API handles to leak.
     //
     REBNOD *n = f->alloc_value_list;
-    while (n != NOD(f)) {
+    while (n != f) {
         REBARR *a = ARR(n);
         n = LINK(ApiNext, a);
         TRASH_CELL_IF_DEBUG(ARR_SINGLE(a));
@@ -457,7 +457,7 @@ inline static void Abort_Frame(REBFRM *f) {
 
     // Abort_Frame() handles any work that wouldn't be done done naturally by
     // feeding a frame to its natural end.
-    // 
+    //
     if (IS_END(f->feed->value))
         goto pop;
 
@@ -481,7 +481,7 @@ inline static void Drop_Frame_Core(REBFRM *f) {
     assert(TG_Top_Frame == f);
 
     REBNOD *n = f->alloc_value_list;
-    while (n != NOD(f)) {
+    while (n != f) {
         REBARR *a = ARR(n);
       #if defined(DEBUG_STDIO_OK)
         printf("API handle was allocated but not freed, panic'ing leak\n");
@@ -588,7 +588,7 @@ inline static void Begin_Action_Core(
 
     // Cache the feed lookahead state so it can be restored in the event that
     // the evaluation turns out to be invisible.
-    // 
+    //
     STATIC_ASSERT(FEED_FLAG_NO_LOOKAHEAD == EVAL_FLAG_CACHE_NO_LOOKAHEAD);
     assert(NOT_EVAL_FLAG(f, CACHE_NO_LOOKAHEAD));
     f->flags.bits |= f->feed->flags.bits & FEED_FLAG_NO_LOOKAHEAD;
@@ -660,7 +660,7 @@ inline static void Push_Action(
             goto sufficient_allocation;
       #endif
 
-            
+
         // It wasn't big enough for `num_args`, so we free the data.
         // But at least we can reuse the series node.
 
@@ -676,7 +676,7 @@ inline static void Push_Action(
                 | SERIES_FLAG_FIXED_SIZE // FRAME!s don't expand ATM
         );
         SER_INFO(s) = SERIES_INFO_MASK_NONE;
-        INIT_LINK_KEYSOURCE(ARR(s), NOD(f)); // maps varlist back to f
+        INIT_LINK_KEYSOURCE(ARR(s), f);  // maps varlist back to f
         mutable_MISC(VarlistMeta, s) = nullptr;
         mutable_BONUS(Patches, s) = nullptr;
         f->varlist = ARR(s);
@@ -734,7 +734,7 @@ inline static void Push_Action(
     // fulfillment) or the head of the "exemplar".
     //
     // !!! It is planned that exemplars will be unified with paramlist, making
-    // the context keys something different entirely.  
+    // the context keys something different entirely.
     //
     REBARR *partials = try_unwrap(ACT_PARTIALS(act));
     if (partials) {
@@ -772,7 +772,7 @@ inline static void Drop_Action(REBFRM *f) {
 
     assert(
         GET_SERIES_FLAG(f->varlist, INACCESSIBLE)
-        or LINK(KeySource, f->varlist) == NOD(f)
+        or LINK(KeySource, f->varlist) == f
     );
 
     if (GET_SERIES_FLAG(f->varlist, INACCESSIBLE)) {
@@ -821,11 +821,11 @@ inline static void Drop_Action(REBFRM *f) {
         f->varlist = CTX_VARLIST(
             Steal_Context_Vars(
                 CTX(f->varlist),
-                NOD(f->original) // degrade keysource from f
+                f->original  // degrade keysource from f
             )
         );
         assert(NOT_SERIES_FLAG(f->varlist, MANAGED));
-        INIT_LINK_KEYSOURCE(f->varlist, NOD(f));
+        INIT_LINK_KEYSOURCE(f->varlist, f);
       #endif
 
         INIT_LINK_KEYSOURCE(f->varlist, ACT_KEYLIST(f->original));
@@ -833,7 +833,7 @@ inline static void Drop_Action(REBFRM *f) {
     }
     else {
         // We can reuse the varlist and its data allocation, which may be
-        // big enough for ensuing calls.  
+        // big enough for ensuing calls.
         //
         // But no series bits we didn't set should be set...and right now,
         // only DETAILS_FLAG_IS_NATIVE sets HOLD.  Clear that.
