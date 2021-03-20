@@ -60,7 +60,7 @@ make-banner: func [
             [
                 set a: text! (s: format ["**  " 68 "**"] a)
               | '= set a: [text! | word! | set-word!] [
-                        b:
+                        b: here
                           path! (b: get b/1)
                         | word! (b: get b/1)
                         | block! (b: spaced b/1)
