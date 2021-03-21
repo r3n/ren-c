@@ -116,9 +116,7 @@
 
     inline static void Javascript_Trace_Helper_Debug(const char *buf) {
         if (PG_JS_Trace) {
-            printf("@%ld: ", cast(long, TG_Tick));  // tick count prefix
-            printf("%.s", buf);
-            printf("\n");  // console.log() won't show up until newline
+            printf("@%ld: %s\n", cast(long, TG_Tick), buf);  // prefix ticks
             fflush(stdout);  // just to be safe
         }
     }
@@ -127,6 +125,10 @@
     // anyway, but JS extension at one time did use threads in a way that
     // didn't run the interpreter in parallel but ran some C code in parallel
     // that might have called trace.  That feature was removed, though.)
+    //
+    // Note: This is done as a statement and not a `do { } while (0)` macro
+    // on purpose!  It's so that EM_ASM_INT() can use it in an expression
+    // returning a value.
     //
     #define JS_TRACE_BUF_SIZE 2048
     static char js_trace_buf_debug[JS_TRACE_BUF_SIZE];
