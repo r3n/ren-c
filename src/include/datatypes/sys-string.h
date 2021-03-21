@@ -437,7 +437,7 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
     assert(not bookmark or SER_USED(bookmark) == 1);  // only one
 
   blockscope {
-    REBLEN booked = BMK_INDEX(bookmark);
+    REBLEN booked = bookmark ? BMK_INDEX(bookmark) : 0;
 
     // `at` is always positive.  `booked - at` may be negative, but if it
     // is positive and bigger than `at`, faster to seek from head.
@@ -458,7 +458,11 @@ inline static REBCHR(*) STR_AT(const_if_c REBSTR *s, REBLEN at) {
     }
 
     index = booked;
-    cp = cast(REBCHR(*), SER_DATA(s) + BMK_OFFSET(bookmark)); }
+    if (bookmark)
+        cp = cast(REBCHR(*), SER_DATA(s) + BMK_OFFSET(bookmark));
+    else
+        cp = cast(REBCHR(*), SER_DATA(s));
+  }
 
     if (index > at) {
       #ifdef DEBUG_TRACE_BOOKMARKS
