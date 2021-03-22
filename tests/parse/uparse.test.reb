@@ -200,18 +200,8 @@
 )]
 
 ; EMIT is a new idea to try and make it easier to use PARSE rules to bubble
-; up objects.  It works with a GATHER and SET-WORD! to capture into a
-; variable, but even goes so far as to make it so the overall parse result
-; can be changed to an object if you use it.
-;
-; !!! That might be a lame idea, revisit.
+; up objects.  It works with a GATHER and SET-WORD!
 [(
-    obj: uparse [1 <foo>] [emit i: integer!, emit t: tag!]
-    did all [
-        obj/i = 1
-        obj/t = <foo>
-    ]
-)(
     uparse [* * * 1 <foo> * * *] [
         some '*
         g: gather [
@@ -236,6 +226,41 @@
     did all [
         result.x = [<a> <a> <a>]
         result.y = [<b> <b> <b>]
+    ]
+)]
+
+; If you EMIT with no GATHER, the current behavior is to make the UPARSE
+; itself emit variable definitions, much like LET.  Having this be a feature
+; of EMIT instead of a new keyword might not be the best idea, but it's
+; being tried out for now.
+[(
+    i: #i
+    t: #t
+    if true [
+        uparse [1 <foo>] [emit i: integer!, emit t: tag!]
+        assert [i = 1, t = <foo>]
+    ]
+    did all [
+        i = #i
+        t = #t
+    ]
+)(
+    base: #base
+    extension: #extension
+    if true [
+       let filename: "demo.txt"
+       uparse filename [
+            emit base: between here "."
+            emit extension: thru end
+        ] else [
+            fail "Not a file with an extension"
+        ]
+        assert [base = "demo"]
+        assert [extension = "txt"]
+    ]
+    did all [
+        base = #base
+        extension = #extension
     ]
 )]
 

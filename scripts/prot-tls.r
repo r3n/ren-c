@@ -214,9 +214,8 @@ emit: func [
     ]
 
     while [code] [
-        if set-word? code/1 [
-            let rebound: add-let-binding (binding of 'return) code/1
-            set rebound tail ctx/msg  ; save position
+        if set-word? code/1 [  ; set the word to the binary at current position
+            add-let-binding (binding of 'return) code/1 (tail ctx/msg)
             code: my next
         ]
         else [
@@ -584,7 +583,7 @@ client-hello: func [
             to-2bin (length of server-name-bin)  ; server name length
             server-name-bin             ; server name
         ]
-        change extension_length to-2bin (length of list_length) 
+        change extension_length to-2bin (length of list_length)
         change list_length to-2bin (length of list_item_1)
     ]
 

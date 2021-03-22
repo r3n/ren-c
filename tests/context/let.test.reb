@@ -112,8 +112,8 @@
 (
     maker: func [name] [
         frame: binding of 'return
-        set (add-let-binding frame to word! unspaced [name 1]) <one>
-        set (add-let-binding frame to word! unspaced [name 2]) <two>
+        add-let-binding frame (to word! unspaced [name 1]) <one>
+        add-let-binding frame (to word! unspaced [name 2]) <two>
     ]
     maker "demo"
     did all [

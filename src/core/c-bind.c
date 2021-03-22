@@ -521,6 +521,7 @@ REBNATIVE(let)
 //      return: [any-word!]
 //      frame [frame!]
 //      word [any-word!]
+//      value [<opt> any-value!]
 //  ]
 //
 REBNATIVE(add_let_binding) {
@@ -531,6 +532,8 @@ REBNATIVE(add_let_binding) {
     if (f_specifier)
         SET_SERIES_FLAG(f_specifier, MANAGED);
     REBSPC *patch = Make_Let_Patch(VAL_WORD_SYMBOL(ARG(word)), f_specifier);
+
+    Move_Cell(ARR_SINGLE(patch), ARG(value));
 
     mutable_BINDING(FEED_SINGLE(f->feed)) = patch;
 

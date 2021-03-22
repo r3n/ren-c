@@ -1366,31 +1366,30 @@ uparse: func [
     f/value: rules
     let pos: do f
 
+    ; If there were EMIT things gathered, but no actual GATHER then just
+    ; assume those should become locals in the stream of execution as LET
+    ; bindings.  Because we want you to be able to emit NULL, the values
+    ; are actually quoted...so we unquote them here.
+    ;
+    all [pos, gathering] then [
+        for-each [name q-value] gathering [
+            add-let-binding (binding of 'return) name (unquote q-value)
+        ]
+    ]
+
     ; If /PROGRESS was requested as an output, then they don't care whether
     ; the tail was reached or not.  Main return is the input unless there
     ; was an actual failure.
     ;
     if progress [
         set progress pos
-        return if pos [
-            either gathering [
-                make object! gathering
-            ][
-                series
-            ]
-        ]
+        return if pos [series]
     ]
 
     ; Note: SERIES may change during the process of the PARSE.  This means
     ; we don't want to precalculate TAIL SERIES, since the tail may change.
     ;
-    return if pos = tail series [
-        either gathering [
-            make object! gathering
-        ][
-            series
-        ]
-    ]
+    return if pos = tail series [series]
 ]
 
 
