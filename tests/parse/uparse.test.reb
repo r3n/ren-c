@@ -418,3 +418,11 @@
         c = "Here be Cs"
     ]
 )]
+
+; TO and THRU are now value bearing, e.g. `x: thru "a"` acts as what would
+; have historicaly been `copy x thru "a"`.
+[(
+    "aaab" = uparse "aaabbb" [return thru "b"]
+)(
+    "aaa" = uparse "aaabbb" [return to "b"]
+)]

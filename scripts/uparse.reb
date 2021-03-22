@@ -319,10 +319,15 @@ default-combinators: make map! reduce [
 
     'to combinator [
         {Match up TO a certain rule (result position before succeeding rule)}
+        result: [any-series!]
         parser [action!]
     ][
+        let start: input
         cycle [
             if parser input [  ; could be `to end`, check TAIL? *after*
+                if result [
+                    set result copy/part start input
+                ]
                 return input
             ]
             if tail? input [
@@ -334,11 +339,16 @@ default-combinators: make map! reduce [
 
     'thru combinator [
         {Match up THRU a certain rule (result position after succeeding rule)}
+        result: [any-series!]
         parser [action!]
     ][
+        let start: input
         let pos
         cycle [
             if pos: parser input [  ; could be `thru end`, check TAIL? *after*
+                if result [
+                    set result copy/part start pos
+                ]
                 return pos
             ]
             if tail? input [
