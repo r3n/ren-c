@@ -168,7 +168,7 @@ static void Process_Text_Helper(
     const char *label
 ){
     REBVAL *text = rebValue(
-        "opt ensure [blank! text!] select", config, "as word!", rebT(label),
+        "opt ensure [blank! text!] select", config, "as word!", rebT(label)
     );
 
     if (text) {
@@ -190,7 +190,7 @@ static void Process_Block_Helper(
     const char *label
 ){
     REBVAL *block = rebValue(
-        "ensure block! select", config, "as word!", rebT(label),
+        "ensure block! select", config, "as word!", rebT(label)
     );
 
     const RELVAL *tail;
@@ -354,7 +354,7 @@ REBNATIVE(make_native)
 
         intptr_t heapaddr = cast(intptr_t, details);
         REBVAL *linkname = rebValue(
-            "unspaced [{N_} as text! to-hex", rebI(heapaddr), "]",
+            "unspaced [{N_} as text! to-hex", rebI(heapaddr), "]"
         );
 
         Copy_Cell(ARR_AT(details, IDX_TCC_NATIVE_LINKNAME), linkname);
@@ -455,7 +455,7 @@ REBNATIVE(compile_p)
             "'OBJ [", rebI(TCC_OUTPUT_OBJ), "]",
             "'PREPROCESS [", rebI(TCC_OUTPUT_PREPROCESS), "]",
             "-1",
-        "]",
+        "]"
     );
 
     if (tcc_set_output_type(state, output_type) < 0)
