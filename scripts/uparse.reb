@@ -1250,6 +1250,13 @@ combinatorize: func [
 ]
 
 
+identity-combinator: combinator [
+    {Combinator used by NULL, e.g. with :(if false [...]) rule patterns}
+][
+    return input
+]
+
+
 parsify: func [
     {Transform one "step's worth" of rules into a parser combinator action}
 
@@ -1283,7 +1290,7 @@ parsify: func [
     case [
         null? :r [
             set advanced rules
-            return :identity
+            return specialize :identity-combinator [state: state]
         ]
 
         word? :r [
