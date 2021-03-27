@@ -916,7 +916,7 @@ static REBIXO To_Thru_Block_Rule(
                 rule = Get_Parse_Value(cell, rule, P_RULE_SPECIFIER);
 
             // Try to match it:
-            if (ANY_ARRAY_OR_PATH_KIND(P_TYPE)) {
+            if (ANY_ARRAY_OR_SEQUENCE_KIND(P_TYPE)) {
                 if (ANY_ARRAY(rule))
                     fail (Error_Parse_Rule());
 

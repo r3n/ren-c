@@ -619,7 +619,7 @@ static void Clonify_And_Bind_Relative(
             // See notes in Clonify()...need to copy immutable paths so that
             // binding pointers can be changed in the "immutable" copy.
             //
-            if (ANY_PATH_KIND(kind))
+            if (ANY_SEQUENCE_KIND(kind))
                 Freeze_Array_Shallow(ARR(series));
 
             would_need_deep = true;
@@ -676,7 +676,7 @@ static void Clonify_And_Bind_Relative(
             INIT_VAL_WORD_PRIMARY_INDEX(v, n);
         }
     }
-    else if (ANY_ARRAY_OR_PATH_KIND(heart)) {
+    else if (ANY_ARRAY_KIND(heart)) {
 
         // !!! Technically speaking it is not necessary for an array to
         // be marked relative if it doesn't contain any relative words
@@ -736,7 +736,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
         index = tail;
 
     REBFLGS flags = ARRAY_MASK_HAS_FILE_LINE | NODE_FLAG_MANAGED;
-    REBU64 deep_types = (TS_SERIES | TS_PATH) & ~TS_NOT_COPIED;
+    REBU64 deep_types = (TS_SERIES | TS_SEQUENCE) & ~TS_NOT_COPIED;
 
     REBLEN len = tail - index;
 
@@ -793,7 +793,7 @@ void Rebind_Values_Deep(
 ) {
     RELVAL *v = head;
     for (; v != tail; ++v) {
-        if (ANY_ARRAY_OR_PATH(v)) {
+        if (ANY_ARRAY_OR_SEQUENCE(v)) {
             const RELVAL *sub_tail;
             RELVAL *sub_at = VAL_ARRAY_AT_MUTABLE_HACK(&sub_tail, v);
             Rebind_Values_Deep(sub_at, sub_tail, from, to, binder);

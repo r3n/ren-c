@@ -198,7 +198,7 @@ void Clonify(
             // they are copied from...which requires new cells.  (Also any
             // nested blocks or groups need to be copied deeply.)
             //
-            if (ANY_PATH_KIND(kind))
+            if (ANY_SEQUENCE_KIND(kind))
                 Freeze_Array_Shallow(ARR(series));
 
             INIT_VAL_NODE1(v, series);
@@ -335,7 +335,7 @@ REBARR *Copy_Rerelativized_Array_Deep_Managed(
 
         Copy_Cell_Header(dest, src);
 
-        if (ANY_ARRAY_OR_PATH(src)) {
+        if (ANY_ARRAY_OR_SEQUENCE(src)) {
             INIT_VAL_NODE1(
                 dest,
                 Copy_Rerelativized_Array_Deep_Managed(

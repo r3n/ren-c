@@ -412,10 +412,10 @@ e-types/emit {
         (TS_SERIES & ~TS_NOT_COPIED)
 
     #define TS_SERIES_OBJ \
-        ((TS_SERIES | TS_CONTEXT | TS_PATH) & ~TS_NOT_COPIED)
+        ((TS_SERIES | TS_CONTEXT | TS_SEQUENCE) & ~TS_NOT_COPIED)
 
     #define TS_ARRAYS_OBJ \
-        ((TS_ARRAY | TS_CONTEXT | TS_PATH) & ~TS_NOT_COPIED)
+        ((TS_ARRAY | TS_CONTEXT | TS_SEQUENCE) & ~TS_NOT_COPIED)
 
     #define TS_CLONE \
         (TS_SERIES & ~TS_NOT_COPIED) // currently same as TS_NOT_COPIED
@@ -645,7 +645,7 @@ e-errfuncs/emit {
      * fully resolved REBVAL* that the error spec specifies.  This is easy
      * to get wrong in C, since variadics aren't checked.  Also, the category
      * symbol needs to be right for the error ID.
-     * 
+     *
      * These are inline function stubs made for each "raw" error in %errors.r.
      * They shouldn't add overhead in release builds, but help catch mistakes
      * at compile time.

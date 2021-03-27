@@ -210,7 +210,7 @@ REB_R Compose_To_Stack_Core(
         REBCEL(const*) cell = VAL_UNESCAPED(f_value);
         enum Reb_Kind heart = CELL_HEART(cell); // notice `''(...)`
 
-        if (not ANY_ARRAY_OR_PATH_KIND(heart)) { // won't substitute/recurse
+        if (not ANY_ARRAY_KIND(heart)) { // won't substitute/recurse
             Derelativize(DS_PUSH(), f_value, specifier); // keep newline flag
             continue;
         }

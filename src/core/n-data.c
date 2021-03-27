@@ -185,7 +185,7 @@ REBNATIVE(bind)
         return Quotify(D_OUT, num_quotes);
     }
 
-    if (not ANY_ARRAY_OR_PATH(v)) {  // QUOTED! could have wrapped any type
+    if (not ANY_ARRAY_OR_SEQUENCE(v)) {  // QUOTED! could have wrapped any type
         Quotify(v, num_quotes);  // put quotes back on
         fail (Error_Invalid_Arg(frame_, PAR(value)));
     }
