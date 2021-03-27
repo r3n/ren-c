@@ -939,19 +939,46 @@ default-combinators: make map! reduce [
          value [datatype!]
     ][
         either any-array? input [
-            if value = type of input/1 [
-                if result [
-                    set result input/1
-                ]
-                return next input
+            if value <> type of input/1 [
+                return null
             ]
-            return null
+            if result [
+                set result input/1
+            ]
+            return next input
         ][
             let [item 'input error]: transcode input
             if error [
                 return null
             ]
             if value != type of item [
+                return null
+            ]
+            if result [
+                set result item
+            ]
+            return input
+        ]
+    ]
+
+    typeset! combinator [
+         result: [any-value!]
+         value [typeset!]
+    ][
+        either any-array? input [
+            if not find value (type of input/1) [
+                return null
+            ]
+            if result [
+                set result input/1
+            ]
+            return next input
+        ][
+            let [item 'input error]: transcode input
+            if error [
+                return null
+            ]
+            if not find value (type of item) [
                 return null
             ]
             if result [

@@ -246,7 +246,6 @@ reword: function [
             parse escape [
                 set prefix delimiter-types
                 set suffix opt delimiter-types
-                end
             ] else [
                 fail ["Invalid /ESCAPE delimiter block" escape]
             ]
