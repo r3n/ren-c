@@ -88,29 +88,29 @@ combinator: func [
             ; the combinator.  That offers lots of potential, but for now
             ; we just use it to notice the furthest parse point reached.
             ;
-            let state: f/state
+            let state: f.state
             let result: do f
             elide all [
-                state/furthest
+                state.furthest
                 result
-                (index? result) > (index? get state/furthest)
-                set state/furthest result
+                (index? result) > (index? get state.furthest)
+                set state.furthest result
             ]
         ]
     )
 ][
     let action: func compose [
         ; Get the text description if given
-        ((if text? spec/1 [spec/1, elide spec: my next]))
+        ((if text? spec.1 [spec.1, elide spec: my next]))
 
         return: [<opt> any-series!]
 
         ; Get the RESULT: definition if there is one
         ;
-        ((if set-word? spec/1 [
-            assert [spec/1 = 'result:]
-            assert [block? spec/2]
-            reduce [spec/1 spec/2]
+        ((if set-word? spec.1 [
+            assert [spec.1 = 'result:]
+            assert [block? spec.2]
+            reduce [spec.1 spec.2]
             elide spec: my skip 2
         ]))
 
@@ -147,10 +147,10 @@ default-combinators: make map! reduce [
         ; If the argument given as a rule has a result, then OPT will also.
         ;
         let f: make frame! :parser
-        f/input: input
+        f.input: input
         if result [
             either find f 'result [
-                f/result: result
+                f.result: result
             ][
                 fail "Result requested from OPT but rule used has no result"
             ]
@@ -422,7 +422,7 @@ default-combinators: make map! reduce [
     ][
         if tail? input [return null]
         if result [
-            set result input/1
+            set result input.1
         ]
         return next input
     ]
@@ -521,7 +521,6 @@ default-combinators: make map! reduce [
             ; !!! Review: should we allow non-value-bearing parsers that just
             ; set limits on the input?
             ;
-            print "no deal"
             return null
         ]
 
@@ -555,11 +554,11 @@ default-combinators: make map! reduce [
         result: [any-series!]
         parser [action!]
     ][
-        if not state/collecting [
-            state/collecting: make block! 10
+        if not state.collecting [
+            state.collecting: make block! 10
         ]
 
-        let collect-base: tail state/collecting
+        let collect-base: tail state.collecting
         if not input: parser input [
             ;
             ; Although the block rules roll back, COLLECT might be used with
@@ -581,20 +580,20 @@ default-combinators: make map! reduce [
     'keep combinator [
         parser [action!]
     ][
-        assert [state/collecting]
+        assert [state.collecting]
 
         let f: make frame! :parser
         if not in f 'result [
             fail "Can't use KEEP with PARSER that doesn't have a RESULT:"
         ]
         let temp
-        f/result: 'temp
-        f/input: input
+        f.result: 'temp
+        f.input: input
         if not let limit: do f [
             return null
         ]
 
-        append state/collecting temp
+        append state.collecting temp
 
         return limit
     ]
@@ -609,11 +608,11 @@ default-combinators: make map! reduce [
         result: [any-series!]
         parser [action!]
     ][
-        let made-state: did if not state/gathering [
-            state/gathering: make block! 10
+        let made-state: did if not state.gathering [
+            state.gathering: make block! 10
         ]
 
-        let gather-base: tail state/gathering
+        let gather-base: tail state.gathering
         if not input: parser input [
             ;
             ; Although the block rules roll back, GATHER might be used with
@@ -624,7 +623,7 @@ default-combinators: make map! reduce [
             ;
             clear gather-base
             if made-state [
-                state/gathering: null
+                state.gathering: null
             ]
             return null
         ]
@@ -632,7 +631,7 @@ default-combinators: make map! reduce [
             set result make object! gather-base
         ]
         either made-state [
-            state/gathering: null  ; eliminate entirely
+            state.gathering: null  ; eliminate entirely
         ][
             clear gather-base  ; clear only from the marked position
         ]
@@ -646,8 +645,8 @@ default-combinators: make map! reduce [
         ; !!! Experiment to allow a top-level accrual, to make EMIT more
         ; efficient by becoming the result of the PARSE.
         ;
-        if not state/gathering [
-            state/gathering: make block! 10
+        if not state.gathering [
+            state.gathering: make block! 10
         ]
 
         let f: make frame! :parser
@@ -655,13 +654,13 @@ default-combinators: make map! reduce [
             fail "Can't use EMIT with PARSER that doesn't have a RESULT:"
         ]
         let temp
-        f/result: 'temp
-        f/input: input
+        f.result: 'temp
+        f.input: input
         if not let limit: do f [
             return null
         ]
-        append state/gathering target
-        append state/gathering quote temp
+        append state.gathering target
+        append state.gathering quote temp
         return limit
     ]
 
@@ -706,11 +705,11 @@ default-combinators: make map! reduce [
     ][
         case [
             any-array? input [
-                if input/1 <> value [
+                if input.1 <> value [
                     return null
                 ]
                 if result [  ; in this case, we want the array's value
-                    set result input/1
+                    set result input.1
                 ]
                 return next input
             ]
@@ -719,7 +718,7 @@ default-combinators: make map! reduce [
             ; no isolated value to capture.  Should we copy it?
 
             any-string? input [
-                if not input: find/match/(if state/case 'case) input value [
+                if not input: find/match/(if state.case 'case) input value [
                     return null
                 ]
             ]
@@ -749,7 +748,7 @@ default-combinators: make map! reduce [
     ][
         case [
             any-array? input [
-                if input/1 = value [return next input]
+                if input.1 = value [return next input]
                 return null
             ]
             any-string? input [
@@ -774,7 +773,7 @@ default-combinators: make map! reduce [
     ][
         case [
             any-array? input [
-                if input/1 = value [return next input]
+                if input.1 = value [return next input]
                 return null
             ]
             any-string? input [
@@ -843,18 +842,18 @@ default-combinators: make map! reduce [
     ][
         case [
             any-array? input [
-                if input/1 = value [
+                if input.1 = value [
                     return next input
                 ]
             ]
             any-string? input [
-                if find value input/1 [
+                if find value input.1 [
                     return next input
                 ]
             ]
             true [
                 assert [binary? input]
-                if find value input/1 [
+                if find value input.1 [
                     return next input
                 ]
             ]
@@ -871,9 +870,9 @@ default-combinators: make map! reduce [
         result: [any-value!]
         value [quoted!]
     ][
-        if :input/1 = unquote value [
+        if :input.1 = unquote value [
             if result [
-                set result input/1
+                set result input.1
             ]
             return next input
         ]
@@ -939,11 +938,11 @@ default-combinators: make map! reduce [
          value [datatype!]
     ][
         either any-array? input [
-            if value <> type of input/1 [
+            if value <> type of input.1 [
                 return null
             ]
             if result [
-                set result input/1
+                set result input.1
             ]
             return next input
         ][
@@ -966,11 +965,11 @@ default-combinators: make map! reduce [
          value [typeset!]
     ][
         either any-array? input [
-            if not find value (type of input/1) [
+            if not find value (type of input.1) [
                 return null
             ]
             if result [
-                set result input/1
+                set result input.1
             ]
             return next input
         ][
@@ -1096,25 +1095,25 @@ default-combinators: make map! reduce [
         let rules: value
         let pos: input
 
-        let collect-baseline: tail try state/collecting  ; see COLLECT
-        let gather-baseline: tail try state/gathering  ; see GATHER
+        let collect-baseline: tail try state.collecting  ; see COLLECT
+        let gather-baseline: tail try state.gathering  ; see GATHER
 
         if result [
             set result <nothing>
         ]
         while [not tail? rules] [
-            if state/verbose [
+            if state.verbose [
                 print ["RULE:" mold/limit rules 60]
                 print ["INPUT:" mold/limit pos 60]
                 print "---"
             ]
 
-            if rules/1 = ', [  ; COMMA! is only legal between steps
+            if rules.1 = ', [  ; COMMA! is only legal between steps
                 rules: my next
                 continue
             ]
 
-            if rules/1 = '| [
+            if rules.1 = '| [
                 ;
                 ; Rule alternative was fulfilled.  Base case is a match, e.g.
                 ; with input "cde" then [| "ab"] will consider itself to be a
@@ -1130,9 +1129,9 @@ default-combinators: make map! reduce [
             let f: make frame! :action
             let r
             let use-result: all [result, in f 'result]
-            f/input: pos
+            f.input: pos
             if use-result [ ; non-result bearing cases ignored
-                f/result: 'r
+                f.result: 'r
             ]
 
             if pos: do f [
@@ -1146,19 +1145,19 @@ default-combinators: make map! reduce [
                 if result [  ; forget accumulated results
                     set result <nothing>
                 ]
-                if state/collecting [  ; toss collected values from this pass
+                if state.collecting [  ; toss collected values from this pass
                     if collect-baseline [  ; we marked how far along we were
                         clear collect-baseline
                     ] else [
-                        clear state/collecting  ; no mark, must have been empty
+                        clear state.collecting  ; no mark, must have been empty
                     ]
                 ]
 
-                if state/gathering [  ; toss gathered values from this pass
+                if state.gathering [  ; toss gathered values from this pass
                     if gather-baseline [  ; we marked how far along we were
                         clear gather-baseline
                     ] else [
-                        clear state/gathering  ; no mark, must have been empty
+                        clear state.gathering  ; no mark, must have been empty
                     ]
                 ]
 
@@ -1169,7 +1168,7 @@ default-combinators: make map! reduce [
                 ;
                 pos: catch [
                     let r
-                    while [r: rules/1] [
+                    while [r: rules.1] [
                         rules: my next
                         if r = '| [throw input]  ; reset POS
                     ]
@@ -1252,16 +1251,16 @@ combinatorize: func [
                 ; Actually a return value.  These are still being figured out.
             ]
             param = 'value [
-                f/value: value
+                f.value: value
             ]
             param = 'state [  ; the "state" is currently the UPARSE frame
-                f/state: state
+                f.state: state
             ]
             quoted? param [  ; literal element captured from rules
-                let r: non-comma rules/1
+                let r: non-comma rules.1
                 rules: my next
 
-                f/(unquote param): :r
+                f.(unquote param): :r
             ]
             true [  ; another parser to combine with
                 ;
@@ -1270,7 +1269,7 @@ combinatorize: func [
                 ; functions.  For now, just work around it.
                 ;
                 let [temp 'rules]: parsify state rules
-                f/(param): :temp
+                f.(param): :temp
             ]
         ]
     ]
@@ -1300,7 +1299,7 @@ parsify: func [
     rules "Parse rules to (partially) convert to a combinator action"
         [block!]
 ][
-    let r: non-comma rules/1
+    let r: non-comma rules.1
     rules: my next
 
     ; Not sure if it's good, but the original GET-GROUP! concept allowed:
@@ -1324,7 +1323,7 @@ parsify: func [
         ]
 
         word? :r [
-            if let c: select state/combinators r [
+            if let c: select state.combinators r [
                 let [f 'rules]: combinatorize rules state :c
 
                 set advanced rules  ; !!! Should `[:advanced]: ...` be ok?
@@ -1348,7 +1347,7 @@ parsify: func [
     ; arguments.  Does this mean the block rule has to hardcode handling of
     ; integers, or that when we do these rules they may have skippable types?
 
-    if not let c: select state/combinators kind of :r [
+    if not let c: select state.combinators kind of :r [
         fail ["Unhandled type in PARSIFY:" kind of :r]
     ]
 
@@ -1397,10 +1396,10 @@ uparse: func [
     ;
     let state: binding of 'return
 
-    let f: make frame! :combinators/(block!)
-    f/state: state
-    f/input: series
-    f/value: rules
+    let f: make frame! :combinators.(block!)
+    f.state: state
+    f.input: series
+    f.value: rules
     let pos: do f
 
     ; If there were EMIT things gathered, but no actual GATHER then just
@@ -1435,7 +1434,7 @@ uparse: func [
 ; We make ANY a synonym for WHILE, temporarily:
 ; https://forum.rebol.info/t/any-vs-many-in-parse-eof-tag-combinators/1540/10
 ;
-default-combinators/('any): :default-combinators/('while)
+default-combinators.('any): :default-combinators.('while)
 
 
 === REBOL2/R3-ALPHA/RED COMPATIBILITY ===
@@ -1486,7 +1485,7 @@ append redbol-combinators reduce [
                 return pos
             ]
             if pos = next input [  ; one unit of advancement
-                set target input/1
+                set target input.1
                 return pos
             ]
             fail "SET in UPARSE can only set up to one element"
@@ -1524,7 +1523,7 @@ append redbol-combinators reduce [
     ; AND is a confusing name for AHEAD, doesn't seem to be a lot of value
     ; in carrying that synonym forward in UPARSE.
     ;
-    'and :default-combinators/('ahead)
+    'and :default-combinators.('ahead)
 
     === OLD-STYLE FAIL INSTRUCTION ===
 
@@ -1545,16 +1544,16 @@ append redbol-combinators reduce [
 
 ; Kill off any new combinators.
 
-redbol-combinators/('between): null
-redbol-combinators/('gather): null
-redbol-combinators/('emit): null
+redbol-combinators.('between): null
+redbol-combinators.('gather): null
+redbol-combinators.('emit): null
 
 ; Red has COLLECT and KEEP, with different semantics--no rollback, and the
 ; overall parse result changes to the collect result vs. setting a variable.
 ; That could be emulated.
 ;
-redbol-combinators/('collect): null
-redbol-combinators/('keep): null
+redbol-combinators.('collect): null
+redbol-combinators.('keep): null
 
 uparse2: specialize :uparse [
     combinators: redbol-combinators
