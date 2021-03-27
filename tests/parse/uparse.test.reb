@@ -35,23 +35,23 @@
 )]
 
 
-; SOME and ANY have become value-bearing; they give back blocks if they match.
+; SOME and WHILE have become value-bearing; giving back blocks if they match.
 [(
     x: _
     did all [
-        uparse "aaa" [x: any "a"]
+        uparse "aaa" [x: while "a"]
         x = ["a" "a" "a"]
     ]
 )(
     x: _
     did all [
-        uparse "aaa" [x: any "b", any "a"]
+        uparse "aaa" [x: while "b", while "a"]
         x = []
     ]
 )(
     x: _
     did all [
-        uparse "aaa" [x: opt some "b", any "a"]
+        uparse "aaa" [x: opt some "b", while "a"]
         x = null
     ]
 )(
@@ -286,11 +286,11 @@
     ]
 )(
     did all [
-        uparse [| | any any any | | |] [
+        uparse [| | while while while | | |] [
             content: between some '| some '|
-            into @content [x: some 'any]
+            into @content [x: some 'while]
         ]
-        x = [any any any]
+        x = [while while while]
     ]
 )]
 

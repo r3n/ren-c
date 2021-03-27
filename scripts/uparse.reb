@@ -193,15 +193,18 @@ default-combinators: make map! reduce [
 
     === LOOPING CONSTRUCT KEYWORDS ===
 
-    ; There was a concept that SOME and ANY would stop if they reached the
-    ; tail of the series, requiring a separate WHILE to continue iterating
-    ; even at the end.  It's not clear why `any [opt "a"]` shouldn't be an
-    ; infinite loop...so for the sake of simplicity we'll try having it do
-    ; that and not check the end.
+    ; ANY and WHILE were slight variations on a theme, with `any [...]` being
+    ; the same as `while [not end, ...]`.  Because historical Redbol PARSE-ANY
+    ; contrasts semantically with with DO-ANY (pick from alternates), we
+    ; choose to make the primitive operation WHILE.
     ;
-    ; https://github.com/metaeducation/rebol-issues/issues/1268
+    ; https://forum.rebol.info/t/any-vs-while-and-not-end/1572
+    ; https://forum.rebol.info/t/any-vs-many-in-parse-eof-tag-combinators/1540/
+    ;
+    ; For the moment, ANY is assigned as an alias for WHILE, but with no
+    ; difference in shade of meaning.
 
-    'any combinator [
+    'while combinator [
         {Any number of matches (including 0)}
         result: [block!]
         parser [action!]
@@ -1400,12 +1403,12 @@ uparse: func [
 ]
 
 
-=== AND COMPATIBILITY ===
+=== ANY COMPATIBILITY ===
 
-; We do add AND as a backwards compatible form of AHEAD...even to the default
-; for now (it has no competing meaning)
+; We make ANY a synonym for WHILE, temporarily:
+; https://forum.rebol.info/t/any-vs-many-in-parse-eof-tag-combinators/1540/10
 ;
-default-combinators/('and): :default-combinators/('ahead)
+default-combinators/('any): :default-combinators/('while)
 
 
 === REBOL2/R3-ALPHA/RED COMPATIBILITY ===
@@ -1488,6 +1491,13 @@ append redbol-combinators reduce [
         ]
         return get value
     ]
+
+    === OLD-STYLE AND SYNONYM FOR AHEAD ===
+
+    ; AND is a confusing name for AHEAD, doesn't seem to be a lot of value
+    ; in carrying that synonym forward in UPARSE.
+    ;
+    'and :default-combinators/('ahead)
 
     === OLD-STYLE FAIL INSTRUCTION ===
 
