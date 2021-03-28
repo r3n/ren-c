@@ -27,7 +27,7 @@ read-deep-seq: func [
     let item: take queue
 
     if equal? #"/" last item [
-        insert queue map-each x read item [join item x]
+        insert queue map-each x read %% (repo-dir)/(item) [join item x]
     ]
 
     item

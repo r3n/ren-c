@@ -37,7 +37,7 @@ REBOL [
 ; This script makes some assumptions about the structure of the repo.
 ;
 
-do %../../tools/common.r
+do %../../tools/common.r  ; sets REPO-DIR (among other things)
 
 do %% (repo-dir)/tools/common-parsers.r
 do %% (repo-dir)/tools/text-lines.reb
