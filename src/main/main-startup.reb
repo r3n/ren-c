@@ -757,56 +757,35 @@ main-startup: func [
         ]
     ]
 
-    let [code header]
-    switch type of boot-embedded [
-        blank! [
-            false  ; signal that there's no embedded code
-        ]
-        binary! [ ; single script
-            [code header]: load/type boot-embedded 'unbound
-            true
-        ]
-        block! [
-            ;
-            ; The encapping is an embedded zip archive.  get-encap did
-            ; the unzipping into a block, and this information must be
-            ; made available somehow.  It shouldn't be part of the "core"
-            ; but just responsibility of the host that supports encap
-            ; based loading.
-            ;
-            o/encap: boot-embedded
+    let main
+    all [
+        o/encap: boot-embedded  ; null if no encapping
 
-            let main: select boot-embedded %main.reb
-            if not binary? main [
-                die "Could not find %main.reb in encapped zip file"
-            ]
-            [code header]: load/type main 'unbound
-            true
-        ]
+        ; The encapping is an embedded zip archive.  get-encap did
+        ; the unzipping into a block, and this information must be
+        ; made available somehow.  It shouldn't be part of the "core"
+        ; but just responsibility of the host that supports encap
+        ; based loading.  We put it in o/encap, and see if it contains a
+        ; %main.reb...if it does, we run it.
 
-        die "Bad embedded boot data (not a BLOCK! or a BINARY!)"
-    ] then execute -> [
-        if execute [
-            ;boot-print ["executing embedded script:" mold code]
-            system/script: make system/standard/script [
-                title: select first code 'title
-                header: first code
-                parent: _
-                path: what-dir
-                args: script-args
-            ]
-            if 'module = select first code 'type [
-                code: reduce [first code, next code]
-                if object? tmp: sys/do-needs/no-user first code [
-                    append code tmp
-                ]
-                import do compose [module (code)]
-            ] else [
-                sys/do-needs first code
-                do intern next code
-            ]
-            quit ;ignore user script and "--do" argument
+        main: select boot-embedded %main.reb
+    ]
+    then [
+        if not binary? main [
+            die "%main.reb not a BINARY! in encapped data"
         ]
+        let [code header]: load main
+
+        ; !!! This needs to be thought through better, in terms of whether
+        ; it's a module and handling HEADER correctly.  Also, any scripts
+        ; should be passed as arguments...not executed.  And the active
+        ; directory should be inside the ZIP, so that FILE! paths are
+        ; resolved relative to %main.reb's location.  But for now, just do
+        ; a proof of concept by showing execution of a main.reb if that is
+        ; found in the encapping.
+
+        emit [do/only (<*> code)]
+        quit-when-done: default [true]
     ]
 
     ; Evaluate any script argument, e.g. `r3 test.r` or `r3 --script test.r`
