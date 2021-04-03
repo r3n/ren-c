@@ -90,7 +90,7 @@ func: func* [
         [<const> block!]
     /gather "Gather SET-WORD! as local variables (preferably, please use LET)"
     <local>
-        new-spec var other
+        new-spec var loc other
         new-body exclusions locals defaulters statics with-return
 ][
     ; R3-Alpha offered features on FUNCTION (a complex usermode construct)
@@ -131,6 +131,7 @@ func: func* [
     statics: _
     defaulters: _
     var: <dummy>  ; enter PARSE with truthy state (gets overwritten)
+    loc: _
     with-return: _
 
     parse spec [any [
@@ -138,7 +139,7 @@ func: func* [
     |
         <elide> (append new-spec <elide>)
     |
-        :(either var '[
+        :(if var '[  ; so long as we haven't reached any <local> or <with> etc.
             set var: [any-word! | any-path! | quoted!] (
                 append new-spec var  ; need quote level as-is in new spec
 
@@ -168,13 +169,14 @@ func: func* [
             copy other some text! (
                 append/only new-spec spaced other  ; spec notes
             )
-        ] '[
-            set var: tuple! (  ; locals legal anywhere
-                append exclusions var
-                append new-spec var
-                var: _
-            )
+        ] else [
+            [false]
         ])
+    |
+        set loc: tuple! (  ; locals legal anywhere
+            append exclusions to word! loc
+            append new-spec loc
+        )
     |
         other: here
         group! (
@@ -253,7 +255,7 @@ func: func* [
     |
         end accept
     |
-        other: (
+        other: here (
             print mold other/1
             fail [
                 ; <where> spec
