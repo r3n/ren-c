@@ -1429,14 +1429,6 @@ uparse: func [
 ]
 
 
-=== ANY COMPATIBILITY ===
-
-; We make ANY a synonym for WHILE, temporarily:
-; https://forum.rebol.info/t/any-vs-many-in-parse-eof-tag-combinators/1540/10
-;
-default-combinators.('any): :default-combinators.('while)
-
-
 === REBOL2/R3-ALPHA/RED COMPATIBILITY ===
 
 ; One of the early applications of UPARSE is to be able to implement backward
@@ -1445,6 +1437,55 @@ default-combinators.('any): :default-combinators.('while)
 redbol-combinators: copy default-combinators
 
 append redbol-combinators reduce [
+
+    === ANY AND SOME HAVE "NO PROGRESS" CONSTRAINT ===
+
+    ; The no-progress constraint of ANY and SOME are discussed here, they are
+    ; believed to perhaps make things harder to understand:
+    ;
+    ; https://forum.rebol.info/t/any-vs-while-and-not-end/1572/2
+    ; https://forum.rebol.info/t/any-vs-many-in-parse-eof-tag-combinators/1540/10
+    ;
+    ; These compatibility versions are not value-bearing.
+
+    'any combinator [
+        {Any number of matches (including 0)}
+        parser [action!]
+    ][
+        let pos
+        cycle [
+            any [
+                not pos: parser input  ; failed rule means stop successfully
+                pos = input  ; no progress means stop successfully
+            ] then [
+                return input
+            ]
+            input: pos
+        ]
+    ]
+
+    'some combinator [
+        {Must run at least one match}
+        parser [action!]
+    ][
+        let pos
+        any [
+            not pos: parser input  ; failed first rule means stop unsuccessfully
+            pos = input  ; no progress first time means stop unsuccessfully
+        ] then [
+            return null
+        ]
+        input: pos  ; any future failings won't fail the overall rule
+        cycle [
+            any [
+                not pos: parser input  ; failed rule means stop successfully
+                pos = input  ; no progress means stop successfully
+            ] then [
+                return input
+            ]
+            input: pos
+        ]
+    ]
 
     === OLD STYLE SET AND COPY COMBINATORS ===
 
@@ -1516,6 +1557,37 @@ append redbol-combinators reduce [
             fail "SEEK (via GET-WORD!) in UPARSE must be in the same series"
         ]
         return get value
+    ]
+
+    === OLD-STYLE INTO BEHAVIOR ===
+
+    'into combinator [
+        {Perform a recursion with a rule}
+        subparser [action!]
+    ][
+        if tail? input [
+            fail "At END cannot use INTO"
+        ]
+        if not any-series? let subseries: input/1 [
+            fail "Need ANY-SERIES! datatype for use with INTO in UPARSE"
+        ]
+
+        ; If the entirety of the item at the input array is matched by the
+        ; supplied parser rule, then we advance past the item.
+        ;
+        let pos: subparser subseries
+        if pos = tail subseries [
+            return next input
+        ]
+        return null
+    ]
+
+    === BREAK TEST ===
+
+    'break combinator [
+        {Stop an iterating rule but succeed}
+    ][
+        fail "BREAK"
     ]
 
     === OLD-STYLE AND SYNONYM FOR AHEAD ===
