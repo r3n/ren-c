@@ -189,6 +189,9 @@ elif [[ $OS_ID = 0.13.2 ]]; then  #arm-android5
     # and architecture work assumed done outside of the config or push this
     # build process itself into rebmake.
     #
+    # !!! This had support for OS X at one point, but darwin-x86_64 is changed
+    # to linux now, since all CI builds are Linux.  Review.
+    #
     if [[ $NDK_REVISION = r13 ]]; then
         #
         # Note: substitute `linux-x86_64` -> `darwin-x86_64` here.  But main
@@ -214,14 +217,14 @@ elif [[ $OS_ID = 0.13.2 ]]; then  #arm-android5
         SYSROOT_COMPILE="${SYSROOT_LINK}"
 
     else
-        GNU_TOOLS_PREFIX="${ANDROID_NDK_ROOT}/toolchains/arm-linux-androideabi-4.9/prebuilt/darwin-x86_64/bin/arm-linux-androideabi-"
+        GNU_TOOLS_PREFIX="${ANDROID_NDK_ROOT}/toolchains/arm-linux-androideabi-4.9/prebuilt/linux-x86_64/bin/arm-linux-androideabi-"
 
         # NDK 18 and later use clang, separate directory for llvm stuff
         #
         CC=clang
-        CROSS_PREFIX="${ANDROID_NDK_ROOT}/toolchains/llvm/prebuilt/darwin-x86_64/bin/armv7a-linux-androideabi29-"
+        CROSS_PREFIX="${ANDROID_NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64/bin/armv7a-linux-androideabi29-"
 
-        SYSROOT_LINK="${ANDROID_NDK_ROOT}/toolchains/llvm/prebuilt/darwin-x86_64/sysroot/"
+        SYSROOT_LINK="${ANDROID_NDK_ROOT}/toolchains/llvm/prebuilt/linux-x86_64/sysroot/"
 
         # NDK 18 and later have unified headers for all Android.
         #

@@ -7,11 +7,15 @@
 # that it can provide a "backdoor" of native services to a browser on a phone
 # which is running another interpreter as the WebAssembly version for the UI.
 #
+# https://github.com/metaeducation/rebol-server
 # https://www.youtube.com/watch?v=r5kccBehMMg
 #
-# !!! Currently we're only testing cross-compilation on Linux and MacOS, but
-# since the NDK is offered on Windows as well we should make sure that works
-# when time permits.
+# So this script not only builds an executable for Android, it also does the
+# bundling of a complete package, that can run the ReplPad web-based console
+# without an Internet connection.  It tests the resulting executable and .APK
+# inside an Android Emulator to make sure they are working.  It even builds
+# a C compiler into the native program, so it can compile new ARM native
+# functions accessible from Ren-C!
 #
 #====# PLEASE READ THE README #===============================================#
 #
@@ -25,11 +29,6 @@
 name: Android Build
 
 
-# Note: These builds are particularly slow because the first interpreter was
-# compiled with TCC and with asserts/debug info, and then the second interpreter
-# is building using that.  We could turn off the debug info, but it's better to
-# have it on so we can catch anomalies.
-#
 # See README: When To Trigger Builds
 #
 on:
@@ -59,9 +58,18 @@ defaults:
 #
 # See README: Jobs
 #
+# The `build-r3-and-apk` job is done on a Linux Machine, because .APK making
+# has only been tested on Linux...and it's simpler to only deal with one
+# workflow for that.  But cross-compiling an Android r3 executable with the NDK
+# has been shown to work on both Mac and Windows.  So it should either work
+# (or not be too far from working) if someone wanted to do that.
+#
+# However, the `test-and-deploy` job is on a Mac, because the testing is in
+# an Android emulator that can't run efficiently on Linux or Windows at time
+# of writing.  More explanation of that is provided with that job further down.
+#
 jobs:
-  android-build:  # Name of this workflow's only job
-
+  build-r3-and-apk:  # Job Name (see further down in file for test job)
 
     # See README: Build Matrix
     #
@@ -69,7 +77,12 @@ jobs:
       matrix:
         include:  # put in order of visibility importance (shown in UI)
 
-        - os: ubuntu-20.04
+        # !!! When you are building on one OS and testing on another OS, that
+        # requires two different jobs.  It's not obvious how to make a matrix
+        # of jobs split out a pipeline so each build job feeds to its own
+        # separate test job.
+        #
+        #- os: ubuntu-20.04
           #
           # !!! versions prior to r16 only offered a gcc-based toolchain
           # circa 2021, this is completely deprecated, however it was being
@@ -83,14 +96,14 @@ jobs:
           # the variety of platforms the core can compile for...and helps
           # point out any incursions of new dependencies that slip in.
           #
-          ndk-revision: r13  # released Oct 2016
-          standard: c99
-          debug: normal
-          extensions: "TCC +"
-          os-id: 0.13.2
-          config-file: android-cross-compiled.r  # Build ARM with x64 compiler
+        #  ndk-revision: r13  # released Oct 2016
+        #  standard: c99
+        #  debug: normal
+        #  extensions: "TCC +"
+        #  os-id: 0.13.2
+        #  config-file: android-cross-compiled.r  # Build ARM with x64 compiler
 
-        - os: macos-latest
+        - os: ubuntu-20.04
           #
           # versions since r18 are entirely clang-based
           # leaving off last letter means get latest patch version (e.g. r21e)
@@ -102,12 +115,9 @@ jobs:
           os-id: 0.13.2
           config-file: android-cross-compiled.r  # Build ARM with x64 compiler
 
-
     # See README: Environment Variables
     #
     env:
-      AWS_S3_BUCKET_NAME: metaeducation
-
       # See README: Minimize GitHub-Specific Syntax
       #
       NDK_REVISION: ${{ matrix.ndk-revision }}
@@ -116,6 +126,304 @@ jobs:
       EXTENSIONS: ${{ matrix.extensions }}
       OS_ID: ${{ matrix.os-id }}
       CONFIG_FILE: ${{ matrix.config-file }}
+
+    # https://github.com/actions/virtual-environments#available-environments
+    #
+    runs-on: ${{ matrix.os }}
+
+    # Steps are a sequence of tasks that will be executed within a single VM
+    # as part of the job.
+    #
+    # See README: Steps
+    #
+    steps:  # (no indentatation needed below; so indent the minimum!)
+
+
+  #====# CHECKOUT STEPS #=====================================================#
+
+    # https://github.com/actions/checkout
+    #
+    # See README: Checkout Action
+    #
+    - uses: actions/checkout@v2  # See README: Trusted Actions
+
+    # The full commit is passed to make to build into the binary, and the
+    # abbreviated commit is used to name the executable.
+    #
+    # See README: Portably Capturing Git Hashes
+    #
+    - name: Grab Git Hash and Short Hash Into Environment Variables
+      run: |
+        git_commit="$(git show --format="%H" --no-patch)"
+        git_commit_short="$(git show --format="%h" --no-patch)"
+        echo "GIT_COMMIT=$git_commit" >> $GITHUB_ENV
+        echo "GIT_COMMIT_SHORT=$git_commit_short" >> $GITHUB_ENV
+
+
+  #====# TOOLCHAIN INSTALLATION STEPS #=======================================#
+
+    # !!! Ideally this would use the same step that clients can use to build
+    # the system with `make.sh`.  Unfortunately, something about the GitHub
+    # Ubuntus do not like the old bootstrap executable.  Make sure the
+    # ordinary path works, but for the moment patch over it just to get
+    # to a point where the action works.
+    #
+    # See README: If Statements
+    #
+    - name: Fetch R3 To Use For "Prep" Build Steps as $R3MAKE (Linux version)
+      run: |
+        echo "OS is ${{ matrix.os }}"
+        repo_dir=$(pwd)/
+        cd prebuilt
+        wget http://hostilefork.com/media/shared/github/r3-linux-dec-2020
+        chmod +x r3-linux-dec-2020
+        r3make=$(pwd)/r3-linux-dec-2020
+        echo "R3MAKE is set to $r3make"
+        echo "R3MAKE=$r3make" >> $GITHUB_ENV  # pass to next step
+
+    - name: Stop the build early if the R3MAKE is no good
+      run: |
+        "$R3MAKE" --do "print {R3MAKE is Working} quit 0"
+
+    # Building for Android requires having a compiler that can build for ARM,
+    # as well as support for the "Bionic" OS (distinct from the Linux that this
+    # container is running on, so the /usr/include and /usr/lib files wouldn't
+    # be usable in the compilation process).
+    #
+    # https://github.com/nttld/setup-ndk
+    #
+    # There is a known layout to the folders, so the Android config can find
+    # the compiler relative to the ANDROID_NDK_ROOT installation path.
+    #
+    # Android [r]evisions (e.g. r13, r21d) are described in this history list:
+    #
+    # https://developer.android.com/ndk/downloads/revision_history
+    #
+    # See README: !!! IMPORTANT - Untrusted Actions, Use Audited Hash !!!
+    #
+    - name: Install the Android NDK (Native Development Kit)
+      id: setup-ndk
+      uses: nttld/setup-ndk@66168bc2be149f117859da845149dee8b763e6c9
+      with:
+        ndk-version: ${{ matrix.ndk-revision }}
+
+    # To find out where the `setup-ndk` action installed the NDK, you have to
+    # look at the output variables for that step.
+    #
+    # There is no "official" standard environment variable for the C/C++ NDK.
+    # But the Java SDK has one that the command line tools look for, and it's
+    # ANDROID_SDK_ROOT.  So we use ANDROID_NDK_ROOT for consistency, and since
+    # simply NDK or ANDROID_NDK don't communicate well that it's a directory
+    # (could be a flag, could be a version number, etc.)
+    #
+    # See README: Environment Variables
+    #
+    - name: Set ANDROID_NDK_ROOT Environment Variable
+      run: |
+        echo "ANDROID_NDK_ROOT=${{ steps.setup-ndk.outputs.ndk-path }}" >> $GITHUB_ENV
+
+    # Once we have the cross compiler, build the TCC library for ARM if this
+    # build is using the TCC extension.  (`sudo apt install libtcc-dev` would
+    # give us something doubly incorrect...an x86_64 library for building
+    # strings of Ccode into x86_64 machine code.)
+    #
+    - name: Cross-Compile libtcc.a if Making an R3 That Can Compile C Code
+      run: |
+        source extensions/tcc/tools/build-libtcc-helper.sh
+        echo "CONFIG_TCCDIR=$(pwd)/tcc" >> $GITHUB_ENV
+
+    # Show a little bit of sanity check information.
+    #
+    # !!! Here is where we would usually do something like `gcc -v` to get
+    # some diagnostic information about the compiler.  However, it's convoluted
+    # to figure out whether gcc (old) or clang (new) are used in the NDK, and
+    # that logic and version detection is in the %android-cross-compiled.r so
+    # there's not much point in duplicating that here in bash.
+    #
+    - name: Output System Information
+      run: |
+        echo "Installed NDK Version: $ANDROID_NDK_VERSION"
+        echo "NDK Is In Directory: $ANDROID_NDK_ROOT"
+
+        echo "Current directory is: $(pwd)"
+
+
+  #====# BUILD STEPS #========================================================#
+
+    # See README: {Braces} For %make.r String Parameters
+    #
+    - name: Generate Makefile for Cross-Compiling to ARM
+      run: |
+        mkdir build
+        cd build
+
+        "$R3MAKE" ../make.r \
+            config="../configs/$CONFIG_FILE" \
+            target=makefile \
+            standard=$STANDARD \
+            os_id=$OS_ID \
+            debug=$DEBUG \
+            git_commit="{$GIT_COMMIT}" \
+            rigorous=no \
+            static=no \
+            extensions="$EXTENSIONS"
+
+    - name: Create Folders For Build Products (Compiler Won't Create Them)
+      run: |
+        cd build
+        make folders
+
+    - name: Prep the Build By Making Various Auto-Generated .h and .c Files
+      run: |
+        cd build
+        make prep
+
+    # https://github.com/actions/upload-artifact
+    #
+    - name: Optional Download of Prep Files Before They Can Cause Build Failure
+      if: false  # Change this to true to download a file
+      uses: actions/upload-artifact@v2  # See README: Trusted Actions
+      with:
+        name: tmp-internals.h
+        path: build/prep/include/tmp-internals.h
+
+    - name: Cross-Compile and Link the C Files to into an ARM-Based R3
+      run: |
+        cd build
+        make
+
+    # !!! Unfortunately, the MacOS bootstrap executable seems to be creating
+    # corrupt zip files.  The problem is sorted out in newer builds, but we
+    # don't have a newer bootstrap build at time of writing.  Since it's just
+    # creating a zip file in a fairly easy way, we punt on calling the script
+    # and do it with the unix command line utility.
+    #
+    - name: Make a .ZIP File of the Encap Resources for TCC
+      run: |
+        # "${R3MAKE}" extensions/tcc/encap-tcc-resources.reb OS_ID=0.13.2
+
+        cp build/prep/include/rebol.h tcc/
+        cd tcc
+        zip -r tcc-encap.zip include/ rebol.h libtcc1.a
+        mv tcc-encap.zip ../build/
+
+
+  #====# .APK GENERATION STEPS #==============================================#
+  #
+  # While the raw `r3` executable can be run in on a root-enabled system, or
+  # inside a terminal app like "Termux"...there is a packaging as an .APK to
+  # use it as a webserver coupled to another copy of R3 running in WASM as
+  # a front-end.  The sandboxed web app presents the interface, while the
+  # Android-native server acts as a "backdoor" to get at things the browser
+  # can't (like the filesystem...though things like the camera would be other
+  # potential targets).
+  #
+  #===========================================================================#
+
+    # DEX stands for Dalvik Executable, optimized for Android
+    #
+    # Note: Installing on an actual Android device e.g. in BusyBox you would use
+    # `sudo apt install dx`, but in Debian the name is different to avoid
+    # conflict with another package.
+    #
+    - name: Install DX Tool for Converting .java Files to .dex Files
+      run: |
+        sudo apt install dalvik-exchange
+        sudo mv /usr/bin/dalvik-exchange /usr/bin/dx
+
+    - name: Install Standalone Eclipse Java Compiler
+      run: sudo apt install ecj
+
+    - name: Install Android Asset Packaging Tool (AAPT)
+      run: sudo apt install aapt
+
+    - name: Install ZipAlign
+      run: sudo apt install zipalign
+
+    # Note: jarsigner is already installed on Ubuntu containers.  You can get
+    # a message about `Can't open /usr/lib/java-wrappers/java-wrappers.sh`
+    # if there's no JDK installed solvable with:
+    # `sudo apt install openjdk-14-jdk-headless`
+    #
+    - name: Ensure Jarsigner is Installed
+      run: jarsigner -help
+
+    - name: Install Android APK Signer
+      run: sudo apt install apksigner
+
+    # We don't use `--recurse-submodules` here because we want to get the
+    # latest versions of the ReplPad and the http server.  The submodules were
+    # committed at arbitrary times.
+    #
+    - name: Clone rebol-server from GitHub
+      run: |
+        git clone https://github.com/metaeducation/rebol-server --depth 1
+        cd rebol-server
+        rm -rf rebol-httpd
+        git clone https://github.com/metaeducation/rebol-httpd --depth 1
+        rm -rf r3-console
+        git clone https://github.com/hostilefork/replpad-js r3-console --depth 1
+
+    # The build.bash script will package with an r3 file in its own directory,
+    # otherwise it downloads one.
+    #
+    - name: Build the rebol-server APK
+      run: |
+        cd rebol-server
+        cp ../build/r3 r3  # will use this r3
+        source build.bash
+        cp bin/rebol-server.apk ../build/rebol-server.apk
+
+
+  #====# UPLOAD ARTIFACTS FOR TESTING JOB #===================================#
+  #
+  # We build on Linux, but test on OS X where the Emulator performance is ok.
+  #
+  #===========================================================================#
+
+    - uses: actions/upload-artifact@master
+      with:
+        name: r3
+        path: build/r3
+        retention-days: 1
+
+    - uses: actions/upload-artifact@master
+      with:
+        name: tcc-encap.zip
+        path: build/tcc-encap.zip
+        retention-days: 1
+
+    - uses: actions/upload-artifact@master
+      with:
+        name: rebol-server.apk
+        path: build/rebol-server.apk
+        retention-days: 1
+
+
+#====# TEST AND DEPLOY JOB #==================================================#
+#
+# At time of writing, performance of emulators on Linux or Windows containers
+# does not make it practical to run in the cloud.  Mac containers are still
+# very slow, but are able to use HAXM acceleration and are somewhat practical.
+#
+# Since APK packaging and other activities are easier to do on Linux we stick
+# to that platform there for simplicity.
+#
+# This job has to run sequentially after the build step, so to prevent it from
+# running in parallel it uses the `needs:` property to say it is dependent.
+#
+#=============================================================================#
+
+  test-and-deploy:  # Name of the job
+
+    needs: build-r3-and-apk  # wants to test the r3 and .APK files produced
+
+    # https://github.com/actions/virtual-environments#available-environments
+    #
+    runs-on: macos-latest
+
+    env:
+      AWS_S3_BUCKET_NAME: metaeducation
 
       # If you override one emulator option with the emulator GitHub Action,
       # you have to override them all.
@@ -184,23 +492,13 @@ jobs:
       #
       EMULATOR_TARGET: google_apis  # [default google_apis playstore]
 
+    steps:
 
-    # https://github.com/actions/virtual-environments#available-environments
+  #====# CHECKOUT STEP #======================================================#
+
+    # We check out even in the test phase so we can use test files from the
+    # repository.
     #
-    runs-on: ${{ matrix.os }}
-
-
-    # Steps are a sequence of tasks that will be executed within a single VM
-    # as part of the job.
-    #
-    # See README: Steps
-    #
-    steps:  # (no indentatation needed below; so indent the minimum!)
-
-
-  #====# CHECKOUT STEPS #=====================================================#
-
-
     # https://github.com/actions/checkout
     #
     # See README: Checkout Action
@@ -208,195 +506,32 @@ jobs:
     - uses: actions/checkout@v2  # See README: Trusted Actions
 
 
-    # The full commit is passed to make to build into the binary, and the
-    # abbreviated commit is used to name the executable.
-    #
-    # See README: Portably Capturing Git Hashes
-    #
-    - name: Grab Git Hash and Short Hash Into Environment Variables
-      run: |
-        git_commit="$(git show --format="%H" --no-patch)"
-        git_commit_short="$(git show --format="%h" --no-patch)"
-        echo "GIT_COMMIT=$git_commit" >> $GITHUB_ENV
-        echo "GIT_COMMIT_SHORT=$git_commit_short" >> $GITHUB_ENV
+  #====# DOWNLOAD ARTIFACTS #=================================================#
 
+    # Note that if the artifact was a single file, the `path` should be the
+    # *directory* into which that file is put.  The name will be that of the
+    # file itself.
 
-  #====# TOOLCHAIN INSTALLATION STEPS #=======================================#
+    - name: Make Directories So Paths Match On Both Jobs
+      run: mkdir build
 
-
-    # See README: If Statements
-    #
-    - name: Fetch R3 To Use For "Prep" Build Steps as $R3MAKE (OS X version)
-      if: matrix.os == 'macos-latest'  # not `${{ matrix.os }} == ...`
-      run: |
-        echo "OS is ${{ matrix.os }}"
-        repo_dir=$(pwd)/
-        source tools/bash/fetch-prebuilt.sh
-        r3make=$(fetch_prebuilt)
-        echo "R3MAKE is set to $r3make"
-        echo "R3MAKE=$r3make" >> $GITHUB_ENV  # pass to next step
-
-
-    # !!! Ideally this would use the same step that clients can use to build
-    # the system with `make.sh`.  Unfortunately, something about the GitHub
-    # Ubuntus do not like the old bootstrap executable.  Make sure the
-    # ordinary path works, but for the moment patch over it just to get
-    # to a point where the action works.
-    #
-    # See README: If Statements
-    #
-    - name: Fetch R3 To Use For "Prep" Build Steps as $R3MAKE (Linux version)
-      if: matrix.os == 'ubuntu-20.04'  # not `${{ matrix.os }} == ...`
-      run: |
-        echo "OS is ${{ matrix.os }}"
-        repo_dir=$(pwd)/
-        cd prebuilt
-        wget http://hostilefork.com/media/shared/github/r3-linux-dec-2020
-        chmod +x r3-linux-dec-2020
-        r3make=$(pwd)/r3-linux-dec-2020
-        echo "R3MAKE is set to $r3make"
-        echo "R3MAKE=$r3make" >> $GITHUB_ENV  # pass to next step
-
-
-    - name: Stop the build early if the R3MAKE is no good
-      run: |
-        "$R3MAKE" --do "print {R3MAKE is Working} quit 0"
-
-
-    # Building for Android requires having a compiler that can build for ARM,
-    # as well as support for the "Bionic" OS (distinct from the Linux that this
-    # container is running on, so the /usr/include and /usr/lib files wouldn't
-    # be usable in the compilation process).
-    #
-    # https://github.com/nttld/setup-ndk
-    #
-    # There is a known layout to the folders, so the Android config can find
-    # the compiler relative to the ANDROID_NDK_ROOT installation path.
-    #
-    # Android [r]evisions (e.g. r13, r21d) are described in this history list:
-    #
-    # https://developer.android.com/ndk/downloads/revision_history
-    #
-    # See README: !!! IMPORTANT - Untrusted Actions, Use Audited Hash !!!
-    #
-    - name: Install the Android NDK (Native Development Kit)
-      id: setup-ndk
-      uses: nttld/setup-ndk@66168bc2be149f117859da845149dee8b763e6c9
+    - uses: actions/download-artifact@master
       with:
-        ndk-version: ${{ matrix.ndk-revision }}
+        name: r3
+        path: build/
 
-
-    # To find out where the `setup-ndk` action installed the NDK, you have to
-    # look at the output variables for that step.
-    #
-    # There is no "official" standard environment variable for the C/C++ NDK.
-    # But the Java SDK has one that the command line tools look for, and it's
-    # ANDROID_SDK_ROOT.  So we use ANDROID_NDK_ROOT for consistency, and since
-    # simply NDK or ANDROID_NDK don't communicate well that it's a directory
-    # (could be a flag, could be a version number, etc.)
-    #
-    # See README: Environment Variables
-    #
-    - name: Set ANDROID_NDK_ROOT Environment Variable
-      run: |
-        echo "ANDROID_NDK_ROOT=${{ steps.setup-ndk.outputs.ndk-path }}" >> $GITHUB_ENV
-
-
-    # Once we have the cross compiler, build the TCC library for ARM if this
-    # build is using the TCC extension.  (`sudo apt install libtcc-dev` would
-    # give us something doubly incorrect...an x86_64 library for building
-    # strings of Ccode into x86_64 machine code.)
-    #
-    - name: Cross-Compile libtcc.a if Making an R3 That Can Compile C Code
-      run: |
-        source extensions/tcc/tools/build-libtcc-helper.sh
-        echo "CONFIG_TCCDIR=$(pwd)/tcc" >> $GITHUB_ENV
-
-
-    # Show a little bit of sanity check information.
-    #
-    # !!! Here is where we would usually do something like `gcc -v` to get
-    # some diagnostic information about the compiler.  However, it's convoluted
-    # to figure out whether gcc (old) or clang (new) are used in the NDK, and
-    # that logic and version detection is in the %android-cross-compiled.r so
-    # there's not much point in duplicating that here in bash.
-    #
-    - name: Output System Information
-      run: |
-        echo "Installed NDK Version: $ANDROID_NDK_VERSION"
-        echo "NDK Is In Directory: $ANDROID_NDK_ROOT"
-
-        echo "Current directory is: $(pwd)"
-
-
-  #====# BUILD STEPS #========================================================#
-
-
-    # See README: {Braces} For %make.r String Parameters
-    #
-    - name: Generate Makefile for Cross-Compiling to ARM
-      run: |
-        mkdir build
-        cd build
-
-        "$R3MAKE" ../make.r \
-            config="../configs/$CONFIG_FILE" \
-            target=makefile \
-            standard=$STANDARD \
-            os_id=$OS_ID \
-            debug=$DEBUG \
-            git_commit="{$GIT_COMMIT}" \
-            rigorous=no \
-            static=no \
-            extensions="$EXTENSIONS"
-
-
-    - name: Create Folders For Build Products (Compiler Won't Create Them)
-      run: |
-        cd build
-        make folders
-
-
-    - name: Prep the Build By Making Various Auto-Generated .h and .c Files
-      run: |
-        cd build
-        make prep
-
-
-    # https://github.com/actions/upload-artifact
-    #
-    - name: Optional Download of Prep Files Before They Can Cause Build Failure
-      if: false  # Change this to true to download a file
-      uses: actions/upload-artifact@v2  # See README: Trusted Actions
+    - uses: actions/download-artifact@master
       with:
-        name: tmp-internals.h
-        path: build/prep/include/tmp-internals.h
+        name: tcc-encap.zip
+        path: build/
+
+    - uses: actions/download-artifact@master
+      with:
+        name: rebol-server.apk
+        path: build/
 
 
-    - name: Cross-Compile and Link the C Files to into an ARM-Based R3
-      run: |
-        cd build
-        make
-        echo "R3BUILT=$(pwd)/r3" >> $GITHUB_ENV
-
-
-    # !!! Unfortunately, the MacOS bootstrap executable seems to be creating
-    # corrupt zip files.  The problem is sorted out in newer builds, but we
-    # don't have a newer bootstrap build at time of writing.  Since it's just
-    # creating a zip file in a fairly easy way, we punt on calling the script
-    # and do it with the unix command line utility.
-    #
-    - name: Make a .ZIP File of the Encap Resources for TCC
-      run: |
-        # "${R3MAKE}" extensions/tcc/encap-tcc-resources.reb OS_ID=0.13.2
-
-        cp build/prep/include/rebol.h tcc/
-        cd tcc
-        zip -r tcc-encap.zip include/ rebol.h libtcc1.a
-        mv tcc-encap.zip ../build/
-
-
-  #====# TESTING STEP #=======================================================#
+  #====# EMULATOR TEST STEP #=================================================#
   #
   # Starting and stopping the emulator is extremely slow.  The first time
   # is always a "cold boot", and takes about 201 seconds to start.  If you
@@ -409,8 +544,10 @@ jobs:
   # whole step.  Output printed to standard output in the android executable
   # will be relayed back by `adb shell` so it can be read in the output log.
   #
+  # ADB useful commands list:
+  # https://gist.github.com/Pulimet/5013acf2cd5b28e55036c82c91bd56d8
+  #
   #===========================================================================#
-
 
     # https://github.com/ReactiveCircus/android-emulator-runner
     #
@@ -433,7 +570,6 @@ jobs:
     # See README: !!! IMPORTANT - Untrusted Actions, Use Audited Hash !!!
     #
     - name: Poke R3 Executable Into Android Emulator And Run Commands
-      if: matrix.os == 'macos-latest'  # not `${{ matrix.os }} == ...`
       uses: hostilefork/android-emulator-runner@dont-wrap-script
       env:
         ADB_R3: adb shell /data/local/tmp/r3  # "Android DeBug" remotely
@@ -448,13 +584,24 @@ jobs:
         # single and double quotes with backslash if they need to appear
         # literally in the shell command line.
         #
+        # Chrome has an annoying "Welcome to Chrome" screen that comes up on
+        # the first run that we want to bypass:
+        # https://stackoverflow.com/a/64629745
+        #
         # !!! `adb root; adb remount` should be able to remount and make
         # %/system writable, since we are using -writable-system.  But that
         # causes `error: closed` and the emulator stops.  So we have to write
-        # to the special writable location %/data/local/tmp
+        # to the special writable location %/data/local/tmp - however with
+        # just root access (no remounting) we get permission to *read* the
+        # /data/data directories for apps, where they may also write.
         #
         script: |
-          adb push "$R3BUILT" $TMP/r3
+          adb root
+
+          adb shell 'echo "chrome --disable-fre --no-default-browser-check --no-first-run" > /data/local/tmp/chrome-command-line'
+          adb shell am start -n com.android.chrome/com.google.android.apps.chrome.Main
+
+          adb push build/r3 $TMP/r3
           adb shell chmod +x $TMP/r3
 
           $ADB_R3 --do \"print [{Hello} \'World]\"
@@ -465,3 +612,58 @@ jobs:
 
           adb push extensions/tcc/tests/call-librebol.r $TMP/call-librebol.r
           $ADB_R3 $TMP/call-librebol.r tcc/
+
+          adb install -g build/rebol-server.apk
+          sleep 20
+          adb shell am start -n giuliolunati.rebolserver/giuliolunati.rebolserver.MainActivity
+          sleep 20
+          adb shell input keyevent KEYCODE_BACK
+          sleep 20
+          adb shell am start -a android.intent.action.VIEW -d http://localhost:8888/apps/r3-console/index.html
+          sleep 60
+          adb shell "input keyboard text 'as text! read'"
+          sleep 20
+          adb shell "input keyboard text ' http://localh'"
+          sleep 20
+          adb shell "input keyboard text 'ost:8888'"
+          sleep 20
+          adb shell "input keyboard text '/testwrite'"
+          sleep 20
+          adb shell "input keyboard text '/data/data'"
+          sleep 20
+          adb shell "input keyboard text '/giuliolunati'"
+          sleep 20
+          adb shell "input keyboard text '.rebolserver'"
+          sleep 20
+          adb shell "input keyboard text '/test.txt'"
+          sleep 20
+          adb shell input keyevent KEYCODE_ENTER
+          sleep 20
+          adb exec-out screencap -p > screen.png
+          adb pull /data/data/giuliolunati.rebolserver/test.txt test.txt
+
+
+    #====# OPTIONAL DOWNLOAD OF EMULATOR SCREENSHOT #=========================#
+    #
+    # If something is going wrong on the cloud emulator when it seems to work
+    # fine on a local emulator, that's a bummer.  All the tools one might use
+    # (e.g. Chrome DevTools to inspect the console log of the browser, etc.)
+    # are unavailable.  But you can capture a screenshot of the emulator at
+    # any moment with:
+    #
+    #    adb exec-out screencap -p > screen.png
+    #
+    # Taking pictures at various points might help deduce at least how far
+    # things are going or where they're getting stuck.
+    #
+    # Note: If you want this step to run even in cases of failure, then you
+    # have to use `if: always()`.  Because unless you specify `always()` then
+    # `success()` is implicit, e.g. `if: true` will still only run if the
+    # previous steps didn't fail.
+    #
+    - uses: actions/upload-artifact@master
+      if: always()  # not the same as "if true", see Note: above
+      with:
+        name: screen.png
+        path: screen.png
+        retention-days: 1
