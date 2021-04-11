@@ -45,7 +45,7 @@ REBNATIVE(delimit)
 
     REBVAL *line = ARG(line);
     if (IS_TEXT(line) or IS_ISSUE(line))
-        return rebValueQ("copy", line, rebEND); // !!! Review performance
+        return rebValueQ("copy", line);  // !!! Review performance
 
     assert(IS_BLOCK(line));
 
@@ -452,7 +452,7 @@ REBNATIVE(deline)
     // AS TEXT! verifies the UTF-8 validity of a BINARY!, and checks for any
     // embedded '\0' bytes, illegal in texts...without copying the input.
     //
-    REBVAL *input = rebValue("as text!", ARG(input), rebEND);
+    REBVAL *input = rebValue("as text!", ARG(input));
 
     if (REF(lines)) {
         Init_Block(D_OUT, Split_Lines(input));

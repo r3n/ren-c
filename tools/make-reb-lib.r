@@ -47,7 +47,7 @@ api-objects: make block! 50
 
 map-each-api: func [code [block!]] [
     map-each api api-objects compose/only [
-        do in api (code)  ; want API variable visible to `code` while running 
+        do in api (code)  ; want API variable visible to `code` while running
     ]
 ]
 
@@ -202,7 +202,7 @@ for-each api api-objects [do in api [
         /inline
         <with> returns wrapper-params
     ][
-        Q: try if Q ["Q"]
+        q: try if Q ["Q"]  ; !!! case-sensitive concession, temporary (?)
         inline: try if inline ["_inline"]
 
         returns: default ["void"]
@@ -219,7 +219,7 @@ for-each api api-objects [do in api [
         } compose [
             wrapper-params  ; "global" where q is undefined, must be first
             (api)
-            Q  ; !!! Binding to all words in contexts
+            q  ; !!! Binding to all words in contexts
         ]
     ]
 
@@ -228,7 +228,7 @@ for-each api api-objects [do in api [
         /Q
         <with> returns wrapper-params
     ][
-        Q: try if Q ["Q"]
+        q: try if Q ["Q"]  ; !!! case-sensitive concession, temporary (?)
 
         returns: default ["void"]
 
@@ -245,7 +245,7 @@ for-each api api-objects [do in api [
         } compose [
             wrapper-params  ; "global" where q is undefined, must be first
             (api)
-            Q  ; !!! Binding to all words in contexts
+            q  ; !!! Binding to all words in contexts
         ]
     ]
 
@@ -392,16 +392,33 @@ e-lib/emit {
      * since variadic macros don't work.  They will also need shims for
      * stdint.h and stdbool.h included.
      */
-    #include <stdlib.h>  /* for size_t */
-    #include <stdarg.h>  /* for va_list, va_start() in inline functions */
-    #if !defined(_PSTDINT_H_INCLUDED) && !defined(LIBREBOL_NO_STDINT)
-        #include <stdint.h>  /* for uintptr_t, int64_t, etc. */
-    #endif
-    #if !defined(_PSTDBOOL_H_INCLUDED) && !defined(LIBREBOL_NO_STDBOOL)
-        #if !defined(__cplusplus)
-            #include <stdbool.h>  /* for bool, true, false (if C99) */
+    #if defined(LIBREBOL_NO_STDLIB)
+        /*
+         * This file won't compile without definitions for uintptr_t and
+         * bool, so make those as a minimum.  They have to be binary compatible
+         * with how the library was compiled...these are just guesses.
+         */
+        #define int64_t long long  /* used for integers */
+        #define uint32_t unsigned int  /* used for codepoint (use int?) */
+        #define uintptr_t unsigned int  /* used for ticks */
+        #define bool _Bool  /* actually part of C99 compiler */
+    #else
+        #include <stdlib.h>  /* for size_t */
+        #if !defined(_PSTDINT_H_INCLUDED) && !defined(LIBREBOL_NO_STDINT)
+            #include <stdint.h>  /* for uintptr_t, int64_t, etc. */
+        #endif
+        #if !defined(_PSTDBOOL_H_INCLUDED) && !defined(LIBREBOL_NO_STDBOOL)
+            #if !defined(__cplusplus)
+                #include <stdbool.h>  /* for bool, true, false (if C99) */
+            #endif
         #endif
     #endif
+
+    /*
+     * No matter what, you need stdarg.h for va_list...TCC extension provides
+     * its own version.
+     */
+    #include <stdarg.h>  /* for va_list, va_start() in inline functions */
 
     /*
      * !!! Needed by following two macros.
@@ -501,7 +518,9 @@ e-lib/emit {
      * client code.  If the client code is on Windows, use WCHAR.  If it's in
      * a unixodbc client use SQLWCHAR.  But use UTF-8 if you possibly can.
      */
-    #ifdef TO_WINDOWS
+    #if defined(LIBREBOL_NO_STDLIB)
+        #define REBWCHAR unsigned int  /* Windows-specific API */
+    #elif defined(TO_WINDOWS)
         #define REBWCHAR wchar_t
     #else
         #define REBWCHAR uint16_t
@@ -715,19 +734,21 @@ e-lib/emit {
          */
         #if !defined(REBOL_EXPLICIT_END)
           /*
-           * Clients who #include "rebol.h" aren't expected to use %sys-core.h
-           * internal APIs (including %sys-core.h hs %rebol.h automatically).
-           * But for some debugging scenarios, adding the internal API as an
-           * "overlay" gives extra functions for recompiling test code which
-           * does things like pick apart cell structure.  If that is the case,
-           * then this allows %sys-core.h to detect that %rebol.h was already
-           * included and is using explicit ends (the core uses explicit ones,
-           * but that is harmlessly redundant for a debug build...each call
-           * will just have two rebENDs--one explicit, one implicit).
+           * Allows detection of when rebol.h has been included with the
+           * implicit end semantics.
            */
           #define REBOL_IMPLICIT_END
 
-          #if defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
+          #ifdef _MSC_VER
+            /*
+             * MS doesn't define __STDC_VERSION__ at all, but implement some of
+             * C99 and C11 anyway.  Trigger an informative error here if C99
+             * macro expansion doesn't work...
+             */
+             #define YourMSVCIsTooOldIfThisErrors(...) (__VA_ARGS__ + 2)
+            inline static int MSVCAgeTest(void)
+              { return YourMSVCIsTooOldIfThisErrors(1); }
+          #elif defined (__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
             /* C99 or above */
           #elif defined(__cplusplus) && __cplusplus >= 201103L
             /* C++11 or above, if following the standard (VS2017 does not) */
@@ -972,6 +993,6 @@ e-table/write-emitted
 ; The JavaScript extension actually mutates the API table, so run the TCC hook
 ; first...
 ;
-do make-file [(repo-dir) tools/../extensions/tcc/prep-libr3-tcc.reb]
+do make-file [(repo-dir) extensions/tcc/tools/prep-libr3-tcc.reb]
 
-do make-file [(repo-dir) tools/../extensions/javascript/prep-libr3-js.reb]
+do make-file [(repo-dir) extensions/javascript/tools/prep-libr3-js.reb]

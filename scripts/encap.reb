@@ -138,44 +138,44 @@ elf-format: context [
         [
             :(bits = 32) [
                 4 skip ; e_entry
-                begin: 4 skip (handler 'e_phoff 4)
-                begin: 4 skip (handler 'e_shoff 4)
+                begin: here, 4 skip (handler 'e_phoff 4)
+                begin: here, 4 skip (handler 'e_shoff 4)
             ]
         |
             :(bits = 64) [
                 8 skip ; e_entry
-                begin: 8 skip (handler 'e_phoff 8)
-                begin: 8 skip (handler 'e_shoff 8)
+                begin: here, 8 skip (handler 'e_phoff 8)
+                begin: here, 8 skip (handler 'e_shoff 8)
             ]
         ]
         4 skip ; e_flags
         2 skip ; e_ehsize
-        begin: 2 skip (handler 'e_phentsize 2)
-        begin: 2 skip (handler 'e_phnum 2)
-        begin: 2 skip (handler 'e_shentsize 2)
-        begin: 2 skip (handler 'e_shnum 2)
-        begin: 2 skip (handler 'e_shstrndx 2)
+        begin: here, 2 skip (handler 'e_phentsize 2)
+        begin: here, 2 skip (handler 'e_phnum 2)
+        begin: here, 2 skip (handler 'e_shentsize 2)
+        begin: here, 2 skip (handler 'e_shnum 2)
+        begin: here, 2 skip (handler 'e_shstrndx 2)
 
         (mode: _)
     ]
 
     program-header-rule: [
-        begin: 4 skip (handler 'p_type 4)
+        begin: here, 4 skip (handler 'p_type 4)
         [
             :(bits = 32) [
-                begin: 4 skip (handler 'p_offset 4)
+                begin: here, 4 skip (handler 'p_offset 4)
                 4 skip ; p_vaddr
                 4 skip ; p_paddr
-                begin: 4 skip (handler 'p_filesz 4)
+                begin: here, 4 skip (handler 'p_filesz 4)
                 4 skip ; p_memsz
             ]
         |
             :(bits = 64) [
                 4 skip ; p_flags, different position in 64-bit
-                begin: 8 skip (handler 'p_offset 8)
+                begin: here, 8 skip (handler 'p_offset 8)
                 8 skip ; p_vaddr
                 8 skip ; p_paddr
-                begin: 8 skip (handler 'p_filesz 8)
+                begin: here, 8 skip (handler 'p_filesz 8)
                 8 skip ; p_memsz
             ]
         ]
@@ -194,34 +194,34 @@ elf-format: context [
     ]
 
     section-header-rule: [
-        begin: 4 skip (handler 'sh_name 4)
-        begin: 4 skip (handler 'sh_type 4)
+        begin: here, 4 skip (handler 'sh_name 4)
+        begin: here, 4 skip (handler 'sh_type 4)
         [
             :(bits = 32) [
-                begin: 4 skip (handler 'sh_flags 4)
-                begin: 4 skip (handler 'sh_addr 4)
-                begin: 4 skip (handler 'sh_offset 4)
-                begin: 4 skip (handler 'sh_size 4)
+                begin: here, 4 skip (handler 'sh_flags 4)
+                begin: here, 4 skip (handler 'sh_addr 4)
+                begin: here, 4 skip (handler 'sh_offset 4)
+                begin: here, 4 skip (handler 'sh_size 4)
             ]
         |
             :(bits = 64) [
-                begin: 8 skip (handler 'sh_flags 8)
-                begin: 8 skip (handler 'sh_addr 8)
-                begin: 8 skip (handler 'sh_offset 8)
-                begin: 8 skip (handler 'sh_size 8)
+                begin: here, 8 skip (handler 'sh_flags 8)
+                begin: here, 8 skip (handler 'sh_addr 8)
+                begin: here, 8 skip (handler 'sh_offset 8)
+                begin: here, 8 skip (handler 'sh_size 8)
             ]
         ]
-        begin: 4 skip (handler 'sh_link 4)
-        begin: 4 skip (handler 'sh_info 4)
+        begin: here, 4 skip (handler 'sh_link 4)
+        begin: here, 4 skip (handler 'sh_info 4)
         [
             :(bits = 32) [
-                begin: 4 skip (handler 'sh_addralign 4)
-                begin: 4 skip (handler 'sh_entsize 4)
+                begin: here, 4 skip (handler 'sh_addralign 4)
+                begin: here, 4 skip (handler 'sh_entsize 4)
             ]
         |
             :(bits = 64) [
-                begin: 8 skip (handler 'sh_addralign 8)
-                begin: 8 skip (handler 'sh_entsize 8)
+                begin: here, 8 skip (handler 'sh_addralign 8)
+                begin: here, 8 skip (handler 'sh_entsize 8)
             ]
         ]
 
@@ -267,9 +267,9 @@ elf-format: context [
 
         parse skip executable e_phoff [
             e_phnum [
-                (mode: 'read) pos: program-header-rule
+                (mode: 'read) let pos: here, program-header-rule
                 (if p_offset >= offset [p_offset: p_offset + delta])
-                (mode: 'write) :pos program-header-rule
+                (mode: 'write) seek pos, program-header-rule
             ]
             to end
         ] else [
@@ -281,9 +281,9 @@ elf-format: context [
         let pos
         parse skip executable e_shoff [
             e_shnum [
-                (mode: 'read) pos: section-header-rule
+                (mode: 'read) let pos: here, section-header-rule
                 (if sh_offset >= offset [sh_offset: sh_offset + delta])
-                (mode: 'write) :pos section-header-rule
+                (mode: 'write) seek pos, section-header-rule
             ]
             to end
         ] else [
@@ -334,7 +334,7 @@ elf-format: context [
         ; Now that we have the string section, we can go through the
         ; section names and see if there's any match for an existing encap
         ;
-        section-index: (
+        let section-index: (
             find-section
                 encap-section-name
                 skip executable e_shoff ; section headers
@@ -407,12 +407,12 @@ elf-format: context [
             ; Update string table size in its corresponding header.
             ;
             parse skip executable string-header-offset [
-                (mode: 'read) pos: section-header-rule
+                (mode: 'read) let pos: here, section-header-rule
                 (
                     assert [sh_offset = string-section-offset]
                     sh_size: sh_size + (1 + length of encap-section-name)
                 )
-                (mode: 'write) :pos section-header-rule
+                (mode: 'write) seek pos, section-header-rule
                 to end
             ] else [
                 fail "Error updating string table size in string header"
@@ -623,7 +623,7 @@ pe-format: context [
     pos: _
 
     DOS-header-rule: gen-rule [
-        ["MZ" | fail-at: (err: 'missing-dos-signature) fail]
+        ["MZ" | fail-at: here (err: 'missing-dos-signature) fail]
         u16-le (last-size: u16)
         u16-le (n-blocks: u16)
         u16-le (n-reloc: u16)
@@ -645,7 +645,7 @@ pe-format: context [
     ] DOS-header
 
     PE-header-rule: [
-        "PE" #{0000} | fail-at: (err: 'missing-PE-signature) fail
+        "PE" #{0000} | fail-at: here, (err: 'missing-PE-signature) fail
     ]
 
     COFF-header: _
@@ -662,7 +662,7 @@ pe-format: context [
             | #{6602} (machine: 'MIPS16)
         ]
         u16-le (machine-value: u16)
-        pos: u16-le (
+        pos: here, u16-le (
             number-of-sections: u16
             number-of-sections-offset: (index of pos) - 1
         )
@@ -681,7 +681,7 @@ pe-format: context [
         and [#{0b01} (signature: 'exe-32)
              | #{0b02} (signature: 'exe-64)
              | #{0701} (signature: 'ROM)
-             | fail-at: (err: 'missing-image-signature) fail
+             | fail-at: here, (err: 'missing-image-signature) fail
         ]
         u16-le (signature-value: u16)
         copy major-linker-version skip  ; 1 byte
@@ -706,8 +706,10 @@ pe-format: context [
         u16-le (major-subsystem-version: u16)
         u16-le (minor-subsystem-version: u16)
         u32-le (win32-version-value: u32)
-        pos: u32-le (image-size: u32
-                image-size-offset: (index of pos) - 1)
+        pos: here, u32-le (
+            image-size: u32
+            image-size-offset: (index of pos) - 1
+        )
         u32-le (size-of-headers: u32)
         u32-le (checksum: u32)
         and [
@@ -724,7 +726,7 @@ pe-format: context [
             | #{1300} (subsystem: 'EFI-ROM)
             | #{1400} (subsystem: 'Xbox)
             | #{1600} (subsystem: 'Windows-Boot-application)
-            | fail-at: (err: 'unrecoginized-subsystem) fail
+            | fail-at: here, (err: 'unrecoginized-subsystem), false
         ]
         u16-le (subsystem-value: u16)
         u16-le (dll-characteristics: u16)
@@ -760,15 +762,16 @@ pe-format: context [
     end-of-section-header: _
 
     exe-rule: [
-        DOS-header-rule pos: (garbage: DOS-header/e-lfanew + 1 - index of pos)
+        DOS-header-rule
+        pos: here, (garbage: DOS-header.e-lfanew + 1 - index of pos)
         garbage skip
         PE-header-rule
         COFF-header-rule
         PE-optional-header-rule
-        PE-optional-header/number-of-RVA-and-sizes data-directory-rule
-        start-of-section-header:
-        COFF-header/number-of-sections section-rule
-        end-of-section-header:
+        PE-optional-header.number-of-RVA-and-sizes data-directory-rule
+        start-of-section-header: here
+        COFF-header.number-of-sections section-rule
+        end-of-section-header: here
 
         ; !!! stop here, no END ?
     ]
@@ -811,11 +814,15 @@ pe-format: context [
     ]
 
     parse-exe: func [
+        return: [logic!]
         exe-data [binary!]
     ][
         reset
         parse exe-data exe-rule
-        if err [
+        if err = 'missing-dos-signature [
+            return false  ; soft failure (just wasn't an EXE, no "MZ")
+        ]
+        if err [  ; hard failure (was an EXE, but something wrong with it)
             fail ["err:" err, "at:" copy/part fail-at 16]
         ]
         true
@@ -833,10 +840,10 @@ pe-format: context [
                 8
             ) 8 ; name, must be 8-byte long
 
-            to-u32-le section/virtual-size
-            to-u32-le section/virtual-offset
-            to-u32-le section/physical-size
-            to-u32-le section/physical-offset
+            to-u32-le section.virtual-size
+            to-u32-le section.virtual-offset
+            to-u32-le section.physical-size
+            to-u32-le section.physical-offset
 
             copy/part (head of insert/dup
                 tail of to binary! copy section/reserved
@@ -868,7 +875,7 @@ pe-format: context [
 
         ;check if there's section name conflicts
         for-each sec sections [
-            if section-name = to text! trim/with sec/name #{00} [
+            if section-name = to text! trim/with sec.name #{00} [
                 fail [
                     "There is already a section named" section-name |
                     mold sec
@@ -879,11 +886,11 @@ pe-format: context [
         ;print ["Section headers end at:" index of end-of-section-header]
         sort/compare sections func [a b][a/physical-offset < b/physical-offset]
 
-        first-section-by-phy-offset: any [
+        let first-section-by-phy-offset: any [
             sections/1
             catch [
                 for-each sec sections [
-                    if not zero? sec/physical-offset [
+                    if not zero? sec.physical-offset [
                         throw sec
                     ]
                 ]
@@ -891,8 +898,8 @@ pe-format: context [
         ]
 
         ;dump first-section-by-phy-offset
-        gap: (
-            first-section-by-phy-offset/physical-offset
+        let gap: (
+            first-section-by-phy-offset.physical-offset
             - (index of end-of-section-header)
         )
         if gap < size-of-section-header [
@@ -900,38 +907,38 @@ pe-format: context [
         ]
 
         ; increment the "number of sections"
-        change skip exe-data COFF-header/number-of-sections-offset
-            to-u16-le (COFF-header/number-of-sections + 1)
+        change skip exe-data COFF-header.number-of-sections-offset
+            to-u16-le (COFF-header.number-of-sections + 1)
 
-        last-section-by-phy-offset: sections/(COFF-header/number-of-sections)
+        let last-section-by-phy-offset: sections/(COFF-header.number-of-sections)
         ;dump last-section-by-phy-offset
 
-        sort/compare sections func [a b][a/virtual-offset < b/virtual-offset]
+        sort/compare sections func [a b][a.virtual-offset < b.virtual-offset]
 
         let last-section-by-virt-offset:
-            sections/(COFF-header/number-of-sections)
+            sections/(COFF-header.number-of-sections)
 
         let last-virt-offset: align-to
-            (last-section-by-virt-offset/virtual-offset
-                + last-section-by-virt-offset/virtual-size)
+            (last-section-by-virt-offset.virtual-offset
+                + last-section-by-virt-offset.virtual-size)
             4096
 
         let new-section-size: align-to
             (length of section-data)
-            PE-optional-header/file-alignment ; physical size
+            PE-optional-header.file-alignment ; physical size
 
         let new-section-offset:
-            last-section-by-phy-offset/physical-offset
-            + last-section-by-phy-offset/physical-size
+            last-section-by-phy-offset.physical-offset
+            + last-section-by-phy-offset.physical-size
 
-        assert [zero? new-section-offset mod PE-optional-header/file-alignment]
+        assert [zero? new-section-offset mod PE-optional-header.file-alignment]
 
         ; Set image size, must be a multiple of SECTION-ALIGNMENT
         ;
-        change skip exe-data PE-optional-header/image-size-offset
+        change skip exe-data PE-optional-header.image-size-offset
             to-u32-le align-to
-                (PE-optional-header/image-size + new-section-size)
-                PE-optional-header/section-alignment
+                (PE-optional-header.image-size + new-section-size)
+                PE-optional-header.section-alignment
 
         ; add a new section header
         ;
@@ -949,22 +956,22 @@ pe-format: context [
         ;print ["current exe-data length" length of exe-data]
         if new-section-offset > length of exe-data [
             print "Last section has been truncated, filling with garbage"
-            insert/dup garbage: copy #{} #{00} (
+            insert/dup let garbage: copy #{} #{00} (
                 new-section-offset - length of exe-data
             )
             print ["length of filler:" length of garbage]
             append exe-data garbage
         ]
 
-        if new-section-size > length of lsection-data [
-            insert/dup garbage: copy #{} #{00} (
+        if new-section-size > length of section-data [
+            insert/dup let garbage: copy #{} #{00} (
                 new-section-size - length of section-data
             )
             section-data: join to binary! section-data garbage
         ]
 
         assert [
-            zero? (length of section-data) mod PE-optional-header/file-alignment
+            zero? (length of section-data) mod PE-optional-header.file-alignment
         ]
 
         ; add the section
@@ -1003,7 +1010,7 @@ pe-format: context [
 
         let target-sec: try catch [
             for-each sec sections [
-                if section-name = to text! trim/with sec/name #{00} [
+                if section-name = to text! trim/with sec.name #{00} [
                     throw sec
                 ]
             ]
@@ -1017,12 +1024,12 @@ pe-format: context [
                 target-sec
             ]
             data [
-                copy/part (skip exe-data target-sec/physical-offset) target-sec/physical-size
+                copy/part (skip exe-data target-sec.physical-offset) target-sec.physical-size
             ]
         ] else [
             reduce [
                 target-sec
-                copy/part (skip exe-data target-sec/physical-offset) target-sec/physical-size
+                copy/part (skip exe-data target-sec.physical-offset) target-sec.physical-size
             ]
         ]
     ]
@@ -1041,29 +1048,29 @@ pe-format: context [
 
         let new-section-size: align-to
             (length of section-data)
-            PE-optional-header/file-alignment
+            PE-optional-header.file-alignment
 
-        let section-size-diff: new-section-size - target-sec/physical-size
+        let section-size-diff: new-section-size - target-sec.physical-size
         if not zero? section-size-diff [
             new-image-size: to-u32-le align-to
-                (PE-optional-header/image-size + section-size-diff)
-                PE-optional-header/section-alignment
+                (PE-optional-header.image-size + section-size-diff)
+                PE-optional-header.section-alignment
 
-            if new-image-size != PE-optional-header/image-size [
-                change skip exe-data PE-optional-header/image-size-offset new-image-size
+            if new-image-size != PE-optional-header.image-size [
+                change skip exe-data PE-optional-header.image-size-offset new-image-size
             ]
         ]
 
         let pos: start-of-section-header
         for-each sec sections [
-            if sec/physical-offset > target-sec/physical-size [
+            if sec.physical-offset > target-sec.physical-size [
                 ;update the offset affected sections
-                sec/physical-offset: sec/physical-offset + section-size-diff
+                sec.physical-offset: sec.physical-offset + section-size-diff
                 update-section-header pos sec
             ]
             pos: skip pos size-of-section-header
         ]
-        remove/part pos: skip exe-data target-sec/physical-offset target-sec/physical-size
+        remove/part pos: skip exe-data target-sec.physical-offset target-sec.physical-size
 
         if new-section-size > length of section-data [ ; needs pad with #{00}
             insert/dup garbage: copy #{} #{00} (
@@ -1088,22 +1095,22 @@ pe-format: context [
         ;dump COFF-header
         ;dump PE-optional-header
         ; decrement the "number of sections"
-        change skip exe-data COFF-header/number-of-sections-offset
-            to-u16-le (COFF-header/number-of-sections - 1)
+        change skip exe-data COFF-header.number-of-sections-offset
+            to-u16-le (COFF-header.number-of-sections - 1)
 
-        image-size-diff: align-to target-sec/physical-size PE-optional-header/section-alignment
+        image-size-diff: align-to target-sec.physical-size PE-optional-header.section-alignment
         if not zero? image-size-diff [
-            change skip exe-data PE-optional-header/image-size-offset
-                to-u32-le (PE-optional-header/image-size - image-size-diff)
+            change skip exe-data PE-optional-header.image-size-offset
+                to-u32-le (PE-optional-header.image-size - image-size-diff)
         ]
 
         let pos: start-of-section-header
         for-each sec sections [
-            print to text! sec/name
+            print to text! sec.name
             ;dump sec
             case [
-                sec/physical-offset = target-sec/physical-offset [
-                    assert [sec/name = target-sec/name]
+                sec.physical-offset = target-sec.physical-offset [
+                    assert [sec.name = target-sec.name]
                     ;target sec, replace with all #{00}
                     change pos head of (
                         insert/dup copy #{} #{00} size-of-section-header
@@ -1111,9 +1118,9 @@ pe-format: context [
                     ; do not skip @pos, so that the next section will
                     ; overwrite this one if it's not the last section
                 ]
-                sec/physical-offset > target-sec/physical-offset [
+                sec.physical-offset > target-sec.physical-offset [
                     ;update the offset affected sections
-                    sec/physical-offset: sec/physical-offset - target-sec/physical-size
+                    sec.physical-offset: sec.physical-offset - target-sec.physical-size
                     update-section-header pos sec
                     pos: skip pos size-of-section-header
                 ]
@@ -1122,7 +1129,7 @@ pe-format: context [
             ]
         ]
 
-        if not (target-sec/physical-offset + 1 = index of pos) [
+        if not (target-sec.physical-offset + 1 = index of pos) [
             ;if the section to remove is not the last section, the last section
             ;must have moved forward, so erase the old section
             change pos head of (
@@ -1130,7 +1137,7 @@ pe-format: context [
             )
         ]
 
-        remove/part skip exe-data target-sec/physical-offset target-sec/physical-size
+        remove/part skip exe-data target-sec.physical-offset target-sec.physical-size
 
         return (head of exe-data, elide reset)
     ]
@@ -1160,18 +1167,18 @@ generic-format: context [
             {Executable to be mutated to either add or update an embedding}
         embedding [binary!]
     ][
-        embed-size: length of embedding
+        let embed-size: length of embedding
 
         ; The executable we're looking at is already encapped if it ends with
         ; the encapping signature.
         ;
-        sig-location: skip tail of executable (negate length of signature)
+        let sig-location: skip tail of executable (negate length of signature)
         case [
             sig-location = signature [
                 print "Binary contains encap version 0 data block."
 
                 let size-location: skip sig-location -8
-                let embed-size: debin [be +] copy/part size-location 8
+                embed-size: debin [be +] copy/part size-location 8
                 print ["Existing embedded data is" embed-size "bytes long."]
 
                 print ["Trimming out existing embedded data."]
@@ -1232,15 +1239,12 @@ encap: func [
     /rebol "Path to a Rebol to encap instead of using the current one"
         [any-value!]
 ][
-    if block? spec [
-        fail "The spec dialect for encapping has not been defined yet"
-    ]
-
-    rebol: default [system/options/boot]
-    let out-rebol-path: either ".exe" = base-name: skip tail of rebol -4 [
-        join (copy/part rebol (index of base-name) - 1) "-encap.exe"
+    let in-rebol-path: any [rebol, system.options.boot]
+    let base-name-tail: skip tail of in-rebol-path -4
+    let out-rebol-path: either ".exe" = base-name-tail [
+        join (copy/part in-rebol-path (index of base-name-tail) - 1) "-encap.exe"
     ][
-        join rebol "-encap"
+        join in-rebol-path "-encap"
     ]
 
     print ["Encapping from original executable:" rebol]
@@ -1249,48 +1253,30 @@ encap: func [
 
     print ["Original executable is" length of executable "bytes long."]
 
-    let single-script: not dir? spec
-
-    let compressed
-    either single-script [
-        let embed: read spec
-        print ["New embedded resource size is" length of embed "bytes long."]
-
-        compressed: gzip embed
-    ][
-        compressed: copy #{}
-        zip/deep/verbose compressed spec
-    ]
+    ; !!! Note: LIB. qualifier needed on ZIP due to binding dependency.  "Sea
+    ; of words" resolves this problem (not committed to master yet).  Also,
+    ; head tuple support is still pending...use GROUP!
+    ;
+    let compressed: copy #{}
+    (:lib.zip)/deep/verbose compressed spec
 
     print ["Compressed resource is" length of compressed "bytes long."]
 
-    ; !!! Renaming the single file "main.reb" and zipping it would probably
-    ; be better, but the interface for zip doesn't allow you to override the
-    ; actual names of disk files at this moment.  Just signal which it is.
-    ;
-    either single-script [
-        insert compressed 0  ; signal a single file encap
-    ][
-        insert compressed 1  ; signal a zipped encap
-    ]
-
-    print ["Extending compressed resource by one byte for zipped/not signal"]
-
     case [
         parse executable [
-            (elf-format/mode: 'read) elf-format/header-rule to end
+            (elf-format.mode: 'read) elf-format.header-rule to end
         ][
             print "ELF format found"
-            elf-format/update-embedding executable compressed
+            elf-format.update-embedding executable compressed
         ]
-        pe-format/parse-exe executable [
+        pe-format.parse-exe executable [
             print "PE format found"
-            pe-format/update-embedding executable compressed
+            pe-format.update-embedding executable compressed
         ]
     ] else [
         print "Unidentified executable format, using naive concatenation."
 
-        generic-format/update-embedding executable compressed
+        generic-format.update-embedding executable compressed
     ]
 
     print ["Writing executable with encap, size, signature to" out-rebol-path]
@@ -1299,55 +1285,37 @@ encap: func [
 
     print ["Output executable written with total size" length of executable]
 
-    ; !!! Currently only test the extraction for single-file, easier.
-    ;
-    all [
-        single-script
-        embed != let extracted: get-encap out-rebol-path
-    ] then [
-        print ["Test extraction size:" length of extracted]
-        print ["Embedded bytes" mold embed]
-        print ["Extracted bytes" mold extracted]
-
-        fail "Test extraction of embedding did not match original data."
-    ]
-
     return out-rebol-path
 ]
 
 
 get-encap: func [
-    return: [blank! binary! block!]
-        {Blank if no encapping found, binary if single file, block if archive}
-    rebol-path [file!]
-        {The executable to search for the encap information in}
+    return: "NULL if no encapping found, unzipped BLOCK! results if found"
+        [<opt> block!]
+    rebol-path "The executable to search for the encap information in"
+        [file!]
 ][
     trap [
         read/part rebol-path 1
     ] then e -> [
         print [e]
         print ["Can't check for embedded code in Rebol path:" rebol-path]
-        return blank
+        return null
     ]
 
-    compressed-data: any [
-        , elf-format/get-embedding rebol-path,
-        , pe-format/get-embedding rebol-path
-        , generic-format/get-embedding rebol-path
+    let compressed-data: any [
+        elf-format.get-embedding rebol-path,
+        pe-format.get-embedding rebol-path,
+        generic-format.get-embedding rebol-path
     ] else [
-        return blank
+        return null
     ]
 
-    switch compressed-data/1 [
-        0 [
-            return gunzip next compressed-data
-        ]
-        1 [
-            let block: copy []
-            unzip/quiet block next compressed-data
-            return block
-        ]
-    ] else [
-        fail ["Unknown embedding signature byte:" compressed-data/1]
-    ]
+    ; !!! Note: LIB. qualifier needed on UNZIP due to binding dependency.  "Sea
+    ; of words" resolves this problem (not committed to master yet).  Also,
+    ; head tuple support is still pending...use GROUP!
+    ;
+    let block: copy []
+    (:lib.unzip)/quiet block compressed-data
+    return block
 ]

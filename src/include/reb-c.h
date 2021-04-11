@@ -749,27 +749,27 @@
     // Ugly combinatorics.  But yes, it's how std::optional does it too.
 
     template<typename L, typename R>
-    bool operator==(optional_pointer<L*> left, optional_pointer<R*> right)
+    bool operator==(optional_pointer<L> left, optional_pointer<R> right)
         { return left.p == right.p; }
 
     template<typename L, typename R>
-    bool operator==(optional_pointer<L*> left, R* right)
+    bool operator==(optional_pointer<L> left, R right)
         { return left.p == right; }
 
     template<typename L, typename R>
-    bool operator==(L* left, optional_pointer<R*> right)
+    bool operator==(L left, optional_pointer<R> right)
         { return left == right.p; }
 
     template<typename L, typename R>
-    bool operator!=(optional_pointer<L*> left, optional_pointer<R*> right)
+    bool operator!=(optional_pointer<L> left, optional_pointer<R> right)
         { return left.p != right.p; }
 
     template<typename L, typename R>
-    bool operator!=(optional_pointer<L*> left, R* right)
+    bool operator!=(optional_pointer<L> left, R right)
         { return left.p != right; }
 
     template<typename L, typename R>
-    bool operator!=(L* left, optional_pointer<R*> right)
+    bool operator!=(L left, optional_pointer<R> right)
         { return left != right.p; }
 
     #define option(TP) optional_pointer<TP>

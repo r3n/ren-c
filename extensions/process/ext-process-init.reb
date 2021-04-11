@@ -57,19 +57,20 @@ call*: adapt :call-internal* [
 ;
 call: :call*/wait
 
-parse-command-to-argv*: function [
+parse-command-to-argv*: func [
     {Helper for when POSIX gets a TEXT! and the /SHELL refinement not used}
 
     return: [block!]
     command [text!]
 ][
-    quoted-shell-item-rule: [  ; Note: ANY because "" is legal as an arg
+    let quoted-shell-item-rule: [  ; Note: ANY because "" is legal as an arg
         any [{\"} | not {"} skip]  ; escaped quotes and nonquotes
     ]
-    unquoted-shell-item-rule: [some [not space skip]]
+    let unquoted-shell-item-rule: [some [not space skip]]
 
+    let result
     parse command [
-        collect result: [any [
+        result: collect [any [
             any space [
                 {"} keep quoted-shell-item-rule {"}
                 | keep unquoted-shell-item-rule
@@ -88,7 +89,7 @@ parse-command-to-argv*: function [
 ]
 
 
-argv-block-to-command*: function [
+argv-block-to-command*: func [
     {Helper for when Windows gets an argv BLOCK! and needs a command line}
 
     return: [text!]
@@ -113,7 +114,7 @@ argv-block-to-command*: function [
 ; as some potentially OS-specific detection on how to launch URLs (e.g. looks
 ; at registry keys on Windows)
 
-browse*: function [
+browse*: func [
     "Open web browser to a URL or local file."
 
     return: <void>
@@ -126,7 +127,7 @@ browse*: function [
     ; easy to do rather than have to add processing on the C side.  Review.
     ;
     for-each template get-os-browsers [
-        command: replace/all (copy template) "%1" either file? location [
+        let command: replace/all (copy template) "%1" either file? location [
             file-to-local location
         ][
             location

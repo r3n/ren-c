@@ -146,8 +146,8 @@ static int Read_Directory(REBREQ *dir_req, REBREQ *file_req)
         // Read first file entry:
 
         WCHAR *dir_wide = rebSpellWideQ(
-            "file-to-local/full/wild", ReqFile(dir_req)->path,
-        rebEND);
+            "file-to-local/full/wild", ReqFile(dir_req)->path
+        );
         h = FindFirstFile(dir_wide, &info);
         rebFree(dir_wide);
 
@@ -184,8 +184,7 @@ static int Read_Directory(REBREQ *dir_req, REBREQ *file_req)
     if (not got_info) {
         assert(false); // see above for why this R3-Alpha code had a "hole"
         rebJumps(
-            "FAIL {%dev-clipboard: NOT(got_info), please report}",
-            rebEND
+            "FAIL {%dev-clipboard: NOT(got_info), please report}"
         );
     }
 
@@ -197,7 +196,7 @@ static int Read_Directory(REBREQ *dir_req, REBREQ *file_req)
         "applique :local-to-file [",
             "path:", rebR(rebTextWide(info.cFileName)),
             "dir: if", rebL(file->modes & RFM_DIR), "'#",
-        "]", rebEND
+        "]"
     );
 
     // !!! We currently unmanage this, because code using the API may
@@ -263,15 +262,15 @@ DEVICE_CMD Open_File(REBREQ *file)
         attrib |= FILE_ATTRIBUTE_READONLY;
 
     if (access == 0)
-        rebJumps("fail {No access modes provided to Open_File()}", rebEND);
+        rebJumps("fail {No access modes provided to Open_File()}");
 
     WCHAR *path_wide = rebSpellWideQ(
         "applique :file-to-local [",
             "path:", ReqFile(file)->path,
             "wild: if", rebL(req->modes & RFM_DIR), "'#",
-            "full: #",
-        "]",
-    rebEND);
+            "full: #"
+        "]"
+    );
 
     HANDLE h = CreateFile(
         path_wide,
@@ -535,8 +534,8 @@ DEVICE_CMD Query_File(REBREQ *file)
     // cause GetFileAttributesEx() to error, vs. backslash (which works)
     //
     WCHAR *path_wide = rebSpellWideQ(
-        "file-to-local/full", ReqFile(file)->path,
-    rebEND);
+        "file-to-local/full", ReqFile(file)->path
+    );
 
     BOOL success = GetFileAttributesEx(
         path_wide, GetFileExInfoStandard, &info
@@ -572,8 +571,8 @@ DEVICE_CMD Create_File(REBREQ *file)
         return Open_File(file);
 
     WCHAR *path_wide = rebSpellWideQ(
-        "file-to-local/full/no-tail-slash", ReqFile(file)->path,
-    rebEND);
+        "file-to-local/full/no-tail-slash", ReqFile(file)->path
+    );
 
     LPSECURITY_ATTRIBUTES lpSecurityAttributes = NULL;
     BOOL success = CreateDirectory(path_wide, lpSecurityAttributes);
@@ -601,8 +600,8 @@ DEVICE_CMD Delete_File(REBREQ *file)
     struct rebol_devreq *req = Req(file);
 
     WCHAR *path_wide = rebSpellWideQ(
-        "file-to-local/full", ReqFile(file)->path,
-    rebEND);  // leave tail slash on for directory removal
+        "file-to-local/full", ReqFile(file)->path
+    );  // leave tail slash on for directory removal
 
     BOOL success;
     if (req->modes & RFM_DIR)
@@ -632,11 +631,11 @@ DEVICE_CMD Rename_File(REBREQ *file)
     REBVAL *to = cast(REBVAL*, req->common.data); // !!! hack!
 
     WCHAR *from_wide = rebSpellWideQ(
-        "file-to-local/full/no-tail-slash", ReqFile(file)->path,
-    rebEND);
+        "file-to-local/full/no-tail-slash", ReqFile(file)->path
+    );
     WCHAR *to_wide = rebSpellWideQ(
-        "file-to-local/full/no-tail-slash", to,
-    rebEND);
+        "file-to-local/full/no-tail-slash", to
+    );
 
     BOOL success = MoveFile(from_wide, to_wide);
 
@@ -675,7 +674,7 @@ REBVAL *File_Time_To_Rebol(REBREQ *file)
         ),  // "secs"
         rebI(1000000 * stime.wMilliseconds), // nano
         rebI(-tzone.Bias),  // zone
-    ")", rebEND);
+    ")");
 }
 
 
@@ -691,9 +690,7 @@ REBVAL *Get_Current_Dir_Value(void)
     WCHAR *path = rebAllocN(WCHAR, len);
     GetCurrentDirectory(len, path);
 
-    REBVAL *result = rebValue(
-        "local-to-file/dir", rebR(rebTextWide(path)),
-    rebEND);
+    REBVAL *result = rebValue("local-to-file/dir", rebR(rebTextWide(path)));
     rebFree(path);
     return result;
 }
@@ -706,7 +703,7 @@ REBVAL *Get_Current_Dir_Value(void)
 //
 bool Set_Current_Dir_Value(const REBVAL *path)
 {
-    WCHAR *path_wide = rebSpellWide("file-to-local/full", path, rebEND);
+    WCHAR *path_wide = rebSpellWide("file-to-local/full", path);
 
     BOOL success = SetCurrentDirectory(path_wide);
 
@@ -734,8 +731,8 @@ REBVAL *Get_Current_Exec(void)
     path[r] = '\0';  // May not be NULL-terminated if buffer is not big enough
 
     REBVAL *result = rebValue(
-        "local-to-file", rebR(rebTextWide(path)),
-    rebEND);
+        "local-to-file", rebR(rebTextWide(path))
+    );
     rebFree(path);
 
     return result;

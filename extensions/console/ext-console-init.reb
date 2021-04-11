@@ -236,7 +236,7 @@ console!: make object! [
 ]
 
 
-start-console: function [
+start-console: func [
     "Called when a REPL is desired after command-line processing, vs quitting"
 
     return: <void>
@@ -245,20 +245,20 @@ start-console: function [
     <static>
         o (system/options)  ; shorthand since options are often read/written
 ][
-    === MAKE CONSOLE! INSTANCE FOR SKINNING ===
+    === {MAKE CONSOLE! INSTANCE FOR SKINNING} ===
 
     ; Instantiate console! object into system/console.  This is updated via
     ; %console-skin.reb if in system/options/resources
 
-    skin-file: case [
+    let skin-file: case [
         file? skin [skin]
         object? skin [blank]
     ] else [%console-skin.reb]
 
     loud-print "Starting console..."
     loud-print newline
-    proto-skin: match object! skin else [make console! []]
-    skin-error: _
+    let proto-skin: match object! skin else [make console! []]
+    let skin-error: null
 
     all [
         skin-file
@@ -267,7 +267,7 @@ start-console: function [
         exists? skin-file: join o/resources skin-file
     ] then [
         trap [
-            new-skin: do load skin-file
+            let new-skin: do load skin-file
 
             ; if loaded skin returns console! object then use as prototype
             all [
@@ -293,7 +293,7 @@ start-console: function [
 
     system/console: proto-skin
 
-    === HOOK FOR HELP ABOUT LAST ERROR ===
+    === {HOOK FOR HELP ABOUT LAST ERROR} ===
 
     ; The WHY command lets the user get help about the last error printed.
     ; To do so, it has to save the last error.  Adjust the error printing
@@ -308,7 +308,7 @@ start-console: function [
         system/state/last-error: e
     ]
 
-    === PRINT BANNER ===
+    === {PRINT BANNER} ===
 
     if o/about [
         boot-print make-banner boot-banner  ; the fancier banner
@@ -316,7 +316,7 @@ start-console: function [
 
     system/console/print-greeting
 
-    === VERBOSE CONSOLE SKINNING MESSAGES ===
+    === {VERBOSE CONSOLE SKINNING MESSAGES} ===
 
     loud-print [newline {Console skinning:} newline]
     if skin-error [
@@ -340,7 +340,7 @@ start-console: function [
 ]
 
 
-ext-console-impl: function [
+ext-console-impl: func [
     {Rebol ACTION! that is called from C in a loop to implement the console}
 
     return: "Code for C caller to sandbox, exit status, RESUME code, or hook"
@@ -354,16 +354,16 @@ ext-console-impl: function [
     skin "Console skin to use if the console has to be launched"
         [<opt> object! file!]
 ][
-    === HOOK RETURN FUNCTION TO GIVE EMITTED INSTRUCTION ===
+    === {HOOK RETURN FUNCTION TO GIVE EMITTED INSTRUCTION} ===
 
     ; The C caller can be given a BLOCK! representing an code the console is
     ; executing on its own behalf, as part of its "skin".  Building these
     ; blocks is made easier by collaboration between EMIT and a hooked version
     ; of the underlying RETURN of this function.
 
-    instruction: copy []
+    let instruction: copy []
 
-    emit: function [
+    let emit: func [
         {Builds up sandboxed code to submit to C, hooked RETURN will finalize}
 
         item "ISSUE! directive, TEXT! comment, (<*> composed) code BLOCK!"
@@ -386,7 +386,7 @@ ext-console-impl: function [
         ]
     ]
 
-    return: function [
+    return: func [
         {Hooked RETURN function which finalizes any gathered EMIT lines}
 
         state "Describes the RESULT that the next call to HOST-CONSOLE gets"
@@ -443,7 +443,7 @@ ext-console-impl: function [
         ]
     ]
 
-    === DO STARTUP HOOK IF THIS IS THE FIRST TIME THE CONSOLE HAS RUN ===
+    === {DO STARTUP HOOK IF THIS IS THE FIRST TIME THE CONSOLE HAS RUN} ===
 
     if not prior [
         ;
@@ -463,11 +463,12 @@ ext-console-impl: function [
         return <prompt>
     ]
 
-    === GATHER DIRECTIVES ===
+    === {GATHER DIRECTIVES} ===
 
     ; #directives may be at the head of BLOCK!s the console ran for itself.
     ;
-    directives: collect [
+    let directives: collect [
+        let i
         if block? prior [
             parse prior [some [set i: issue! (keep i)] end]
         ]
@@ -478,7 +479,7 @@ ext-console-impl: function [
         return <prompt>
     ]
 
-    === QUIT handling ===
+    === {QUIT handling} ===
 
     ; https://en.wikipedia.org/wiki/Exit_status
 
@@ -500,7 +501,7 @@ ext-console-impl: function [
         ]
     ]
 
-    === HALT handling (e.g. Ctrl-C or Escape) ===
+    === {HALT handling (e.g. Ctrl-C or Escape)} ===
 
     all [
         error? :result
@@ -525,7 +526,7 @@ ext-console-impl: function [
         return <prompt>
     ]
 
-    === RESUME handling ===
+    === {RESUME handling} ===
 
     ; !!! This is based on debugger work-in-progress.  A nested console that
     ; has been invoked via a breakpoint the console will sandbox most errors
@@ -607,14 +608,14 @@ ext-console-impl: function [
 
     assert [quoted? :result]
 
-    === HANDLE RESULT FROM EXECUTION OF CODE ON USER'S BEHALF ===
+    === {HANDLE RESULT FROM EXECUTION OF CODE ON USER'S BEHALF} ===
 
     if group? prior [
         emit [system/console/print-result (<*> get/any 'result)]
         return <prompt>
     ]
 
-    === HANDLE CONTINUATION THE CONSOLE SENT TO ITSELF ===
+    === {HANDLE CONTINUATION THE CONSOLE SENT TO ITSELF} ===
 
     assert [block? prior]
 
@@ -652,6 +653,7 @@ ext-console-impl: function [
         return <prompt>
     ]
 
+    let code
     trap [
         ; Note LOAD now makes BLOCK! even for a single item,
         ; e.g. `load "word"` => `[word]`
@@ -701,9 +703,9 @@ ext-console-impl: function [
         return <prompt>
     ]
 
-    === HANDLE CODE THAT HAS BEEN SUCCESSFULLY LOADED ===
+    === {HANDLE CODE THAT HAS BEEN SUCCESSFULLY LOADED} ===
 
-    if shortcut: select system/console/shortcuts try first code [
+    if let shortcut: select system/console/shortcuts try first code [
         ;
         ; Shortcuts like `q => [quit]`, `d => [dump]`
         ;
@@ -738,12 +740,12 @@ ext-console-impl: function [
 ]
 
 
-why: function [
+why: func [
     "Explain the last error in more detail."
     return: <void>
     'err [<end> word! path! error!] "Optional error value"
 ][
-    err: default [system/state/last-error]
+    let err: default [system/state/last-error]
 
     if match [word! path!] err [
         err: get err
@@ -758,7 +760,7 @@ why: function [
 ]
 
 
-upgrade: function [
+upgrade: func [
     "Check for newer versions."
     return: <void>
 ][

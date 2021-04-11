@@ -144,8 +144,8 @@ REBNATIVE(map_event)
     PUSH_GC_GUARD(gob);
 
     REBVAL *mapped = rebValue(
-        "map-gob-offset", gob, "make pair! [", rebI(x), rebI(y), "]",
-    rebEND);
+        "map-gob-offset", gob, "make pair! [", rebI(x), rebI(y), "]"
+    );
 
     // For efficiency, %reb-event.h is able to store direct REBGOB pointers
     // (This loses any index information or other cell-instance properties)
@@ -276,11 +276,11 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
             if (num_pending == 0)
                 return nullptr; // has no pending ports!
             timeout = ALL_BITS; // no timeout provided
-            val = END_NODE;
+            val = nullptr;
         }
     }
 
-    if (NOT_END(val)) {
+    if (val != nullptr) {
         switch (VAL_TYPE(val)) {
           case REB_INTEGER:
           case REB_DECIMAL:
@@ -449,7 +449,7 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
     // like INTERSECT and INTERSECTED?  The original "Sieve_Ports" in R3-Alpha
     // had custom code here but this just uses the API.
 
-    REBVAL *sieved = rebValue("intersect", ports, waked, rebEND);
+    REBVAL *sieved = rebValue("intersect", ports, waked);
     Copy_Cell(D_OUT, sieved);
     rebRelease(sieved);
 

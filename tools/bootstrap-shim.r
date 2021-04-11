@@ -30,6 +30,12 @@ REBOL [
     }
 ]
 
+; Define HERE and SEEK as no-ops for compatibility in parse
+; https://forum.rebol.info/t/parse-bootstrap-compatibility-strategy/1533
+;
+here: []
+seek: []
+
 ; The snapshotted Ren-C existed right before <blank> was legal to mark an
 ; argument as meaning a function returns null if that argument is blank.
 ; See if this causes an error, and if so assume it's the old Ren-C, not a
@@ -43,6 +49,13 @@ REBOL [
 trap [
     func [i [<blank> integer!]] [...]
 ] else [
+    ;
+    ; While things are in flux with MAKE-FILE, do it in order to sync any
+    ; bootstrapping executables more recent than the one that didn't have it.
+    ; It will overwrite the MAKE-FILE that's built in.
+    ;
+    do %../scripts/make-file.r  ; Experimental!  Trying to replace PD_File...
+
     ; OPT has behavior of turning NULLs into VOID! to keep you from optioning
     ; something you don't need to, but with refinement changes bootstrap code
     ; would get ugly if it had to turn every OPT of a refinement into OPT TRY.
@@ -54,7 +67,7 @@ trap [
     ]
 
     ; https://forum.rebol.info/t/just-vs-lit-literal-literally/1453
-    ; bootstrap executable on github actions doesn't have this change
+    ; bootstrap executable on GitHub CI doesn't have this change
     ;
     if undefined? 'just [
         just: :literal
@@ -101,6 +114,17 @@ set: specialize :lib/set [opt: true]
 print: func [value] [
     lib/print either value == newline [""][value]
 ]
+
+
+; NON is a new helpful opposite to ENSURE
+;
+non: func [type [<opt> datatype!] value [<opt> any-value!]] [
+    if :type = type of :value [
+        fail ["NON Didn't Expect Value to be of type" type else [<null>]]
+    ]
+    return :value
+]
+
 
 ; Enfixedness was conceived as not a property of an action itself, but of a
 ; particular relationship between a word and an action.  While this had some
@@ -154,7 +178,14 @@ collect-lets: func [
     return lets
 ]
 
-let: :nihil
+
+let: func [
+    return: []  ; old-style invisibility
+    :look [any-value! <...>]  ; old-style variadic
+][
+    if word? first look [take look]  ; otherwise leave SET-WORD! to runs
+]
+
 
 modernize-action: function [
     "Account for <blank> annotation, refinements as own arguments"
@@ -518,6 +549,52 @@ dequote: func [x] [
         lit-path! [to path! x]
     ] else [x]
 ]
+
+
+; Temporarily work around MATCH usage bug in bootstrap unzip:
+;
+;    data: if match [file! url! blank!] try :source/2 [
+;
+; If there is no SOURCE/2, it gets NULL...which it turns into a blank because
+; there was no <opt> in match.
+;
+; But then if that blank matches, it gives a VOID! so you don't get misled
+; in tests exactly like this one.  (!)
+;
+; Temporarily make void matches just return true for duration of the zip.
+; Also, make PRINT accept FILE! and TEXT! so the /VERBOSE option will work.
+;
+zip: enclose :zip func [f] [
+    let old-match: :match
+    let old-print: :print
+
+    if f/verbose [
+        fail "/VERBOSE not working due to PRINT problem, broken in bootstrap"
+    ]
+
+    ; !!! This workaround is crashing the bootstrap EXE, let it go for now
+    ;lib/print: adapt :print [
+    ;    if match [file! text!] :line [
+    ;        line: reduce [line]
+    ;    ]
+    ;]
+
+    lib/match: func [type value [<opt> any-value!]] [
+        let answer
+        if void? set* 'answer match type value [
+            return true
+        ]
+        return get 'answer
+    ]
+
+    let result: do f
+
+    lib/match: :old-match
+    ;lib/print: :old-print
+
+    return result
+]
+
 
 ; This experimental MAKE-FILE is targeting behavior that should be in the
 ; system core eventually.  Despite being very early in its design, it's

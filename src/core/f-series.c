@@ -260,10 +260,12 @@ REBINT Compare_Arrays_At_Indexes(
     if (s_array == t_array and s_index == t_index)
          return 0;
 
+    const RELVAL *s_tail = ARR_TAIL(s_array);
+    const RELVAL *t_tail = ARR_TAIL(t_array);
     const RELVAL *s = ARR_AT(s_array, s_index);
     const RELVAL *t = ARR_AT(t_array, t_index);
 
-    if (IS_END(s) or IS_END(t))
+    if (s == s_tail or t == t_tail)
         goto diff_of_ends;
 
     while (
@@ -277,7 +279,7 @@ REBINT Compare_Arrays_At_Indexes(
         s++;
         t++;
 
-        if (IS_END(s) or IS_END(t))
+        if (s == s_tail or t == t_tail)
             goto diff_of_ends;
     }
 
@@ -288,8 +290,8 @@ REBINT Compare_Arrays_At_Indexes(
     // Treat end as if it were a REB_xxx type of 0, so all other types would
     // compare larger than it.
     //
-    if (IS_END(s)) {
-        if (IS_END(t))
+    if (s == s_tail) {
+        if (t == t_tail)
             return 0;
         return -1;
     }

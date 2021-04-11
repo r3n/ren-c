@@ -32,6 +32,7 @@ REBOL [
     }
 ]
 
+
 ; !!! The general workings of modules is to scan them for top-level set-words,
 ; and then bind the module itself to those words.  This module is redefining
 ; the workings of the system fundamentally.  While doing those definitions
@@ -208,7 +209,7 @@ rewrite-spec-and-body: helper [
                 spec: my next
             ]
 
-            append spec as set-word! argument  ; SET-WORD! in specs are locals
+            append spec to tuple! argument  ; .VAR in specs are locals
 
             ; Take the value of the refinement and assign it to the argument
             ; name that was in the spec.  Then set refinement to true/blank.
@@ -239,7 +240,7 @@ rewrite-spec-and-body: helper [
         ]
 
         spec: head spec  ; At tail, so seek head for any debugging!
-    
+
         ; We don't go to an effort to provide a non-definitional return.  But
         ; add support for an EXIT that's a synonym for returning void.
         ;
@@ -289,7 +290,7 @@ redbol-func: func: emulate [
         body [block!]
     ][
         if find spec <local> [
-            return func-nonconst spec body  ; assume "new style" function 
+            return func-nonconst spec body  ; assume "new style" function
         ]
 
         spec: copy spec
@@ -309,7 +310,7 @@ redbol-function: function: emulate [
         /extern [block!]  ; from R3-Alpha, adopted by Red
     ][
         if find spec <local> [
-            return function-nonconst spec body  ; assume "new style" function 
+            return function-nonconst spec body  ; assume "new style" function
         ]
 
         if block? with [with: make object! with]
@@ -570,7 +571,8 @@ do: emulate [
 
         if var [  ; DO/NEXT
             if args [fail "Can't use DO/NEXT with ARGS"]
-            source: evaluate/result :source (just result:)
+            let result
+            source: evaluate/result :source 'result
             set var source  ; DO/NEXT put the *position* in the var
             return :result  ; DO/NEXT returned the *evaluative result*
         ]
@@ -668,6 +670,16 @@ also: emulate [
     ]
 ]
 
+
+; PARSE is different in Ren-C than in historical Rebol.  However, the goal is
+; to have it run on a framework that's easily twistable for compatibility or
+; new features by building on top of something called UPARSE:
+;
+; https://forum.rebol.info/t/introducing-uparse-the-hackable-usermode-parse/1529
+;
+; UPARSE is in early development at time of writing and is very slow.  But the
+; goal is to speed it up over time.  But Redbol uses it today anyway.
+
 parse: emulate [
     function [
         {Non-block rules replaced by SPLIT: https://trello.com/c/EiA56IMR}
@@ -687,7 +699,7 @@ parse: emulate [
             blank! [split input charset reduce [tab space CR LF]]
             text! [split input to-bitset rules]
         ] else [
-            did parse/(case_PARSE) input rules
+            did uparse2/(case_PARSE) input rules
         ]
     ]
 ]
@@ -1272,7 +1284,7 @@ cloaker: helper [function [  ; specialized as CLOAK and DECLOAK
 
     n: first #{A5}
 
-    ; In the C code this just kept adding to a 32-bit number, allowing 
+    ; In the C code this just kept adding to a 32-bit number, allowing
     ; overflow...then using a C cast to a byte.  Try to approximate this by
     ; just doing the math in modulo 256
     ;
@@ -1287,7 +1299,7 @@ cloaker: helper [function [  ; specialized as CLOAK and DECLOAK
     if not decode [
         i: 1
         while [i < dlen] [
-            data/(1 + i): data/(1 + i) xor+ 
+            data/(1 + i): data/(1 + i) xor+
                 (data/(1 + i - 1) xor+ key/(1 + modulo i klen))
             i: i + 1
         ]

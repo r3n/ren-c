@@ -224,8 +224,7 @@ static void Set_Vector_At(REBCEL(const*) vec, REBLEN n, const RELVAL *set) {
                 "unspaced [", rebI(bitsize), "{-bit}]",
                 rebT(sign ? "signed" : "unsigned"),
                 "{VECTOR! type}"
-        "]",
-        rebEND
+        "]"
     );
 }
 
@@ -278,7 +277,7 @@ REBARR *Vector_To_Array(const REBVAL *vect)
         Get_Vector_At(dest, vect, n);
 
     SET_SERIES_LEN(arr, len);
-    assert(IS_END(dest));
+    assert(dest == ARR_TAIL(arr));
 
     return arr;
 }

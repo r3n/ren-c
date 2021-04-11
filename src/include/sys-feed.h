@@ -319,7 +319,7 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
         break; }
 
       case DETECTED_AS_END: {  // end of variadic input, so that's it for this
-        feed->value = END_NODE;
+        feed->value = END_CELL;
 
         // The va_end() is taken care of here, or if there is a throw/fail it
         // is taken care of by Abort_Frame_Core()
@@ -393,11 +393,13 @@ inline static void Fetch_Next_In_Feed(REBFED *feed) {
         }
     }
     else {
-        feed->value = ARR_AT(FEED_ARRAY(feed), FEED_INDEX(feed));
-        ++FEED_INDEX(feed);
+        if (FEED_INDEX(feed) != cast(REBINT, ARR_LEN(FEED_ARRAY(feed)))) {
+            feed->value = ARR_AT(FEED_ARRAY(feed), FEED_INDEX(feed));
+            ++FEED_INDEX(feed);
+        }
+        else {
+            feed->value = END_CELL;
 
-        if (IS_END(feed->value)) {
-            //
             // !!! At first this dropped the hold here; but that created
             // problems if you write `do code: [clear code]`, because END
             // is reached when CODE is fulfilled as an argument to CLEAR but
@@ -518,9 +520,7 @@ inline static REBFED* Alloc_Feed(void) {
 
     REBSER *s = &feed->singular;  // SER() not yet valid
     s->leader.bits = NODE_FLAG_NODE | FLAG_FLAVOR(FEED);
-    SER_INFO(s) = Endlike_Header(
-        FLAG_USED_BYTE_ARRAY()  // reserved for future use
-    );
+    SER_INFO(s) = SERIES_INFO_MASK_NONE;
     Prep_Cell(FEED_SINGLE(feed));
     mutable_LINK(Splice, &feed->singular) = nullptr;
     mutable_MISC(Pending, &feed->singular) = nullptr;
@@ -593,6 +593,7 @@ inline static void Prep_Array_Feed(
     feed->flags.bits = flags;
 
     if (first) {
+        assert(NOT_END(first));
         feed->value = unwrap(first);
         Init_Any_Array_At_Core(
             FEED_SINGLE(feed), REB_BLOCK, array, index, specifier
@@ -602,6 +603,8 @@ inline static void Prep_Array_Feed(
     }
     else {
         feed->value = ARR_AT(array, index);
+        if (feed->value == ARR_TAIL(array))
+            feed->value = END_CELL;
         Init_Any_Array_At_Core(
             FEED_SINGLE(feed), REB_BLOCK, array, index + 1, specifier
         );

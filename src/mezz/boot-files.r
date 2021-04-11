@@ -27,7 +27,6 @@ REBOL [
     %sys-ports.r
     %sys-codec.r ; export to lib!
     %sys-load.r
-    %sys-start.r
 ]
 
 ; lib: mid-level lib context:

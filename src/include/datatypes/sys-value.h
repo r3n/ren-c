@@ -170,14 +170,14 @@
 // flag bits of the node.  This could have a runtime check in debug build
 // with a C++ variation that only takes mutable pointers.
 //
-inline static void INIT_VAL_NODE1(RELVAL *v, const REBNOD *node) {
+inline static void INIT_VAL_NODE1(RELVAL *v, option(const REBNOD*) node) {
     assert(v->header.bits & CELL_FLAG_FIRST_IS_NODE);
-    PAYLOAD(Any, v).first.node = node;
+    PAYLOAD(Any, v).first.node = try_unwrap(node);
 }
 
-inline static void INIT_VAL_NODE2(RELVAL *v, const REBNOD *node) {
+inline static void INIT_VAL_NODE2(RELVAL *v, option(const REBNOD*) node) {
     assert(v->header.bits & CELL_FLAG_SECOND_IS_NODE);
-    PAYLOAD(Any, v).second.node = node;
+    PAYLOAD(Any, v).second.node = try_unwrap(node);
 }
 
 #define VAL_NODE1(v) \
@@ -512,81 +512,6 @@ inline static RELVAL *Prep_Cell_Core(RELVAL *c) {
 #endif
 
 
-//=//// END MARKER ////////////////////////////////////////////////////////=//
-//
-// Historically Rebol arrays were always one value longer than their maximum
-// content, and this final slot was used for a REBVAL type called END!.
-// Like a '\0' terminator in a C string, it was possible to start from one
-// point in the series and traverse to find the end marker without needing
-// to look at the length (though the length in the series header is maintained
-// in sync, also).
-//
-// Ren-C changed this so that END is not a user-exposed data type, and that
-// it's not a requirement for the byte sequence containing the end byte be
-// the full size of a cell.  The type byte (which is 0 for an END) lives in
-// the second byte, hence two bytes are sufficient to indicate a terminator.
-//
-
-#define END_NODE \
-    cast(const REBVAL*, &PG_End_Node) // rebEND is char*, not REBVAL* aligned!
-
-#if defined(DEBUG_TRACK_EXTEND_CELLS) || defined(DEBUG_CELL_WRITABILITY)
-    inline static REBVAL *SET_END_Debug(RELVAL *v) {
-        ASSERT_CELL_WRITABLE_EVIL_MACRO(v);
-
-        mutable_KIND3Q_BYTE(v) = REB_0_END; // release build behavior
-
-        // Detection of END is designed to only be signaled by one byte.
-        // See the definition of `rebEND` for how this is used to make a
-        // small C string signal, and Init_Endlike_Header() for how a singular
-        // array sacrifices just one byte of its SERIES_INFO bits to signal
-        // an END to its contents.  Hence you cannot count on the heart
-        // byte being anything in an END cell.  Set to trash in debug.
-        //
-        mutable_HEART_BYTE(v) = REB_T_TRASH;
-        return cast(REBVAL*, v);
-    }
-
-    #define SET_END(v) \
-        SET_END_Debug(TRACK_CELL_IF_DEBUG(v))
-#else
-    inline static REBVAL *SET_END(RELVAL *v) {
-        mutable_KIND3Q_BYTE(v) = REB_0_END; // must be a prepared cell
-        return cast(REBVAL*, v);
-    }
-#endif
-
-// IS_END()/NOT_END() are called *a lot*, and adding costly checks to it will
-// slow down the debug build dramatically--taking up to 10% of the total time.
-// Hence DEBUG_CHECK_ENDS is disabled in the default debug build.
-//
-// IMPORTANT: Notice that END markers may not have NODE_FLAG_CELL, and may
-// be as short as 2 bytes long.
-//
-#if !defined(DEBUG_CHECK_ENDS)
-    #define IS_END(p) \
-        (((const REBYTE*)(p))[1] == REB_0_END)  // Note: needs (p) parens!
-#else
-    inline static bool IS_END(const void *p) {
-        if (((const REBYTE*)(p))[0] & NODE_BYTEMASK_0x40_FREE) {
-            printf("IS_END() called on garbage\n");
-            panic (p);
-        }
-
-        if (((const REBYTE*)(p))[1] == REB_0_END)
-            return true;
-
-        if (not (((const REBYTE*)(p))[0] & NODE_BYTEMASK_0x01_CELL)) {
-            printf("IS_END() found non-END pointer that's not a cell\n");
-            panic (p);
-        }
-
-        return false;
-    }
-#endif
-
-#define NOT_END(v) \
-    (not IS_END(v))
 
 
 //=////////////////////////////////////////////////////////////////////////=//
@@ -617,7 +542,7 @@ inline static RELVAL *Prep_Cell_Core(RELVAL *c) {
 inline static bool IS_RELATIVE(const RELVAL *v) {
     if (not Is_Bindable(v))
         return false;  // may use extra for non-GC-marked uintptr_t-size data
-        
+
     REBSER *binding = BINDING(v);
     if (not binding)
         return false;  // INTEGER! and other types are inherently "specific"
@@ -649,20 +574,21 @@ inline static bool IS_RELATIVE(const RELVAL *v) {
 // one is sure that the value is specific, and `cast(REBVAL*, v`) is a better
 // choice for efficiency.  This applies to things like `Copy_Cell()`, which
 // is called often and already knew its input was a REBVAL* to start with.
+//
+// Also, if you are enumerating an array of items you "know to be specific"
+// then you have to worry about if the array is empty:
+//
+//     REBVAL *head = SPECIFIC(ARR_HEAD(a));  // !!! a might be tail!
+//
 
 inline static REBVAL *SPECIFIC(const_if_c RELVAL *v) {
-    //
-    // Note: END is tolerated to help in specified array enumerations, e.g.
-    //
-    //     REBVAL *head = SPECIFIC(ARR_HEAD(specified_array));  // may be end
-    //
-    assert(IS_END(v) or IS_SPECIFIC(v));
+    assert(IS_SPECIFIC(v));
     return m_cast(REBVAL*, cast(const REBVAL*, v));
 }
 
 #if defined(__cplusplus)
     inline static const REBVAL *SPECIFIC(const RELVAL *v) {
-        assert(IS_END(v) or IS_SPECIFIC(v));  // ^-- see note about END
+        assert(IS_SPECIFIC(v));
         return cast(const REBVAL*, v);
     }
 
@@ -713,11 +639,13 @@ inline static REBVAL *SPECIFIC(const_if_c RELVAL *v) {
 #define UNSPECIFIED nullptr
 
 
-#define VAL_WORD_CACHE(v) \
-    cast(REBSPC*, VAL_NODE1(v))
+inline static void INIT_VAL_WORD_SYMBOL(RELVAL *v, const REBSYM *symbol)
+  { INIT_VAL_NODE1(v, symbol); }
 
-inline static void INIT_VAL_WORD_CACHE(const RELVAL *v, REBSPC *specifier)
-  { INIT_VAL_NODE1(m_cast(RELVAL*, v), specifier); }
+inline static const REBSYM *VAL_WORD_SYMBOL(REBCEL(const*) cell) {
+    assert(ANY_WORD_KIND(CELL_HEART(cell)));
+    return SYM(VAL_NODE1(cell));
+}
 
 #define MONDEX_MOD 4095  // modulus for the cached index modulus ("mondex")
 #define VAL_WORD_INDEXES_U32(v)         PAYLOAD(Any, (v)).second.u32

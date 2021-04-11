@@ -198,8 +198,8 @@ REBNATIVE(shove)
         }
         else if (IS_SET_PATH(left)) {
             f->feed->gotten = nullptr;  // calling arbitrary code, may disrupt
-            composed_set_path = rebValueQ("compose", left, rebEND);
-            REBVAL *temp = rebValueQ("get/hard", composed_set_path, rebEND);
+            composed_set_path = rebValueQ("compose", left);
+            REBVAL *temp = rebValueQ("get/hard", composed_set_path);
             Copy_Cell(D_OUT, temp);
             rebRelease(temp);
         }
@@ -244,9 +244,7 @@ REBNATIVE(shove)
         }
         else if (IS_SET_PATH(left)) {
             f->feed->gotten = nullptr;  // calling arbitrary code, may disrupt
-            rebElideQ(
-                "set/hard", composed_set_path, NULLIFY_NULLED(D_OUT),
-            rebEND);
+            rebElideQ("set/hard", composed_set_path, NULLIFY_NULLED(D_OUT));
             rebRelease(composed_set_path);
         }
         else
@@ -451,7 +449,7 @@ REBNATIVE(do)
 
         f->varlist = varlist;
         f->rootvar = CTX_ROOTVAR(c);
-        INIT_LINK_KEYSOURCE(varlist, NOD(f));
+        INIT_LINK_KEYSOURCE(varlist, f);
 
         assert(FRM_PHASE(f) == CTX_FRAME_ACTION(c));
         INIT_FRM_BINDING(f, VAL_FRAME_BINDING(source));
@@ -825,7 +823,7 @@ REBNATIVE(applique)
 
     f->varlist = varlist;
     f->rootvar = CTX_ROOTVAR(exemplar);
-    INIT_LINK_KEYSOURCE(varlist, NOD(f));
+    INIT_LINK_KEYSOURCE(varlist, f);
 
     INIT_FRM_PHASE(f, VAL_ACTION(applicand));
     INIT_FRM_BINDING(f, VAL_ACTION_BINDING(applicand));

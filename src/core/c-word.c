@@ -558,8 +558,9 @@ void Startup_Symbols(REBARR *words)
         *SER_AT(REBSTR*, PG_Symbol_Canons, cast(REBLEN, sym))
     );
 
-    RELVAL *word = ARR_HEAD(words);
-    for (; NOT_END(word); ++word) {
+    const RELVAL *tail = ARR_TAIL(words);
+    const RELVAL *word = ARR_HEAD(words);
+    for (; word != tail; ++word) {
         assert(IS_WORD(word));  // real word, not fake (e.g. `/` as -slash-0-)
         REBSYM *canon = m_cast(REBSYM*, VAL_WORD_SYMBOL(word));
 

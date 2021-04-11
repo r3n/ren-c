@@ -87,9 +87,7 @@ REBNATIVE(reduce)
         }
 
         if (not IS_NULLED(ARG(predicate))) {  // post-process result if needed
-            REBVAL *processed = rebValue(
-                rebINLINE(predicate), rebQ(D_OUT),
-            rebEND);
+            REBVAL *processed = rebValue(rebINLINE(predicate), rebQ(D_OUT));
             if (processed)
                 Copy_Cell(D_OUT, processed);
             else
@@ -189,7 +187,7 @@ REB_R Compose_To_Stack_Core(
         DECLARE_LOCAL (temp);
         Derelativize(temp, composee, specifier);
         PUSH_GC_GUARD(temp);
-        any_array = rebValueQ("as block!", temp, rebEND);
+        any_array = rebValueQ("as block!", temp);
         DROP_GC_GUARD(temp);
     }
     else
@@ -212,7 +210,7 @@ REB_R Compose_To_Stack_Core(
         REBCEL(const*) cell = VAL_UNESCAPED(f_value);
         enum Reb_Kind heart = CELL_HEART(cell); // notice `''(...)`
 
-        if (not ANY_ARRAY_OR_PATH_KIND(heart)) { // won't substitute/recurse
+        if (not ANY_ARRAY_KIND(heart)) { // won't substitute/recurse
             Derelativize(DS_PUSH(), f_value, specifier); // keep newline flag
             continue;
         }
@@ -270,7 +268,7 @@ REB_R Compose_To_Stack_Core(
                 predicate
                 and not doubled_group
             ){
-                insert = rebValue(rebINLINE(predicate), rebQ(out), rebEND);
+                insert = rebValue(rebINLINE(predicate), rebQ(out));
             } else
                 insert = IS_NULLED(out) ? nullptr : out;
 
@@ -294,7 +292,7 @@ REB_R Compose_To_Stack_Core(
 
                 const RELVAL *push_tail;
                 const RELVAL *push = VAL_ARRAY_AT(&push_tail, insert);
-                if (NOT_END(push)) {
+                if (push != push_tail) {
                     //
                     // Only proxy newline flag from the template on *first*
                     // value spliced in (it may have its own newline flag)

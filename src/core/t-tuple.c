@@ -277,8 +277,8 @@ REBTYPE(Sequence)
                     // consider this an API test.)
                     //
                     v = rebUnboxInteger(
-                        "to integer! round divide", rebI(v), arg,
-                    rebEND);
+                        "to integer! round divide", rebI(v), arg
+                    );
                 }
                 else {
                     if (a == 0)

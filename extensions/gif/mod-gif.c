@@ -279,7 +279,7 @@ REBNATIVE(decode_gif)
     cp += 13;
     transparency_index = -1;
 
-    REBVAL *frames = rebValue("copy []", rebEND);
+    REBVAL *frames = rebValue("copy []");
 
     for (;;) {
         if (cp >= end) break;
@@ -347,8 +347,8 @@ REBNATIVE(decode_gif)
             "append", frames, "make image! compose [",
                 "(to pair! [", rebI(w), rebI(h), "])",
                 binary,
-            "]",
-        rebEND);
+            "]"
+        );
 
         rebRelease(binary);
     }
@@ -362,7 +362,7 @@ REBNATIVE(decode_gif)
     REBVAL *result = rebValue("case [",
         "empty?", frames, "[fail {No frames found in GIF}]",
         "1 = length of", frames, "[first", frames, "]",
-    "] else [", frames, "]", rebEND);
+    "] else [", frames, "]");
 
     rebRelease(frames);
 

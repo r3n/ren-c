@@ -118,7 +118,7 @@ REBNATIVE(get_os_browsers)
 {
     PROCESS_INCLUDE_PARAMS_OF_GET_OS_BROWSERS;
 
-    REBVAL *list = rebValue("copy []", rebEND);
+    REBVAL *list = rebValue("copy []");
 
   #if defined(TO_WINDOWS)
 
@@ -171,7 +171,7 @@ REBNATIVE(get_os_browsers)
         --len;
     }
 
-    rebElide("append", list, rebR(rebLengthedTextWide(buffer, len)), rebEND);
+    rebElide("append", list, rebR(rebLengthedTextWide(buffer, len)));
 
     rebFree(buffer);
 
@@ -183,12 +183,12 @@ REBNATIVE(get_os_browsers)
         "append", list, "[",
             rebT("xdg-open %1"),
             rebT("x-www-browser %1"),
-        "]", rebEND
+        "]"
     );
 
   #else // Just try /usr/bin/open on POSIX, OS X, Haiku, etc.
 
-    rebElide("append", list, rebT("/usr/bin/open %1"), rebEND);
+    rebElide("append", list, rebT("/usr/bin/open %1"));
 
   #endif
 
@@ -238,7 +238,7 @@ static void kill_process(pid_t pid, int signal);
 #endif
 
 //
-//  terminate: native [
+//  export terminate: native [
 //
 //  "Terminate a process (not current one)"
 //
@@ -338,7 +338,7 @@ REBNATIVE(get_env)
   #ifdef TO_WINDOWS
     // Note: The Windows variant of this API is NOT case-sensitive
 
-    WCHAR *key = rebSpellWideQ(variable, rebEND);
+    WCHAR *key = rebSpellWideQ(variable);
 
     DWORD val_len_plus_one = GetEnvironmentVariable(key, NULL, 0);
     if (val_len_plus_one == 0) { // some failure...
@@ -364,7 +364,7 @@ REBNATIVE(get_env)
   #else
     // Note: The Posix variant of this API is case-sensitive
 
-    char *key = rebSpellQ(variable, rebEND);
+    char *key = rebSpellQ(variable);
 
     const char* val = getenv(key);
     if (val == NULL) // key not present in environment
@@ -411,8 +411,8 @@ REBNATIVE(set_env)
     REBVAL *value = ARG(value);
 
   #ifdef TO_WINDOWS
-    WCHAR *key_wide = rebSpellWide(variable, rebEND);
-    WCHAR *opt_val_wide = rebSpellWide("ensure [<opt> text!]", value, rebEND);
+    WCHAR *key_wide = rebSpellWide(variable);
+    WCHAR *opt_val_wide = rebSpellWide("ensure [<opt> text!]", value);
 
     if (not SetEnvironmentVariable(key_wide, opt_val_wide)) // null unsets
         fail ("environment variable couldn't be modified");
@@ -420,7 +420,7 @@ REBNATIVE(set_env)
     rebFree(opt_val_wide);
     rebFree(key_wide);
   #else
-    char *key_utf8 = rebSpell(variable, rebEND);
+    char *key_utf8 = rebSpell(variable);
 
     if (IS_NULLED(value)) {
       #ifdef unsetenv
@@ -443,7 +443,7 @@ REBNATIVE(set_env)
     }
     else {
       #ifdef setenv
-        char *val_utf8 = rebSpell(value, rebEND);
+        char *val_utf8 = rebSpell(value);
 
         if (setenv(key_utf8, val_utf8, 1) == -1) // the 1 means "overwrite"
             fail ("setenv() coudln't set environment variable");
@@ -468,7 +468,7 @@ REBNATIVE(set_env)
         // not worth the work.
 
         char *key_equals_val_utf8 = rebSpell(
-            "unspaced [", variable, "{=}", value, "]", rebEND
+            "unspaced [", variable, "{=}", value, "]"
         );
 
         char *duplicate = strdup(key_equals_val_utf8);
@@ -499,7 +499,7 @@ REBNATIVE(list_env)
 {
     PROCESS_INCLUDE_PARAMS_OF_LIST_ENV;
 
-    REBVAL *map = rebValue("make map! []", rebEND);
+    REBVAL *map = rebValue("make map! []");
 
   #ifdef TO_WINDOWS
     //
@@ -532,8 +532,8 @@ REBNATIVE(list_env)
         REBVAL *val = rebLengthedTextWide(eq_pos + 1, val_len);
 
         rebElide(
-            "append", map, "[", rebR(key), rebR(val), "]",
-        rebEND);
+            "append", map, "[", rebR(key), rebR(val), "]"
+        );
 
         key_equals_val += len + 1; // next
     }
@@ -563,9 +563,7 @@ REBNATIVE(list_env)
         int val_size = size - (eq_pos - key_equals_val) - 1;
         REBVAL *val = rebSizedText(eq_pos + 1, val_size);
 
-        rebElide(
-            "append", map, "[", rebR(key), rebR(val), "]",
-        rebEND);
+        rebElide("append", map, "[", rebR(key), rebR(val), "]");
     }
   #endif
 
@@ -800,9 +798,7 @@ static void kill_process(pid_t pid, int signal)
 
     switch (errno) {
       case EINVAL:
-        rebJumps(
-            "fail [{Invalid signal number:}", rebI(signal), "]", rebEND
-        );
+        rebJumps("fail [{Invalid signal number:}", rebI(signal), "]");
 
       case EPERM:
         Fail_Permission_Denied();
@@ -833,8 +829,8 @@ REBNATIVE(send_signal)
 {
     PROCESS_INCLUDE_PARAMS_OF_SEND_SIGNAL;
 
-    pid_t pid = rebUnboxInteger(ARG(pid), rebEND);
-    int signal = rebUnboxInteger(ARG(signal), rebEND);
+    pid_t pid = rebUnboxInteger(ARG(pid));
+    int signal = rebUnboxInteger(ARG(signal));
 
     // !!! Is called `send-signal` but only seems to call kill (?)
     //

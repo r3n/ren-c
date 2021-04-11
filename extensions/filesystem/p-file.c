@@ -95,8 +95,7 @@ REBVAL *Query_File_Or_Dir(const REBVAL *port, REBREQ *file)
             "size:", rebI(ReqFile(file)->size),
             "type:", (req->modes & RFM_DIR) ? "'dir" : "'file",
             "date:", rebR(timestamp),
-        "]",
-        rebEND
+        "]"
     );
 }
 
@@ -123,7 +122,7 @@ static void Open_File_Port(
     REBVAL *result = OS_DO_DEVICE(file, RDC_OPEN);
     assert(result != nullptr); // should be synchronous
 
-    if (rebDid("error?", result, rebEND))
+    if (rebDid("error?", result))
         fail (Error_Cannot_Open_Raw(ReqFile(file)->path, result));
 
     rebRelease(result);  // !!! ignore any other result?
@@ -388,8 +387,8 @@ REB_R File_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
             Cleanup_File(file);
 
-            if (rebDid("error?", result, rebEND))
-                rebJumps("fail", result, rebEND);
+            if (rebDid("error?", result))
+                rebJumps("fail", result);
 
             rebRelease(result); // ignore result
         }
@@ -458,8 +457,8 @@ REB_R File_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
             Cleanup_File(file);
 
-            if (rebDid("error?", result, rebEND))
-                rebJumps("fail", result, rebEND);
+            if (rebDid("error?", result))
+                rebJumps("fail", result);
 
             rebRelease(result);
         }
@@ -515,8 +514,8 @@ REB_R File_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
             Cleanup_File(file);
 
-            if (rebDid("error?", result, rebEND))
-                rebJumps("fail", result, rebEND);
+            if (rebDid("error?", result))
+                rebJumps("fail", result);
 
             rebRelease(result); // ignore error
         }
@@ -533,8 +532,8 @@ REB_R File_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         REBVAL *result = OS_DO_DEVICE(file, RDC_DELETE);
         assert(result != NULL); // should be synchronous
 
-        if (rebDid("error?", result, rebEND))
-            rebJumps("fail", result, rebEND);
+        if (rebDid("error?", result))
+            rebJumps("fail", result);
 
         rebRelease(result); // ignore result
         RETURN (port); }
@@ -551,8 +550,8 @@ REB_R File_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
         REBVAL *result = OS_DO_DEVICE(file, RDC_RENAME);
         assert(result != NULL); // should be synchronous
-        if (rebDid("error?", result, rebEND))
-            rebJumps("fail", result, rebEND);
+        if (rebDid("error?", result))
+            rebJumps("fail", result);
         rebRelease(result); // ignore result
 
         RETURN (ARG(from)); }
@@ -563,14 +562,14 @@ REB_R File_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
             REBVAL *cr_result = OS_DO_DEVICE(file, RDC_CREATE);
             assert(cr_result != NULL);
-            if (rebDid("error?", cr_result, rebEND))
-                rebJumps("fail", cr_result, rebEND);
+            if (rebDid("error?", cr_result))
+                rebJumps("fail", cr_result);
             rebRelease(cr_result);
 
             REBVAL *cl_result = OS_DO_DEVICE(file, RDC_CLOSE);
             assert(cl_result != NULL);
-            if (rebDid("error?", cl_result, rebEND))
-                rebJumps("fail", cl_result, rebEND);
+            if (rebDid("error?", cl_result))
+                rebJumps("fail", cl_result);
             rebRelease(cl_result);
         }
 
@@ -590,7 +589,7 @@ REB_R File_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
             Setup_File(file, 0, path);
             REBVAL *result = OS_DO_DEVICE(file, RDC_QUERY);
             assert(result != NULL);
-            if (rebDid("error?", result, rebEND)) {
+            if (rebDid("error?", result)) {
                 rebRelease(result); // !!! R3-Alpha returned blank on error
                 return nullptr;
             }

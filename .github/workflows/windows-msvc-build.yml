@@ -1,0 +1,333 @@
+#
+# File: %windows-build.yml
+#
+#=============================================================================#
+#
+# This does Windows builds on GitHub's Windows Server container, using the
+# Microsoft CL.EXE and LINK.EXE.
+#
+# While the default shell is PowerShell for Windows Actions, we are able to
+# override that and use bash...which makes more sense when trying to maintain
+# similar simple scripts on several platorms.
+#
+#====# PLEASE READ THE README #===============================================#
+#
+# Whenever this file says "See README", that is referring to the notes in the
+# %.github/workflows/README.md file.  If something appears in multiple GitHub
+# Workflow files, it's best to document it there instead of repeating it:
+#
+# https://github.com/metaeducation/ren-c/blob/master/.github/workflows/README.md
+#
+
+name: Windows MSVC
+
+
+# See README: When To Trigger Builds
+#
+on:
+  push:
+    branches: [
+      msvc,  # pushing to msvc won't build other workflows, use to debug
+      windows  # pushing to windows builds this and mingw, use to debug
+    ]
+  pull_request:
+    branches: [
+      master
+    ]
+  workflow_dispatch:  # Allows running this workflow manually from Actions tab
+
+
+# Standardize to use bash on all platforms.
+#
+# See README: Using The Strict Erroring Bash Shell
+#
+defaults:
+  run:
+    shell: bash
+
+
+# Each "Job" runs in its own VM, and a workflow run is made up of one or more
+# jobs that can run sequentially or in parallel.
+#
+# See README: Jobs
+#
+jobs:
+  windows-msvc-build:  # Name of this workflow's only job
+
+    # https://github.com/actions/virtual-environments#available-environments
+    #
+    runs-on: windows-2016
+
+
+    # See README: Build Matrix
+    #
+    strategy:
+      matrix:
+       include:
+
+         - os-id: 0.3.40  # 64-bit Target (built on this 64-bit platform)
+           config-file: vs2019-x64.r
+           standard: c99
+           debug: none
+           extensions: View -  # View requires C99, disable it
+           variation: ""
+
+         - os-id: 0.3.40  # 64-bit Target (built on this 64-bit platform)
+           config-file: vs2019-x64.r
+           standard: c99
+           debug: normal
+           extensions: "ODBC +"  # View requires C99, disable it
+           variation: "-debug"
+
+         - os-id: 0.3.01  # 32-bit Target (built on this 64-bit platform)
+           config-file: vs2019-x86.r
+           standard: c++17  # c++11 is "default", no option for it
+           debug: normal
+           extensions: "ODBC +"
+           variation: "-debug"
+
+
+    # See README: Environment Variables
+    #
+    env:
+      AWS_S3_BUCKET_NAME: metaeducation
+
+      # See README: Minimize GitHub-Specific Syntax
+      #
+      OS_ID: ${{ matrix.os-id }}
+      CONFIG_FILE: ${{ matrix.config-file }}
+      STANDARD: ${{ matrix.standard }}
+      DEBUG: ${{ matrix.debug }}
+      EXTENSIONS: ${{ matrix.extensions }}
+      VARIATION: ${{ matrix.variation }}
+
+
+    # Steps are a sequence of tasks that will be executed within a single VM
+    # as part of the job.
+    #
+    # See README: Steps
+    #
+    steps:  # (no indentatation needed below; so indent the minimum!)
+
+
+  #====# CHECKOUT STEPS #=====================================================#
+
+
+    # GitHub CI checkout on Windows auto translates LF to CR/LF in files:
+    #
+    # https://github.com/actions/checkout/issues/135
+    #
+    # However, Ren-C is taking the long view on this and prohibiting CR/LF in
+    # source by default.
+    #
+    # https://forum.rebol.info/t/newlina-non-grata/1207
+    # https://forum.rebol.info/t/1264
+    #
+    - name: Disable LF to CRLF Auto Translation In Git
+      run: |
+        git config --global core.autocrlf false
+        git config --global core.eol lf
+
+
+    # https://github.com/actions/checkout
+    #
+    # See README: Checkout Action
+    #
+    - uses: actions/checkout@v2  # See README: Trusted Actions
+
+
+    # The full commit is passed to make to build into the binary, and the
+    # abbreviated commit is used to name the executable.
+    #
+    # See README: Portably Capturing Git Hashes
+    #
+    - name: Grab Git Hash and Short Hash Into Environment Variables
+      run: |
+        git_commit="$(git show --format="%H" --no-patch)"
+        git_commit_short="$(git show --format="%h" --no-patch)"
+        echo "GIT_COMMIT=$git_commit" >> $GITHUB_ENV
+        echo "GIT_COMMIT_SHORT=$git_commit_short" >> $GITHUB_ENV
+
+
+  #====# TOOLCHAIN INSTALLATION STEPS #=======================================#
+
+
+    # !!! See if fetch_prebuilt could adapt to working with Windows bash (?)
+    #
+    - name: Fetch R3 To Use For "Prep" Build Steps as $R3MAKE
+      run: |
+        curl https://s3.amazonaws.com/r3bootstraps/r3-windows-x86-8994d23.exe -o r3make.exe
+        echo "R3MAKE=$(pwd)\r3make.exe" >> $GITHUB_ENV  # pass to next step
+
+
+    - name: Stop the build early if the R3MAKE is no good
+      run: |
+        "$R3MAKE" --do "print {R3MAKE is Working} quit 0"
+
+
+    # By default you can't call MSVC Compilation from the command line.  Use
+    # an action that is written to address that.
+    #
+    # https://github.com/ilammy/msvc-dev-cmd
+    #
+    # See README: !!! IMPORTANT - Untrusted Actions, Use Audited Hash !!!
+    #
+    - name: Enable CL.EXE C Compiler and Other Dev Tools From a Command Prompt
+      uses: ilammy/msvc-dev-cmd@aa2e60900e4cc1eda092dd8f53dab2b32efeacf5
+
+
+    # Using bash as the shell means a symlink tool /usr/bin/link gets in the
+    # path before MS's LINK.EXE.  It's not clear what the best workaround for
+    # this is, so just move it out of the way for now.  Other ideas here:
+    #
+    # https://github.com/ilammy/msvc-dev-cmd/issues/25
+    #
+    - name: Rename GNU-based Symlink Utility `link` So LINK.EXE Is In Path
+      run: |
+        mv /usr/bin/link.exe /usr/bin/gnu-link
+
+
+    # Show a little bit of sanity check information.  MSC is weird because you
+    # can't ask for the version specifically, you just call it with no args:
+    #
+    # https://stackoverflow.com/q/1233312/
+    #
+    - name: Output System Information
+      run: |
+        echo "MSC (cl.exe) version check:"
+        cl
+
+
+  #====# BUILD STEPS #========================================================#
+
+
+    # See README: {Braces} For %make.r String Parameters
+    #
+    - name: Use Rebmake to Generate an NMAKE Makefile
+      run: |
+        mkdir build
+        cd build
+
+        "$R3MAKE" ../make.r \
+            config="../configs/$CONFIG_FILE" \
+            target=nmake \
+            standard=$STANDARD \
+            os_id=$OS_ID \
+            debug=$DEBUG \
+            git_commit="{$GIT_COMMIT}" \
+            rigorous=no \
+            static=no \
+            extensions="$EXTENSIONS"
+
+
+    - name: Create Folders For Build Products (Compiler Won't Create Them)
+      run: |
+        cd build
+        nmake folders
+
+
+    - name: Prep the Build By Making Various Auto-Generated .h and .c Files
+      run: |
+        cd build
+        nmake prep
+
+
+    # https://github.com/actions/upload-artifact
+    #
+    - name: Optional Download of Prep Files Before They Can Cause Build Failure
+      if: false  # Change this to true to download a file
+      uses: actions/upload-artifact@v2  # See README: Trusted Actions
+      with:
+        name: tmp-internals.h
+        path: build/prep/include/tmp-internals.h
+
+
+    - name: Compile and Link the C Files to into R3BUILT
+      run: |
+        cd build
+        nmake
+        echo "R3BUILT=$(pwd)/r3" >> $GITHUB_ENV
+
+
+    # See README: Ren-C Code As Step
+    #
+    - name: Copy Built R3 To Where It Can Be Used As A Shell
+      run: |
+        cp build/r3 "C:/Program Files/Git/usr/bin/r3built.EXE"
+
+
+  #====# TESTING STEPS #======================================================#
+
+
+    - name: Basic Smoke Test (Print A Message And Quit)
+      run: |
+        "$R3BUILT" --do "print {hi}"
+
+
+    - name: HTTPS Read Test (If This Works, A Lot Of Things Are Working)
+      shell: r3built --fragment {0}  # See README: Ren-C Code As Step
+      run: |
+        print {== Hello From R3 HTTPS Read Test! ==}
+        parse as text! read https://example.com [
+            thru <h1> copy header: to </h1> to end
+        ] else [
+            fail "Couldn't Capture Page Title"
+        ]
+        assert [header = "Example Domain"]
+        print ["Succeeded:" header]
+
+
+  #====# DEPLOY STEPS #=======================================================#
+
+
+    # This action configures the AWS keys stored in GitHub's "Secrets" for
+    # the repository so that `aws s3` allows us to do uploads, without needing
+    # to publish any passwords publicly:
+    #
+    # https://github.com/aws-actions/configure-aws-credentials
+    #
+    # See README: Trusted Actions
+    #
+    - name: Configure AWS Credentials
+      if: github.ref == 'refs/heads/master'  # see notes on DEPLOY STEPS
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.METAEDUCATION_AWS_ACCESS_KEY }}
+        aws-secret-access-key: ${{ secrets.METAEDUCATION_AWS_SECRET_KEY }}
+        aws-region: us-east-1
+
+
+    # Name the executable based on the abbreviated commit, whether it is a
+    # debug or release build, and if it was built using C++ or not.  Note that
+    # the C++ debug builds have additional runtime checks in the debug
+    # build...though there should not be any impact on the release build.
+    # (Though there may be additional DLL dependencies regardless.)
+    #
+    # !!! All Ren-C stakeholders should be using debug builds at this time.
+    #
+    - name: Deploy Executable
+      if: github.ref == 'refs/heads/master'  # see notes on DEPLOY STEPS
+      run: |
+        cd build
+        NEW_NAME="r3-${GIT_COMMIT_SHORT}${VARIATION}.exe"
+        OPT_TYPE=""  # e.g. "--content-type application/wasm"
+
+        local=r3.exe
+        remote=s3://${AWS_S3_BUCKET_NAME}/travis-builds/${OS_ID}/${NEW_NAME}
+        aws s3 cp $local $remote $OPT_TYPE
+
+
+    - name: Greenlight Build
+      if: github.ref == 'refs/heads/master'  # see notes on DEPLOY STEPS
+      run: |
+        cd build
+        local=last-deploy.short-hash
+
+        # -n option to echo means "no newline at end" (it's not a "text file"
+        # so there is no standard enforcing that it have one...and it's
+        # easier in the client to not have it)
+        #
+        echo -n "${GIT_COMMIT_SHORT}" > $local
+
+        remote=s3://${AWS_S3_BUCKET_NAME}/travis-builds/${OS_ID}/$local
+        aws s3 cp $local $remote  # upload

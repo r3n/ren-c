@@ -477,7 +477,7 @@ bool Try_Fill_Pool(REBPOL *pool)
 }
 
 
-#if !defined(NDEBUG)
+#if defined(DEBUG_FANCY_PANIC)
 
 //
 //  Try_Find_Containing_Node_Debug: C
@@ -501,7 +501,7 @@ REBNOD *Try_Find_Containing_Node_Debug(const void *p)
             if (nodebyte & NODE_BYTEMASK_0x01_CELL) { // a "pairing"
                 REBVAL *pairing = VAL(cast(void*, unit));
                 if (p >= cast(void*, pairing) and p < cast(void*, pairing + 1))
-                    return NOD(pairing);  // REBSER is actually REBVAL[2]
+                    return pairing;  // REBSER is actually REBVAL[2]
                 continue;
             }
 
@@ -617,7 +617,7 @@ void Unmanage_Pairing(REBVAL *paired) {
 //
 void Free_Pairing(REBVAL *paired) {
     assert(NOT_CELL_FLAG(paired, MANAGED));
-    Free_Node(SER_POOL, NOD(paired));
+    Free_Node(SER_POOL, paired);
 
   #if defined(DEBUG_COUNT_TICKS)
     //
@@ -1266,17 +1266,8 @@ void Assert_Pointer_Detection_Working(void)
     assert(Detect_Rebol_Pointer(freed_cell) == DETECTED_AS_FREED_CELL);
   #endif
 
-    DECLARE_LOCAL (end_cell);
-    SET_END(end_cell);
-    assert(Detect_Rebol_Pointer(end_cell) == DETECTED_AS_END);
-    assert(Detect_Rebol_Pointer(END_NODE) == DETECTED_AS_END);
+    assert(Detect_Rebol_Pointer(END_CELL) == DETECTED_AS_END);
     assert(Detect_Rebol_Pointer(rebEND) == DETECTED_AS_END);
-
-    // An Endlike_Header() can use the NODE_FLAG_MANAGED bit however it wants.
-    // But the canon END_NODE is not managed, which was once used for a trick
-    // of using it vs. nullptr...but that trick isn't being used right now.
-    //
-    assert(not (END_NODE->header.bits & NODE_FLAG_MANAGED));
 
     REBSER *ser = Make_Series(1, FLAG_FLAVOR(BINARY));
     assert(Detect_Rebol_Pointer(ser) == DETECTED_AS_SERIES);

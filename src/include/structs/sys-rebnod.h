@@ -72,19 +72,13 @@
     //
     // https://en.cppreference.com/w/cpp/language/ebo
     //
-    // The optimization hits a tricky case with REBCTX (or REBACT/REBMAP).
-    // e.g. in order to not be able to mistakenly pass a REBCTX* to a routine
-    // that is expecting a REBARR*, REBCTX is not derived from REBARR...rather
-    // it is declared as a structure containing a single REBARR.  But if we
-    // add REBNOD as a base class of REBCTX, then it will contain a member
-    // derived from REBNOD as well.
+    // At one time there was an attempt to make REBCTX/REBACT/REBMAP derive
+    // from REBNOD, but not REBSER.  Facilitating that through multiple
+    // inheritance foils the Empty Base Class optimization, and creates other
+    // headaches.  So it was decided that so long as they are REBSER and not
+    // REBARR, that's still abstract enough to block most casual misuses.
     //
-    // Avoiding this means having a more fundamental form of REBSER that does
-    // not derive from REBNOD, which REBCTX then contains.  After that it can
-    // safely derive from REBNOD...while still being unwilling to directly
-    // coerce itself to a REBARR.
-    //
-    struct Reb_Node {};  // used as empty base class for REBSER + REBVAL
+    struct Reb_Node {};  // used as empty base class for REBSER, REBVAL, REBFRM
     typedef struct Reb_Node REBNOD;
 #endif
 
@@ -108,7 +102,7 @@
 //
 // These can form *compile-time constants*, which can be singly assigned to
 // a uintptr_t in one instruction.  Quantities smaller than a byte can be
-// mixed in on with bytes: 
+// mixed in on with bytes:
 //
 //    uintptr_t flags
 //        = FLAG_LEFT_BIT(0) | FLAG_LEFT_BIT(1) | FLAG_SECOND_BYTE(13);
@@ -337,7 +331,7 @@ inline static uintptr_t FLAG_SECOND_UINT16(uint16_t u)
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Assignments to bits and fields in the header are done through a native
-// platform-sized integer...while still being able to control the underlying
+// pointer-sized integer...while still being able to control the underlying
 // ordering of those bits in memory.  See FLAG_LEFT_BIT() in %reb-c.h for how
 // this is achieved.
 //
@@ -347,10 +341,6 @@ inline static uintptr_t FLAG_SECOND_UINT16(uint16_t u)
 // bytes", which may never legally start a UTF-8 string:
 //
 // https://en.wikipedia.org/wiki/UTF-8#Codepage_layout
-//
-// There are applications of Reb_Header as an "implicit terminator".  Such
-// header patterns don't actually start valid REBNODs, but have a bit pattern
-// able to signal the IS_END() test for REBVAL.  See Endlike_Header()
 //
 
 union Reb_Header {
@@ -493,10 +483,7 @@ union Reb_Header {
 // If this bit is set in the header, it indicates the slot the header is for
 // is `sizeof(REBVAL)`.
 //
-// In the debug build, it provides safety for all value writing routines,
-// including avoiding writing over "implicit END markers".  For details, see
-// Endlike_Header().
-//
+// In the debug build, it provides some safety for all value writing routines.
 // In the release build, it distinguishes "pairing" nodes (holders for two
 // REBVALs in the same pool as ordinary REBSERs) from an ordinary REBSER node.
 // Plain REBSERs have the cell mask clear, while pairing values have it set.

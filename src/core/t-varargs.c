@@ -166,7 +166,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
         if (Vararg_Op_If_No_Advance_Handled(
             out,
             op,
-            IS_END(shared) ? END_NODE : VAL_ARRAY_ITEM_AT(shared),
+            IS_END(shared) ? END_CELL : VAL_ARRAY_ITEM_AT(shared),
             IS_END(shared) ? SPECIFIED : VAL_SPECIFIER(shared),
             pclass
         )){
@@ -281,7 +281,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
             out,
             op,
             hit_barrier
-                ? END_NODE
+                ? END_CELL
                 : cast(const RELVAL *, f->feed->value), // might be END
             f_specifier,
             pclass
@@ -681,8 +681,12 @@ REBNATIVE(variadic_q)
 {
     INCLUDE_PARAMS_OF_VARIADIC_Q;
 
-    const REBVAL *param = ACT_PARAMS_HEAD(VAL_ACTION(ARG(action)));
-    for (; NOT_END(param); ++param) {
+    REBACT *action = VAL_ACTION(ARG(action));
+
+    const REBKEY *key_tail;
+    const REBKEY *key = ACT_KEYS(&key_tail, action);
+    const REBVAL *param = ACT_PARAMS_HEAD(action);
+    for (; key != key_tail; ++param, ++key) {
         if (Is_Param_Variadic(param))
             return Init_True(D_OUT);
     }

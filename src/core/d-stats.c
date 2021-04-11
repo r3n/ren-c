@@ -63,7 +63,7 @@ REBNATIVE(stats)
             "made-blocks:", rebI(PG_Reb_Stats->Blocks),
             "made-objects:", rebI(PG_Reb_Stats->Objects),
             "recycles:", rebI(PG_Reb_Stats->Recycle_Counter),
-        "]", rebEND);
+        "]");
       #else
         fail (Error_Debug_Only_Raw());
       #endif

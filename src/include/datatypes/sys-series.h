@@ -473,16 +473,13 @@ inline static REBYTE *SER_DATA_AT(REBYTE w, const_if_c REBSER *s, REBLEN i) {
     }
 #endif
 
-//
+
 // In general, requesting a pointer into the series data requires passing in
 // a type which is the correct size for the series.  A pointer is given back
 // to that type.
 //
 // Note that series indexing in C is zero based.  So as far as SERIES is
 // concerned, `SER_HEAD(t, s)` is the same as `SER_AT(t, s, 0)`
-//
-// Use C-style cast instead of cast() macro, as it will always be safe and
-// this is used very frequently.
 
 #define SER_AT(t,s,i) \
     cast(t*, SER_DATA_AT(sizeof(t), (s), (i)))
@@ -515,8 +512,10 @@ inline static void SET_SERIES_USED(REBSER *s, REBLEN used) {
         // !!! See notes on TERM_SERIES_IF_NEEDED() for how array termination
         // is slated to be a debug feature only.
         //
+      #ifdef DEBUG_TERM_ARRAYS
         if (IS_SER_ARRAY(s))
-            SET_END(SER_AT(RELVAL, s, used));
+            TRASH_CELL_IF_DEBUG(SER_AT(RELVAL, s, used));
+      #endif
     }
     else {
         assert(used < sizeof(s->content));
@@ -531,7 +530,6 @@ inline static void SET_SERIES_USED(REBSER *s, REBLEN used) {
                 assert(used == 1);
                 if (IS_END(SER_HEAD(RELVAL, s)))
                     Init_Nulled(SER_HEAD(RELVAL, s));  // !!! Unreadable void?
-                assert(IS_END(SER_AT(RELVAL, s, 1)));
             }
         }
         else
@@ -649,8 +647,11 @@ inline static void TERM_SERIES_IF_NECESSARY(REBSER *s)
           #endif
         }
     }
-    else if (IS_SER_DYNAMIC(s) and IS_SER_ARRAY(s))
-        SET_END(SER_TAIL(RELVAL, s));
+    else if (IS_SER_DYNAMIC(s) and IS_SER_ARRAY(s)) {
+      #ifdef DEBUG_TERM_ARRAYS
+        Init_Trash_Debug(SER_TAIL(RELVAL, s));
+      #endif
+    }
 }
 
 #ifdef NDEBUG
@@ -926,13 +927,13 @@ inline static const RELVAL *ENSURE_MUTABLE(const RELVAL *v) {
 #define PUSH_GC_GUARD(node) \
     Push_Guard_Node(node)
 
-inline static void DROP_GC_GUARD(const void *p) {
+inline static void DROP_GC_GUARD(const REBNOD *node) {
   #if defined(NDEBUG)
-    UNUSED(p);
+    UNUSED(node);
   #else
-    if (NOD(p) != *SER_LAST(REBNOD*, GC_Guarded)) {
+    if (node != *SER_LAST(const REBNOD*, GC_Guarded)) {
         printf("DROP_GC_GUARD() pointer that wasn't last PUSH_GC_GUARD()\n");
-        panic (p);  // should show current call stack AND where node allocated
+        panic (node);
     }
   #endif
 
@@ -980,7 +981,7 @@ inline static const REBSER *VAL_SERIES(REBCEL(const*) v) {
     //
     // uses "evil macro" variants because the cost of this basic operation
     // becomes prohibitive when the functions aren't inlined and checks wind
-    // up getting done 
+    // up getting done
     //
     inline static REBIDX VAL_INDEX_UNBOUNDED(REBCEL(const*) v) {
         enum Reb_Kind k = CELL_HEART(v);  // only const access if heart!
@@ -1266,18 +1267,12 @@ inline static REBSER *Make_Series(REBLEN capacity, REBFLGS flags)
     if (cast(REBU64, capacity) * wide > INT32_MAX)
         fail (Error_No_Memory(cast(REBU64, capacity) * wide));
 
-    // Non-array series nodes do not need their info bits to conform to the
-    // rules of Endlike_Header(), so plain assignment can be used with a
-    // non-zero second byte.  However, it obeys the fixed info bits for now.
-    // (It technically doesn't need to.)
-    //
     REBSER *s = Alloc_Series_Node(flags);
-    assert(not IS_SER_ARRAY(s));
 
     if (GET_SERIES_FLAG(s, INFO_NODE_NEEDS_MARK))
         TRASH_POINTER_IF_DEBUG(s->info.node);
     else
-        SER_INFO(s) = Endlike_Header(0);
+        SER_INFO(s) = SERIES_INFO_MASK_NONE;
 
     if (
         (flags & SERIES_FLAG_DYNAMIC)  // inlining will constant fold

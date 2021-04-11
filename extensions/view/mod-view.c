@@ -85,7 +85,6 @@
     #endif
 #endif
 
-#define REBOL_IMPLICIT_END
 #include "sys-core.h"
 
 #include "tmp-mod-view.h"

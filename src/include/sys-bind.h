@@ -101,7 +101,7 @@ inline static bool Is_Overriding_Context(REBCTX *stored, REBCTX *override)
     // For now, deriving from FRAME! is just disabled.
     //
     // Use a faster check for REB_FRAME than CTX_TYPE() == REB_FRAME, since
-    // we were extracting keysources anyway. 
+    // we were extracting keysources anyway.
     //
     // !!! Note that in virtual binding, something like a FOR-EACH would
     // wind up overriding words bound to FRAME!s, even though not "derived".
@@ -331,7 +331,7 @@ inline static void INIT_BINDING_MAY_MANAGE(
 //
 inline static bool IS_WORD_UNBOUND(const RELVAL *v) {
     assert(ANY_WORD_KIND(CELL_HEART(VAL_UNESCAPED(v))));
-    return IS_SYMBOL(BINDING(v));
+    return BINDING(v) == UNBOUND;
 }
 
 #define IS_WORD_BOUND(v) \
@@ -347,20 +347,16 @@ inline static REBLEN VAL_WORD_INDEX(const RELVAL *v) {
 
 inline static REBARR *VAL_WORD_BINDING(const RELVAL *v) {
     assert(ANY_WORD_KIND(CELL_HEART(VAL_UNESCAPED(v))));
-    REBSER *binding = BINDING(v);  // Note: is const if REBSTR...
-    if (IS_SYMBOL(binding))
-        return UNBOUND;
-    return ARR(binding);
+    return ARR(BINDING(v));  // could be nullptr / UNBOUND
 }
 
 inline static void INIT_VAL_WORD_BINDING(RELVAL *v, const REBSER *binding) {
     assert(ANY_WORD_KIND(CELL_HEART(VAL_UNESCAPED(v))));
 
-    assert(binding);  // can't set word bindings to nullptr
     mutable_BINDING(v) = binding;
 
   #if !defined(NDEBUG)
-    if (IS_SYMBOL(binding))
+    if (binding == nullptr)
         return;  // e.g. UNBOUND (words use strings to indicate unbounds)
 
     if (binding->leader.bits & NODE_FLAG_MANAGED) {
@@ -403,9 +399,8 @@ inline static REBVAL* Unrelativize(RELVAL* out, const RELVAL* v) {
     Unrelativize(Alloc_Value(), (v))
 
 inline static void Unbind_Any_Word(RELVAL *v) {
-    const REBSTR *spelling = VAL_WORD_SYMBOL(VAL_UNESCAPED(v));
-    INIT_VAL_WORD_BINDING(v, spelling);
     INIT_VAL_WORD_PRIMARY_INDEX(v, 0);
+    INIT_VAL_WORD_BINDING(v, nullptr);
 }
 
 inline static REBCTX *VAL_WORD_CONTEXT(const REBVAL *v) {
@@ -420,35 +415,6 @@ inline static REBCTX *VAL_WORD_CONTEXT(const REBVAL *v) {
     REBCTX *c = CTX(binding);
     FAIL_IF_INACCESSIBLE_CTX(c);
     return c;
-}
-
-// When a word is bound, its spelling is derived from the context it is bound
-// to.  This means getting at the spelling will cost slightly more, but frees
-// up space in word cell for other features.  Note that this means if a
-// context is freed, its keylist must be retained to provide the words.
-//
-inline static const REBSYM *VAL_WORD_SYMBOL(REBCEL(const*) cell) {
-    assert(ANY_WORD_KIND(CELL_HEART(cell)));
-
-    if (IS_SYMBOL(BINDING(cell)))
-        return SYM(BINDING(cell));
-
-    REBARR *binding = ARR(BINDING(cell));
-
-    // Note: inside QUOTED! cells, all words should be bound to strings.  This
-    // is because different bindings can be made at each reference site.
-    // So at this point, we can be certain the cell is a RELVAL.
-
-    const RELVAL *v = CELL_TO_VAL(cell);
-
-    if (IS_DETAILS(binding))  // relative
-        return KEY_SYMBOL(ACT_KEY(ACT(binding), VAL_WORD_INDEX(v)));
-
-    if (IS_PATCH(binding))  // let
-        return LINK(PatchSymbol, binding);
-
-    assert(IS_VARLIST(binding));  // specific
-    return KEY_SYMBOL(CTX_KEY(CTX(binding), VAL_WORD_INDEX(v)));
 }
 
 
@@ -507,168 +473,96 @@ inline static option(REBARR*) Get_Word_Container(
 
     REBARR *binding = VAL_WORD_BINDING(any_word);
 
-    if (specifier == SPECIFIED) {  // Note: may become SPECIFIED again below
-        if (binding == UNBOUND)
-            return nullptr;
+    if (specifier == SPECIFIED or not IS_PATCH(specifier))
+        goto not_virtually_bound;
 
-        assert(IS_VARLIST(binding) or IS_PATCH(binding));  // not relative
-        *index_out = VAL_WORD_INDEX(any_word);
-        return binding;
-    }
-
-    // Virtual binding shortcut; if a virtual binding is in effect and it
-    // matches the cache in the word, then trust the information in it...
-    // whether that's a hit or a miss.
+  blockscope {
     //
-    if (specifier == VAL_WORD_CACHE(any_word)) {
-        //
-        // Since the number of bits available in a virtual bind is limited,
-        // the value stored is the index modulo MONDEX_MOD.  A miss is
-        // recorded with the actual value MONDEX_MOD (since 0 can be an
-        // actual modulus result).
-        //
-        REBLEN mondex = VAL_WORD_VIRTUAL_MONDEX_UNCHECKED(any_word);
-        if (mondex == MONDEX_MOD)
-            goto virtual_miss;
+    // There was caching to assist with this previously...but it was complex
+    // and needs to be rethought.  Hence we have no way of knowing if
+    // this word is overridden without doing a linear search.  Do it
+    // and then save the hit or miss information in the word for next use.
+    //
+    const REBSTR *spelling = VAL_WORD_SYMBOL(VAL_UNESCAPED(any_word));
+
+    // !!! Virtual binding could use the bind table as a kind of next
+    // level cache if it encounters a large enough object to make it
+    // wortwhile?
+    //
+    do {
+        if (GET_SUBCLASS_FLAG(PATCH, specifier, LET)) {
+            if (LINK(PatchSymbol, specifier) == spelling) {
+                *index_out = 1;  // !!! lie, review
+                return specifier;
+            }
+            goto skip_miss_patch;
+        }
+
+        REBARR *overbind;  // avoid goto-past-initialization warning
+        overbind = ARR(BINDING(ARR_SINGLE(specifier)));
+        if (not IS_VARLIST(overbind)) {  // a patch-formed LET overload
+            if (LINK(PatchSymbol, overbind) == spelling) {
+                *index_out = 1;
+                return overbind;
+            }
+            goto skip_miss_patch;
+        }
+
+        if (
+            IS_SET_WORD(ARR_SINGLE(specifier))
+            and REB_SET_WORD != CELL_KIND(VAL_UNESCAPED(any_word))
+        ){
+            goto skip_miss_patch;
+        }
 
       blockscope {
-        const REBSTR *spelling = VAL_WORD_SYMBOL(VAL_UNESCAPED(any_word));
+        REBCTX *overload = CTX(overbind);
 
-        // We have the primary binding's spelling to check against, so we
-        // can recognize when the lossy index matches up.  It needs to match
-        // one of the virtual overriding contexts...we don't have enough bits
-        // to say which one so check them all.
+        // Length at time of virtual bind is cached by index.  This avoids
+        // allowing untrustworthy cache states.
         //
-        // !!! To improve locality it might be better to take a couple of
-        // mondex bits to use as the mod of the chain length.
-        //
-        do {
-            assert(IS_PATCH(specifier));
+        REBLEN cached_len = VAL_WORD_INDEX(ARR_SINGLE(specifier));
 
-            if (GET_SUBCLASS_FLAG(PATCH, specifier, LET)) {
-                if (LINK(PatchSymbol, specifier) == spelling) {
-                    *index_out = 1;  // !!! lie, review
-                    return specifier;
-                }
-                goto skip_hit_patch;
-            }
+        REBLEN index = 1;
+        const REBKEY *key = CTX_KEYS_HEAD(overload);
+        for (; index <= cached_len; ++key, ++index) {
+            if (KEY_SYMBOL(key) != spelling)
+                continue;
 
-            if (
-                IS_SET_WORD(ARR_SINGLE(specifier))
-                and REB_SET_WORD != CELL_KIND(VAL_UNESCAPED(any_word))
-            ){
-                goto skip_hit_patch;
-            }
-
-          blockscope {
-            REBCTX *overload = CTX(BINDING(ARR_SINGLE(specifier)));
-
-            // Length at time of virtual bind is cached by index.  This avoids
-            // allowing untrustworthy cache states.
+            // !!! FOR-EACH uses the slots in an object to count how
+            // many arguments there are...and if a slot is reusing an
+            // existing variable it holds that variable.  This ties into
+            // general questions of hiding which is the same bit.  Don't
+            // count it as a hit.
             //
-            REBLEN cached_len = VAL_WORD_INDEX(ARR_SINGLE(specifier));
+            if (GET_CELL_FLAG(CTX_VAR(overload, index), BIND_NOTE_REUSE))
+                break;
 
-            REBLEN index = mondex;
-            for (; index <= cached_len; index += MONDEX_MOD) {
-                if (spelling != KEY_SYMBOL(CTX_KEY(overload, mondex)))
-                    continue;
-
-                *index_out = mondex;
-                return CTX_VARLIST(overload);
-            }
-          }
-
-          skip_hit_patch:
-            specifier = NextPatch(specifier);
-        } while (
-            specifier and not IS_VARLIST(specifier)
-        );
-
-        panic (any_word);  // bad cache in value
+            // Found a match!  Cache it to speed up next time.  Note that
+            // since specifier chains change frames for relativization,
+            // we have to store the head of the chain.  Review.
+            //
+            INIT_VAL_WORD_VIRTUAL_MONDEX(any_word, index % MONDEX_MOD);
+            *index_out = index;
+            return CTX_VARLIST(overload);
+        }
       }
-    }
+      skip_miss_patch:
+        specifier = NextPatch(specifier);
+    } while (
+        specifier and not IS_VARLIST(specifier)
+    );
 
-  virtual_miss:
+    // Update the cache to say we miss on this particular specifier
+    //
+    INIT_VAL_WORD_VIRTUAL_MONDEX(any_word, MONDEX_MOD);
 
-    if (IS_PATCH(specifier)) {
-        //
-        // Bad news: We have a virtual bind in effect, but not the virtual
-        // bind that is cached in the word.  We have no way of knowing if
-        // this word is overridden without doing a linear search.  Do it
-        // and then save the hit or miss information in the word for next use.
-        //
-        INIT_VAL_WORD_CACHE(any_word, specifier);  // we're updating it
+    // The linked list of specifiers bottoms out with either null or the
+    // varlist of the frame we want to bind relative values with.  So
+    // `specifier` should be set now.
+  }
 
-        const REBSTR *spelling = VAL_WORD_SYMBOL(VAL_UNESCAPED(any_word));
-
-        // !!! Virtual binding could use the bind table as a kind of next
-        // level cache if it encounters a large enough object to make it
-        // wortwhile?
-        //
-        do {
-            if (GET_SUBCLASS_FLAG(PATCH, specifier, LET)) {
-                if (LINK(PatchSymbol, specifier) == spelling) {
-                    *index_out = 1;  // !!! lie, review
-                    return specifier;
-                }
-                goto skip_miss_patch;
-            }
-
-            if (
-                IS_SET_WORD(ARR_SINGLE(specifier))
-                and REB_SET_WORD != CELL_KIND(VAL_UNESCAPED(any_word))
-            ){
-                goto skip_miss_patch;
-            }
-
-          blockscope {
-            REBCTX *overload = CTX(BINDING(ARR_SINGLE(specifier)));
-
-            // Length at time of virtual bind is cached by index.  This avoids
-            // allowing untrustworthy cache states.
-            //
-            REBLEN cached_len = VAL_WORD_INDEX(ARR_SINGLE(specifier));
-
-            REBLEN index = 1;
-            const REBKEY *key = CTX_KEYS_HEAD(overload);
-            for (; index <= cached_len; ++key, ++index) {
-                if (KEY_SYMBOL(key) != spelling)
-                    continue;
-
-                // !!! FOR-EACH uses the slots in an object to count how
-                // many arguments there are...and if a slot is reusing an
-                // existing variable it holds that variable.  This ties into
-                // general questions of hiding which is the same bit.  Don't
-                // count it as a hit.
-                //
-                if (GET_CELL_FLAG(CTX_VAR(overload, index), BIND_NOTE_REUSE))
-                    break;
-
-                // Found a match!  Cache it to speed up next time.  Note that
-                // since specifier chains change frames for relativization,
-                // we have to store the head of the chain.  Review.
-                //
-                INIT_VAL_WORD_VIRTUAL_MONDEX(any_word, index % MONDEX_MOD);
-                *index_out = index;
-                return CTX_VARLIST(overload);
-            }
-          }
-          skip_miss_patch:
-            specifier = NextPatch(specifier);
-        } while (
-            specifier and not IS_VARLIST(specifier)
-        );
-
-        // Update the cache to say we miss on this particular specifier
-        //
-        INIT_VAL_WORD_VIRTUAL_MONDEX(any_word, MONDEX_MOD);
-
-        // The linked list of specifiers bottoms out with either null or the
-        // varlist of the frame we want to bind relative values with.  So
-        // `specifier` should be set now.
-    }
-
-    assert(specifier == SPECIFIED or IS_VARLIST(specifier));
+  not_virtually_bound: {
 
     REBCTX *c;
 
@@ -710,7 +604,7 @@ inline static option(REBARR*) Get_Word_Container(
             REBSER *f_binding = SPC_BINDING(specifier); // can't fail()
             if (f_binding and Is_Overriding_Context(c, CTX(f_binding))) {
                 //
-                // The specifier binding overrides--because what's happening 
+                // The specifier binding overrides--because what's happening
                 // is that this cell came from a METHOD's body, where the
                 // particular ACTION! value cell triggering it held a binding
                 // of a more derived version of the object to which the
@@ -749,6 +643,7 @@ inline static option(REBARR*) Get_Word_Container(
 
     *index_out = VAL_WORD_INDEX(any_word);
     return CTX_VARLIST(c);
+  }
 }
 
 static inline const REBVAL *Lookup_Word_May_Fail(
@@ -926,7 +821,6 @@ inline static REBVAL *Derelativize(
         // We don't want to do this with REB_QUOTED since the cache is shared.
         //
         if (KIND3Q_BYTE_UNCHECKED(v) != REB_QUOTED) {
-            INIT_VAL_WORD_CACHE(out, UNSPECIFIED);
             INIT_VAL_WORD_VIRTUAL_MONDEX(out, MONDEX_MOD);  // necessary?
         }
         return cast(REBVAL*, out);
@@ -1034,31 +928,74 @@ inline static REBARR *Merge_Patches_May_Reuse(
     assert(IS_PATCH(parent));
     assert(IS_PATCH(child));
 
-    // If we find the child already accounted for in the parent, we're done.
-    // Recursions should notice this case and return up to make a no-op.
+    // Case of already incorporating.  Came up with:
+    //
+    //    1 then x -> [2 also y -> [3]]
+    //
+    // A virtual link for Y is added on top of the virtual link for X that
+    // resides on the [3] block.  But then feed generation for [3] tries to
+    // apply the Y virtual link again.  !!! Review if that's just inefficient.
     //
     if (NextPatch(parent) == child) {
         SET_SUBCLASS_FLAG(PATCH, parent, REUSED);
-        return parent;  // reused existing
+        return parent;
     }
 
     // If we get to the end of the merge chain and don't find the child, then
     // we're going to need a patch that incorporates it.
     //
     REBARR *next;
+    bool was_next_reused;
     if (NextPatch(parent) == nullptr or IS_VARLIST(NextPatch(parent))) {
         next = child;
-        SET_SUBCLASS_FLAG(PATCH, next, REUSED);
+        was_next_reused = true;
     }
-    else
+    else {
         next = Merge_Patches_May_Reuse(NextPatch(parent), child);
+        was_next_reused = GET_SUBCLASS_FLAG(PATCH, next, REUSED);
+    }
+
+    // If we have to make a new patch due to non-reuse, then we cannot make
+    // one out of a LET, since the patch *is* the variable.  It's actually
+    // uncommon for this to happen, but here's an example of how to force it:
+    //
+    //     block1: do [let x: 10, [x + y]]
+    //     block2: do compose/deep [let y: 20, [(block1)]]
+    //     30 = do first block2
+    //
+    // So we have to make a new patch that points to the LET, or promote it
+    // (using node-identity magic) into an object.  We point at the LET.
+    //
+    REBARR *binding;
+    REBLEN limit;
+    enum Reb_Kind kind;
+    if (GET_SUBCLASS_FLAG(PATCH, parent, LET)) {
+        binding = parent;
+        limit = 1;
+
+        // !!! LET bindings do not have anywhere to put the subclass info of
+        // whether they only apply to SET-WORD!s or things like that, so they
+        // are always assumed to be "universal bindings".  More granular
+        // forms of LET would need to get more bits somehow...either by
+        // being a different "flavor" or by making a full object.  We might
+        // have just gone ahead and done that here, but having to make an
+        // object would bloat things considerably.  Try allowing LET patches
+        // to act as the storage to point at by other patches for now.
+        //
+        kind = REB_WORD;
+    }
+    else {
+        binding = ARR(BINDING(ARR_SINGLE(parent)));
+        limit = VAL_WORD_INDEX(ARR_SINGLE(parent));
+        kind = VAL_TYPE(ARR_SINGLE(parent));
+    }
 
     return Make_Patch_Core(
-        CTX(BINDING(ARR_SINGLE(parent))),
-        VAL_WORD_INDEX(ARR_SINGLE(parent)),
+        binding,
+        limit,
         next,
-        VAL_TYPE(ARR_SINGLE(parent)),
-        GET_SUBCLASS_FLAG(PATCH, next, REUSED)
+        kind,
+        was_next_reused
     );
 }
 
@@ -1148,6 +1085,13 @@ inline static REBSPC *Derive_Specifier_Core(
 
     if (IS_VARLIST(old)) {
         //
+        // If the specifier is only for providing resolutions of variables in
+        // functions, an array specified by a frame isn't going to need that.
+        // This is kind of like dealing with something specified.
+        //
+        if (IS_VARLIST(specifier))  // superfluous additional specification
+            return old;
+
         // If the array cell is already holding a frame, then it intends to
         // broadcast that down for resolving relative values underneath it.
         // We can only pass thru the incoming specifier if it is compatible.

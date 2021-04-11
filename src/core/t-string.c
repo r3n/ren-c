@@ -333,7 +333,7 @@ REBNATIVE(to_text)
         );
     }
 
-    return rebValueQ("to text!", ARG(value), rebEND);
+    return rebValueQ("to text!", ARG(value));
 }
 
 

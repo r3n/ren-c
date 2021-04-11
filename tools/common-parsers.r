@@ -91,7 +91,7 @@ load-until-blank: function [
 
     rule: [
         some [not terminator rebol-value]
-        opt wsp opt [1 2 newline] position: to end
+        opt wsp opt [1 2 newline] position: here to end
     ]
 
     either parse text rule [
@@ -127,15 +127,15 @@ proto-parser: context [
     grammar: context bind [
 
         rule: [
-            parse-position: opt fileheader
-            any [parse-position: segment]
+            parse-position: here opt fileheader
+            any [parse-position: here segment]
         ]
 
         fileheader: [
             (data: _)
             doubleslashed-lines
             and is-fileheader
-            eoh:
+            eoh: here
             (
                 emit-fileheader data
             )
@@ -295,8 +295,10 @@ rewrite-if-directives: function [
                     change ["#if" thru newline "#endif" thru newline] ""
                     | change ["#elif" thru newline "#endif"] "#endif"
                     | change ["#else" thru newline "#endif"] "#endif"
-                ] (rewritten: true) :position
-                | thru newline
+                ] (rewritten: true)
+                seek :position  ; GET-WORD! for bootstrap (SEEK is no-op)
+
+              | thru newline
             ]
             end
         ]

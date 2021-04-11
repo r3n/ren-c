@@ -40,7 +40,7 @@ REBOL [
 ]
 
 
-compile: function [
+compile: func [
     {Compiles one or more native functions at the same time, with options.}
 
     return: <void>
@@ -59,6 +59,7 @@ compile: function [
     }
     /files "COMPILABLES represents a list of disk files (TEXT! paths)"
     /inspect "Return the C source code as text, but don't compile it"
+    /nostdlib "Do not include <stdlib.h> automatically with librebol"
 ][
     ; !!! Due to module dependencies there's some problem with GET-ENV not
     ; being available in some builds.  It gets added to lib but is somehow not
@@ -76,8 +77,18 @@ compile: function [
     ; https://github.com/rebol/rebol-issues/issues/2334
 
     settings: default [[]]
-    config: make object! [
-        options: copy []  ; block! of text!s (compiler switches)
+    let config: make object! [
+        ;
+        ; This is a BLOCK! of TEXT!s (compiler switches).
+        ;
+        ; NOTE: Any double-quotes in this list are assumed to be for wrapping
+        ; filenames with spaces in them.  So if you want a literal double
+        ; quote in a -D instruction for a #define, it must be escaped with
+        ; a backslash here.  The C99 command has to throw them in, because
+        ; they would have been taken out by the shell processing.
+        ;
+        options: copy []
+
         include-path: copy []  ; block! of text!s (local directories)
         library-path: copy []  ; block! of text!s (local directories)
         library: copy []  ; block of text!s (local filenames)
@@ -87,7 +98,7 @@ compile: function [
         output-file: _  ; not needed if MEMORY
     ]
 
-    b: settings
+    let b: settings
     while [not tail? b] [
         var: (select config try match word! key: b/1) else [
             fail [{COMPILE/OPTIONS parameter} key {is not supported}]
@@ -97,7 +108,7 @@ compile: function [
             fail [{Missing argument to} key {in COMPILE}]
         ]
 
-        arg: b/1
+        let arg: b/1
         b: next b
 
         if block? var [  ; at present, this always means multiple paths
@@ -310,7 +321,7 @@ compile: function [
     ; would be to encap the executable you already have as a copy with the
     ; natives loaded into it.
 
-    librebol: false
+    let librebol: false
 
     compilables: map-each item compilables [
         item: maybe if match [word! path!] :item [get item]
@@ -345,9 +356,41 @@ compile: function [
              */
             #define LIBREBOL_NO_STDINT
             #include <stddef.h>
-            #define REBOL_IMPLICIT_END  /* TCC can do C99 macros, use them! */
             #include "rebol.h"
         }
+
+        ; The nostdlib feature is specific to a bare-bones demo environment
+        ; with only the r3 executable and the TCC-specific encap files.  The
+        ; C code in such a environment will depend on libRebol for input and
+        ; output, e.g. `rebElide("print")` vs. printf().
+        ;
+        ; While this may sound limiting in terms of "C as exposure to native
+        ; functionality" it has two main applications:
+        ;
+        ; * Making it easy to test that compilation is working on devices in
+        ;   CI tests without having to install a toolchain; especially useful
+        ;   in ARM emulation.
+        ;
+        ; * Offering C as raw access to assembly for algorithms like crypto
+        ;   and hashes, which really just need the math part of C.
+        ;
+        ; Note that libRebol provides memory allocation via rebAlloc() and
+        ; rebFree(), so it's possible to write code that is not completely
+        ; trivial...though you'd run into walls by not having the likes of
+        ; memcpy() or memmove().  :-/  Long story short: useful for testing.
+        ;
+        if nostdlib [
+            ;
+            ; Needs to go before the librebol inclusion that was put at the
+            ; head of the compilables above!
+            ;
+            insert compilables trim/auto mutable {#define LIBREBOL_NO_STDLIB}
+
+            ; TCC adds -lc (by calling `tcc_add_library_err(s1, "c");`) by
+            ; default during link, unless you override it with this switch.
+            ;
+            append config/options "-nostdlib"
+        ]
 
         ; We want to embed and ship "rebol.h" automatically.  But as a first
         ; step, try overriding with the LIBREBOL_INCLUDE_DIR environment
@@ -399,9 +442,9 @@ compile: function [
     ; want local paths.  Convert.
     ;
     config/runtime-path: my file-to-local/full
-    config/librebol-path: ~taken-into-account~  ; COMPILE* does not read
+    config/librebol-path: '~taken-into-account~  ; COMPILE* does not read
 
-    result: applique :compile* [
+    let result: applique :compile* [
         compilables: compilables
         config: config
         files: files
@@ -418,7 +461,7 @@ compile: function [
 ]
 
 
-c99: function [
+c99: func [
     {http://pubs.opengroup.org/onlinepubs/9699919799/utilities/c99.html}
 
     return: "Exit status code (try to match gcc/tcc)"
@@ -429,33 +472,46 @@ c99: function [
     /runtime "Alternate way of specifying CONFIG_TCCDIR environment variable"
         [text! file!]
 ][
-    command: default [system/options/args]
-    command: spaced command
+    command: spaced any [command, system/options/args]
 
-    compilables: copy []
+    let compilables: copy []
 
-    nonspacedot: negate charset reduce [space tab cr lf "."]
+    let nonspacedot: complement charset reduce [space tab cr lf "."]
 
-    infile: _  ; set to <multi> if multiple input files
-    outfile: _
+    let infile: _  ; set to <multi> if multiple input files
+    let outfile: _
 
-    outtype: _  ; default will be EXE (also overridden if `-c` or `-E`)
+    let outtype: _  ; default will be EXE (also overridden if `-c` or `-E`)
 
-    settings: collect [
-        option-no-arg-rule: [copy option: to [space | end] (
+    let settings: collect [
+        let option-no-arg-rule: [copy option: to [space | end] (
             keep compose [options (option)]
         )]
 
-        option-with-arg-rule: [
+        let option
+        let option-with-arg-rule: [
             opt space copy option: to [space | end] (
+                ;
+                ; If you do something like `option {-DSTDIO_H="stdio.h"}, TCC
+                ; seems to process it like `-DSTDIO_H=stdio.h` which won't
+                ; work with `#include STDIO_H`.  But if the command line had
+                ; said `-DSTDIO_H=\"stdio.h\"` we would be receiving it
+                ; after the shell processed it, so those quotes would be
+                ; unescaped here.  Add the escaping back in for TCC.
+                ;
+                replace/all option {"} {\"}
+
                 keep compose [options (option)]
             )
         ]
 
-        known-extension-rule: ["." ["c" | "a" | "o"] ahead [space | end]]
+        let known-extension-rule: ["." ["c" | "a" | "o"] ahead [space | end]]
 
-        rule: [
-            last-pos:  ; Save for errors
+        let filename
+        let temp
+        let last-pos
+        let rule: [
+            last-pos: here  ; Save for errors
 
             "-c" (  ; just compile (no link phase)
                 keep compose [output-type (outtype: 'OBJ)]
@@ -474,25 +530,25 @@ c99: function [
             option-no-arg-rule
             |
             "-I"  ; add directory to search for #include files
-            opt space copy incpath: to [space | end] (
-                keep compose [include-path (incpath)]
+            opt space copy temp: to [space | end] (
+                keep compose [include-path (temp)]
             )
             |
             "-L"  ; add directory to search for library files
-            opt space copy libpath: to [space | end] (
-                keep compose [library-path (libpath)]
+            opt space copy temp: to [space | end] (
+                keep compose [library-path (temp)]
             )
             |
             "-l"  ; add library (-llibrary means search for "liblibrary.a")
-            opt space copy libname: to [space | end] (
-                keep compose [library (libname)]
+            opt space copy temp: to [space | end] (
+                keep compose [library (temp)]
             )
             |
             ahead "-O"  ; optimization level
             option-with-arg-rule
             |
             "-o"  ; output file (else default should be "a.out")
-            opt space copy outfile to [space | end] (  ; overwrites a.out
+            opt space copy outfile: to [space | end] (  ; overwrites a.out
                 keep compose [output-file (outfile)]
             )
             |
@@ -549,7 +605,7 @@ c99: function [
             ]
             'OBJ [
                 if infile != <multi> [
-                    parse infile [to [".c" end] replace ".c" ".o"] else [
+                    parse copy infile [to [".c" end] change ".c" ".o"] else [
                         fail "Input file must end in `.c` for use with -c"
                     ]
                 ]
@@ -562,6 +618,7 @@ c99: function [
     ]
 
     if inspect [
+        print mold compilables
         print mold settings
     ]
 
@@ -570,19 +627,38 @@ c99: function [
 ]
 
 
-bootstrap: function [
+bootstrap: func [
     {Download Rebol sources from GitHub and build using TCC}
+    /options "Use SYSTEM/OPTIONS/ARGS to get additional make.r options"
 ][
-    unzip %. https://codeload.github.com/metaeducation/ren-c/zip/master
+    ; We fetch the .ZIP file of the master branch from GitHub.  Note that this
+    ; actually contains a subdirectory called `ren-c-master` which the
+    ; source files are in.  We change into that directory.
+    ;
+    let zipped-url: https://codeload.github.com/metaeducation/ren-c/zip/master
+    print ["Downloading and Unzipping Source From:" zipped-url]
+    unzip/quiet %. zipped-url
 
-    unzip %./tccencap https://metaeducation.s3.amazonaws.com/travis-builds/0.4.40/r3-06ac629-debug-cpp-tcc-encap.zip
-    lib/set-env "CONFIG_TCCDIR" unspaced [what-dir "/tccencap"]
+    ; We'd like to bundle the contents of the CONFIG_TCCDIR into the
+    ; executable as part of the build process for the TCC extension.  The
+    ; best way to do that would be a .ZIP file via the encap facility.  Since
+    ; that hasn't been done, use fetching from a web build as a proxy for it.
+    ;
+    unzip/quiet %./tccencap https://metaeducation.s3.amazonaws.com/travis-builds/0.4.40/r3-06ac629-debug-cpp-tcc-encap.zip
+    lib/set-env "CONFIG_TCCDIR" file-to-local make-file [(what-dir) %tccencap/]
 
     cd ren-c-master
-    lib/call "mkdir build"
-    cd %build
-    lib/call compose [
-        (system/options/boot) "../make.r" "CONFIG=../configs/bootstrap.r"
+
+    ; make.r will notice we are in the same directory as itself, and so it
+    ; will make a %build/ subdirectory to do the building in.
+    ;
+    let status: lib/call compose [
+        (system/options/boot) "make.r"
+            "config=configs/bootstrap.r"
+            ((if options [system/options/args]))
+    ]
+    if status != 0 [
+        fail ["BOOTSTRAP command failed with exit status:" status]
     ]
 ]
 

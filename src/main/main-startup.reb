@@ -46,19 +46,21 @@ loud-print: redescribe [
     enclose :print func [f] [if system/options/verbose [do f]]
 )
 
-make-banner: function [
+make-banner: func [
     "Build startup banner."
     fmt [block!]
 ][
-    str: make text! 200
-    star: append/dup make text! 74 #"*" 74
-    spc: format ["**" 70 "**"] ""
+    let str: make text! 200
+    let star: append/dup make text! 74 #"*" 74
+    let spc: format ["**" 70 "**"] ""
+
+    let [a b s]
     parse fmt [
         some [
             [
                 set a: text! (s: format ["**  " 68 "**"] a)
               | '= set a: [text! | word! | set-word!] [
-                        b:
+                        b: here
                           path! (b: get b/1)
                         | word! (b: get b/1)
                         | block! (b: spaced b/1)
@@ -100,7 +102,7 @@ boot-banner: [
     *
 ]
 
-about: function [
+about: func [
     "Information about REBOL"
     return: <void>
 ][
@@ -116,7 +118,7 @@ about: function [
 ; like an ordinary ACTION!, and all the proxying is handled for the user.
 ; Work done on the dialect here could be shared in common.
 ;
-usage: function [
+usage: func [
     "Prints command-line arguments."
     return: <void>
 ][
@@ -133,7 +135,8 @@ usage: function [
 
         --do expr        Evaluate expression (quoted)
         --help (-?)      Display this usage information
-        --script file    Implicitly provide script to run
+        --script file    Explicitly provide script to run, change working dir
+        --fragment file  Run without changing directory, CR+LF ok on Windows
         --version (-v)   Display version only (then quit)
         --               End of options (treat remainder as script args)
 
@@ -164,14 +167,14 @@ usage: function [
     }
 ]
 
-license: function [
+license: func [
     "Prints the REBOL/core license agreement."
     return: <void>
 ][
     print system/license
 ]
 
-host-script-pre-load: function [
+host-script-pre-load: func [
     {Code registered as a hook when a module or script are loaded}
     return: <void>
     is-module [logic!]
@@ -204,7 +207,7 @@ what-dir:
 change-dir: '~unset~
 
 
-main-startup: function [
+main-startup: func [
     "Usermode command-line processing: handles args, security, scripts"
 
     return: [<opt> any-value!] "!!! Narrow down return type?"
@@ -233,9 +236,9 @@ main-startup: function [
     ; We hook the RETURN function so that it actually returns an instruction
     ; that the code can build up from multiple EMIT statements.
 
-    instruction: copy []
+    let instruction: copy []
 
-    emit: function [
+    let emit: func [
         {Builds up sandboxed code to submit to C, hooked RETURN will finalize}
 
         item "ISSUE! directive, TEXT! comment, (<*> composed) code BLOCK!"
@@ -258,7 +261,7 @@ main-startup: function [
         ]
     ]
 
-    return: function [
+    return: func [
         {Hooked RETURN function which finalizes any gathered EMIT lines}
 
         state "Describes the RESULT that the next call to HOST-CONSOLE gets"
@@ -360,7 +363,7 @@ main-startup: function [
 
     === HELPER FUNCTIONS ===
 
-    die: func [
+    let die: func [
         {A graceful way to "FAIL" during startup}
 
         reason "Error message"
@@ -381,7 +384,7 @@ main-startup: function [
         return <die>
     ]
 
-    to-dir: function [
+    let to-dir: func [
         {Convert string path to absolute dir! path}
 
         return: "Null if not found"
@@ -395,11 +398,11 @@ main-startup: function [
         ]
     ]
 
-    get-home-path: function [
+    let get-home-path: func [
         {Return HOME path (e.g. $HOME on *nix)}
         return: [<opt> file!]
     ][
-        get-env: attempt [:system/modules/Process/get-env] else [
+        let get-env: attempt [:system/modules/Process/get-env] else [
             loud-print [
                 "Interpreter not built with GET-ENV, can't detect HOME dir" LF
                 "(Build with Process extension enabled to address this)"
@@ -410,20 +413,20 @@ main-startup: function [
         return to-dir try any [
             get-env 'HOME
             all [
-                homedrive: get-env 'HOMEDRIVE
-                homepath: get-env 'HOMEPATH
+                let homedrive: get-env 'HOMEDRIVE
+                let homepath: get-env 'HOMEPATH
                 join homedrive homepath
             ]
         ]
     ]
 
-    get-resources-path: function [
+    let get-resources-path: func [
         {Return platform specific resources path.}
         return: [<opt> file!]
     ][
         ; lives under systems/options/home
 
-        path: join o/home switch system/platform/1 [
+        let path: join o/home switch system/platform/1 [
             'Windows [%REBOL/]
         ] else [
             %.rebol/  ; default *nix (covers Linux, MacOS (OS X) and Unix)
@@ -438,17 +441,17 @@ main-startup: function [
     ; NB. Above can be overridden by --home option
     ; TBD - check perms are correct (SECURITY)
     all [
-        home-dir: try get-home-path
+        let home-dir: try get-home-path
         system/user/home: o/home: home-dir
-        resources-dir: try get-resources-path
+        let resources-dir: try get-resources-path
         o/resources: resources-dir
     ]
 
     sys/script-pre-load-hook: :host-script-pre-load
 
-    do-string: _  ; will be set if a string is given with --do
+    let do-string: _  ; will be set if a string is given with --do
 
-    quit-when-done: _  ; by default run CONSOLE
+    let quit-when-done: _  ; by default run CONSOLE
 
     ; Process the option syntax out of the command line args in order to get
     ; the intended arguments.  TAKEs each option string as it goes so the
@@ -470,7 +473,7 @@ main-startup: function [
         o/bin: first split-path o/boot
     ]
 
-    param-or-die: func [
+    let param-or-die: func [
         {Take --option argv and then check if param arg is present, else die}
         option [text!] {Command-line option (switch) used}
     ][
@@ -503,11 +506,11 @@ main-startup: function [
     comment [emit #countdown-if-error]
     emit #die-if-error
 
-    is-script-implicit: true
+    let is-script-implicit: true
 
     while [not tail? argv] [
 
-        is-option: did parse/case argv/1 [
+        let is-option: did parse/case argv/1 [
 
             ["--" end] (
                 ; Double-dash means end of command line arguments, and the
@@ -575,7 +578,7 @@ main-startup: function [
             )
         |
             "--suppress" end (
-                param: param-or-die "SUPPRESS"
+                let param: param-or-die "SUPPRESS"
                 o/suppress: if param = "*" [
                     ; suppress all known start-up files
                     [%rebol.reb %user.reb %console-skin.reb]
@@ -589,6 +592,34 @@ main-startup: function [
                 quit-when-done: default [true]  ; overrides blank, not false
 
                 is-script-implicit: false  ; not the first post-option arg
+            )
+        |
+            ; Added initially for GitHub CI.  Concept is that it takes a
+            ; filename and runs it with "shell semantics", e.g. how bash would
+            ; work.  The code is loaded from the file and run as a string, not
+            ; through the DO %FILE mechanics that change the directory.
+            ;
+            "--fragment" end (
+                let code: read local-to-file param-or-die "FRAGMENT"
+                is-script-implicit: false  ; must use --script
+
+                o/quiet: true  ; don't print banner, just run code string
+                quit-when-done: default [true]  ; override blank, not false
+
+                ; !!! Here we make a concession to Windows CR LF, only when
+                ; running code fragments.  This was added because when you use
+                ; a custom shell in GitHub CI, it takes a piece out of the
+                ; yaml file (which has no CR LF) and puts it in a temporary
+                ; file which does have CR LF on Windows.  This would be
+                ; difficult to work around.
+                ;
+                if system/version/4 = 3 [  ; Windows
+                    code: deline code  ; Removes CR or leaves as-is
+                ] else [
+                    code: as text! code
+                ]
+                emit {Use /ONLY so that QUIT/WITH quits, vs. return DO value}
+                emit [do/only (code)]
             )
         |
             ["-t" | "--trace"] end (
@@ -608,12 +639,12 @@ main-startup: function [
                 ; No window; not currently applicable
             )
         |
-            [copy cli-option: [["--" | "-" | "+"] to end ]] (
+            [let cli-option copy cli-option: [["--" | "-" | "+"] to end] (
                 die [
                     "Unknown command line option:" cli-option LF
                     {!! For a full list of command-line options use: --help}
                 ]
-            )
+            )]
         ]
 
         if not is-option [break]
@@ -656,9 +687,9 @@ main-startup: function [
     o/args: argv  ; whatever's left is positional args
 
 
-    boot-embedded: get-encap system/options/boot
+    let boot-embedded: get-encap system/options/boot
 
-    if any [boot-embedded o/script] [o/quiet: true]
+    if any [boot-embedded, o/script] [o/quiet: true]
 
     ; Set option/paths for /path, /boot, /home, and script path
     o/path: what-dir  ;dirize any [o/path o/home]
@@ -669,7 +700,7 @@ main-startup: function [
     ]
 
     if file? o/script [  ; Get the path
-        script-path: split-path o/script
+        let script-path: split-path o/script
         case [
             slash = first first script-path []      ; absolute
             %./ = first script-path [script-path/1: o/path]   ; curr dir
@@ -679,7 +710,7 @@ main-startup: function [
     ]
 
     ; Convert command line arg strings as needed:
-    script-args: o/args ; save for below
+    let script-args: o/args  ; save for below
 
     ; version, import, secure are all of valid type or blank
 
@@ -726,55 +757,35 @@ main-startup: function [
         ]
     ]
 
-    switch type of boot-embedded [
-        blank! [
-            false  ; signal that there's no embedded code
-        ]
-        binary! [ ; single script
-            [code header]: load/type boot-embedded 'unbound
-            true
-        ]
-        block! [
-            ;
-            ; The encapping is an embedded zip archive.  get-encap did
-            ; the unzipping into a block, and this information must be
-            ; made available somehow.  It shouldn't be part of the "core"
-            ; but just responsibility of the host that supports encap
-            ; based loading.
-            ;
-            o/encap: boot-embedded
+    let main
+    all [
+        o/encap: boot-embedded  ; null if no encapping
 
-            main: select boot-embedded %main.reb
-            if not binary? main [
-                die "Could not find %main.reb in encapped zip file"
-            ]
-            [code header]: load/type main 'unbound
-            true
-        ]
+        ; The encapping is an embedded zip archive.  get-encap did
+        ; the unzipping into a block, and this information must be
+        ; made available somehow.  It shouldn't be part of the "core"
+        ; but just responsibility of the host that supports encap
+        ; based loading.  We put it in o/encap, and see if it contains a
+        ; %main.reb...if it does, we run it.
 
-        die "Bad embedded boot data (not a BLOCK! or a BINARY!)"
-    ] then execute -> [
-        if execute [
-            ;boot-print ["executing embedded script:" mold code]
-            system/script: make system/standard/script [
-                title: select first code 'title
-                header: first code
-                parent: _
-                path: what-dir
-                args: script-args
-            ]
-            if 'module = select first code 'type [
-                code: reduce [first code, next code]
-                if object? tmp: sys/do-needs/no-user first code [
-                    append code tmp
-                ]
-                import do compose [module (code)]
-            ] else [
-                sys/do-needs first code
-                do intern next code
-            ]
-            quit ;ignore user script and "--do" argument
+        main: select boot-embedded %main.reb
+    ]
+    then [
+        if not binary? main [
+            die "%main.reb not a BINARY! in encapped data"
         ]
+        let [code header]: load main
+
+        ; !!! This needs to be thought through better, in terms of whether
+        ; it's a module and handling HEADER correctly.  Also, any scripts
+        ; should be passed as arguments...not executed.  And the active
+        ; directory should be inside the ZIP, so that FILE! paths are
+        ; resolved relative to %main.reb's location.  But for now, just do
+        ; a proof of concept by showing execution of a main.reb if that is
+        ; found in the encapping.
+
+        emit [do/only (<*> code)]
+        quit-when-done: default [true]
     ]
 
     ; Evaluate any script argument, e.g. `r3 test.r` or `r3 --script test.r`

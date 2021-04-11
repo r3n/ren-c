@@ -130,7 +130,7 @@ REB_R MAKE_Word(
         // Run the same mechanics that AS WORD! would, since it's immutable.
         //
       as_word: {
-        REBVAL *as = rebValue("as", Datatype_From_Kind(kind), arg, rebEND);
+        REBVAL *as = rebValue("as", Datatype_From_Kind(kind), arg);
         Copy_Cell(out, as);
         rebRelease(as);
 
@@ -165,7 +165,7 @@ REB_R TO_Word(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
     // `to integer! /"10"` making 10.  We might call these "solo paths" as
     // a generalization of "refinement paths"
     //
-    if (IS_PATH(arg)) {
+    if (IS_PATH(arg) or IS_TUPLE(arg)) {
         SET_END(out);
 
         DECLARE_LOCAL (temp);

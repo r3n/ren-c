@@ -67,6 +67,7 @@
 //
 REBVAL *Make_Native(
     RELVAL **item, // the item will be advanced as necessary
+    const RELVAL *tail,
     REBSPC *specifier,
     REBNAT dispatcher,
     const REBVAL *module
@@ -111,7 +112,7 @@ REBVAL *Make_Native(
 
     const REBVAL *spec = SPECIFIC(*item);
     ++*item;
-    if (not IS_BLOCK(spec))
+    if (spec == tail or not IS_BLOCK(spec))
         panic (spec);
 
     // With the components extracted, generate the native and add it to
@@ -245,7 +246,7 @@ REBARR *Startup_Natives(const REBVAL *boot_natives)
     REBLEN n = 0;
     REBVAL *generic_word = nullptr; // gives clear error if GENERIC not found
 
-    while (NOT_END(item)) {
+    while (item != tail) {
         if (n >= Num_Natives)
             panic (item);
 
@@ -254,6 +255,7 @@ REBARR *Startup_Natives(const REBVAL *boot_natives)
 
         REBVAL *native = Make_Native(
             &item,
+            tail,
             specifier,
             Native_C_Funcs[n],
             Lib_Context

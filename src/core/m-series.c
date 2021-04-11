@@ -345,9 +345,15 @@ REBYTE *Reset_Buffer(REBSER *buf, REBLEN len)
 void Assert_Series_Term_Core(const REBSER *s)
 {
     if (IS_SER_ARRAY(s)) {
-        const RELVAL *tail = ARR_TAIL(ARR(s));
-        if (NOT_END(tail))
-            panic (tail);
+      #ifdef DEBUG_TERM_ARRAYS
+        if (IS_SER_DYNAMIC(s)) {
+            const RELVAL *tail = ARR_TAIL(ARR(s));
+            if (not (tail->header.bits & NODE_FLAG_CELL))
+                panic (s);
+            if (not IS_TRASH_DEBUG(tail))
+                panic (tail);
+        }
+      #endif
     }
     else if (SER_WIDE(s) == 1) {
         const REBYTE *tail = BIN_TAIL(BIN(s));
@@ -373,18 +379,16 @@ void Assert_Series_Core(const REBSER *s)
     if (IS_FREE_NODE(s))
         panic (s);
 
-    assert(
-        GET_SERIES_INFO(s, 0_IS_TRUE)  // NODE_FLAG_NODE
-        and NOT_SERIES_INFO(s, 1_IS_FALSE)  // NOT(NODE_FLAG_FREE)
-        and GET_SERIES_INFO(s, 7_IS_TRUE)  // NODE_FLAG_CELL
-    );
-
     assert(SER_FLAVOR(s) != FLAVOR_TRASH);
     assert(SER_USED(s) <= SER_REST(s));
 
     Assert_Series_Term_Core(s);
 }
 
+#endif
+
+
+#if defined(DEBUG_FANCY_PANIC)
 
 //
 //  Panic_Series_Debug: C

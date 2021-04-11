@@ -21,7 +21,7 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // This provides some convenience routines that require more definitions than
-// are available when %sys-rebnod.h is being processed.  (e.g. REBVAL, 
+// are available when %sys-rebnod.h is being processed.  (e.g. REBVAL,
 // REBSER, REBFRM...)
 //
 // See %sys-rebnod.h for what a "node" means in this context.
@@ -184,10 +184,8 @@ inline static void *Alloc_Node(REBLEN pool_id) {
 // have NODE_FLAG_FREE...which will identify the node as not in use to anyone
 // who enumerates the nodes in the pool (such as the garbage collector).
 //
-inline static void Free_Node(REBLEN pool_id, void *p)
+inline static void Free_Node(REBLEN pool_id, REBNOD* node)
 {
-    REBNOD* node = NOD(p);
-
   #ifdef DEBUG_MONITOR_SERIES
     if (
         pool_id == SER_POOL
@@ -266,14 +264,14 @@ inline static void Free_Node(REBLEN pool_id, void *p)
 
 enum Reb_Pointer_Detect {
     DETECTED_AS_UTF8 = 0,
-    
+
     DETECTED_AS_SERIES = 1,
     DETECTED_AS_FREED_SERIES = 2,
 
     DETECTED_AS_CELL = 3,
     DETECTED_AS_FREED_CELL = 4,
 
-    DETECTED_AS_END = 5 // may be a cell, or made with Endlike_Header()
+    DETECTED_AS_END = 5  // may be a cell, or a rebEND signal
 };
 
 inline static enum Reb_Pointer_Detect Detect_Rebol_Pointer(const void *p)

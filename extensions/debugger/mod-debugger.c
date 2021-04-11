@@ -64,7 +64,7 @@ bool Do_Breakpoint_Throws(
     // here (or inject a check with HIJACK on BREAKPOINT) to make sure that
     // debugging was allowed.  Review doing that check here.
 
-    REBVAL *inst = rebValue("debug-console", rebEND);
+    REBVAL *inst = rebValue("debug-console");
 
     if (IS_INTEGER(inst)) {
         Init_Thrown_With_Label(out, inst, NATIVE_VAL(quit));

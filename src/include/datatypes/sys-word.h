@@ -58,7 +58,7 @@
 // a union and then read from another.
 //
 #define LINK_KeySource_TYPE         REBNOD*
-#define LINK_KeySource_CAST         NOD
+#define LINK_KeySource_CAST         // none, just use node (NOD() complains)
 #define HAS_LINK_KeySource          FLAVOR_VARLIST
 
 inline static void INIT_LINK_KEYSOURCE(REBARR *varlist, REBNOD *keysource) {
@@ -96,9 +96,9 @@ inline static REBVAL *Init_Any_Word_Core(
     const REBSYM *sym
 ){
     RESET_VAL_HEADER(out, kind, CELL_FLAG_FIRST_IS_NODE);
-    mutable_BINDING(out) = sym;
     VAL_WORD_INDEXES_U32(out) = 0;
-    INIT_VAL_WORD_CACHE(out, SPECIFIED);
+    mutable_BINDING(out) = nullptr;
+    INIT_VAL_WORD_SYMBOL(out, sym);
 
     return cast(REBVAL*, out);
 }
@@ -111,23 +111,36 @@ inline static REBVAL *Init_Any_Word_Core(
 #define Init_Set_Word(out,str)      Init_Any_Word((out), REB_SET_WORD, (str))
 #define Init_Sym_Word(out,str)      Init_Any_Word((out), REB_SYM_WORD, (str))
 
+inline static const REBKEY *CTX_KEY(REBCTX *c, REBLEN n);
+
 inline static REBVAL *Init_Any_Word_Bound_Core(
     RELVAL *out,
     enum Reb_Kind type,
-    REBCTX *context,  // spelling determined by context and index
-    REBLEN index
+    REBARR *binding,  // spelling determined by linked-to thing
+    REBLEN index  // must be 1 if LET patch
 ){
     RESET_VAL_HEADER(out, type, CELL_FLAG_FIRST_IS_NODE);
-    mutable_BINDING(out) = context;
+    mutable_BINDING(out) = binding;
     VAL_WORD_INDEXES_U32(out) = index;
-    INIT_VAL_WORD_CACHE(out, SPECIFIED);
+
+    if (IS_VARLIST(binding)) {
+        INIT_VAL_WORD_SYMBOL(out, *CTX_KEY(CTX(binding), index));
+    } else {
+        assert(GET_SUBCLASS_FLAG(PATCH, binding, LET));
+        assert(index == 1);
+        INIT_VAL_WORD_SYMBOL(out, LINK(PatchSymbol, binding));
+    }
 
     return cast(REBVAL*, out);
 }
 
 #define Init_Any_Word_Bound(out,type,context,index) \
     Init_Any_Word_Bound_Core( \
-        TRACK_CELL_IF_DEBUG(out), (type), (context), (index))
+        TRACK_CELL_IF_DEBUG(out), (type), CTX_VARLIST(context), (index))
+
+#define Init_Any_Word_Patched(out,type,let) \
+    Init_Any_Word_Bound_Core( \
+        TRACK_CELL_IF_DEBUG(out), (type), (let), 1)
 
 
 // Helper calls strsize() so you can more easily use literals at callsite.

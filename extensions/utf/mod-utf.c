@@ -300,9 +300,9 @@ REBNATIVE(decode_utf16le)
 
     // Drop byte-order marker, if present
     //
-    rebElide(
-        "if #\"^(FEFF)\" = first", D_OUT, "[take", D_OUT, "]",
-    rebEND);
+    rebElide("if #\"^(FEFF)\" = first", D_OUT, "[",
+        "take", D_OUT,
+    "]");
 
     return D_OUT;
 }
@@ -381,8 +381,8 @@ REBNATIVE(decode_utf16be)
     // Drop byte-order marker, if present
     //
     rebElide(
-        "if #\"^(FEFF)\" = first", D_OUT, "[take", D_OUT, "]",
-    rebEND);
+        "if #\"^(FEFF)\" = first", D_OUT, "[take", D_OUT, "]"
+    );
 
     return D_OUT;
 }

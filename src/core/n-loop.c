@@ -405,8 +405,9 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
         //
         // ANY-CONTEXT! and MAP! allow one var (keys) or two vars (keys/vals)
         //
-        REBVAL *pseudo_var = CTX_VAR(les->pseudo_vars_ctx, 1);
-        for (; NOT_END(pseudo_var); ++pseudo_var) {
+        const REBVAR *pseudo_tail;
+        REBVAL *pseudo_var = CTX_VARS(&pseudo_tail, les->pseudo_vars_ctx);
+        for (; pseudo_var != pseudo_tail; ++pseudo_var) {
             REBVAL *var = Real_Var_From_Pseudo(pseudo_var);
 
             // Even if data runs out, we could still have one last loop body
@@ -543,7 +544,7 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
                 break;
 
               case REB_ACTION: {
-                REBVAL *generated = rebValue(les->data, rebEND);
+                REBVAL *generated = rebValue(les->data);
                 if (generated) {
                     if (var)
                         Copy_Cell(var, generated);
@@ -640,7 +641,7 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
         // as part of an overall vetting of "generic iteration" (which this
         // is a poor substitute for).
         //
-        REBVAL *block = rebValueQ("as block!", ARG(data), rebEND);
+        REBVAL *block = rebValueQ("as block!", ARG(data));
         Copy_Cell(ARG(data), block);
         rebRelease(block);
     }
@@ -739,7 +740,7 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
         assert(IS_ERROR(r));
         if (mode == LOOP_MAP_EACH or mode == LOOP_MAP_EACH_SPLICED)
             DS_DROP_TO(dsp_orig);
-        rebJumps ("fail", rebR(r), rebEND);
+        rebJumps ("fail", rebR(r));
     }
 
     // Otherwise, nullptr signals result in les.out (a.k.a. D_OUT)
@@ -1154,7 +1155,7 @@ static inline REBLEN Finalize_Remove_Each(struct Remove_Each_State *res)
                 --len;
                 ++count;
             }
-            if (IS_END(src)) {
+            if (src == tail) {
                 SET_SERIES_LEN(VAL_ARRAY_KNOWN_MUTABLE(res->data), len);
                 return count;
             }
@@ -1255,8 +1256,9 @@ static REB_R Remove_Each_Core(struct Remove_Each_State *res)
     while (index < len) {
         assert(res->start == index);
 
-        REBVAL *var = CTX_VAR(res->context, 1);  // not movable, see #2274
-        for (; NOT_END(var); ++var) {
+        const REBVAR *var_tail;
+        REBVAL *var = CTX_VARS(&var_tail, res->context);  // fixed (#2274)
+        for (; var != var_tail; ++var) {
             if (index == len) {
                 //
                 // The second iteration here needs x = #"c" and y as void.
@@ -1487,7 +1489,7 @@ REBNATIVE(remove_each)
         REBLEN removals = Finalize_Remove_Each(&res);
         UNUSED(removals);
 
-        rebJumps("fail", rebR(r), rebEND);
+        rebJumps("fail", rebR(r));
     }
 
     if (res.broke)
@@ -1677,7 +1679,7 @@ REBNATIVE(until)
                 return D_OUT;  // body evaluated truthily, return value
         }
         else {
-            if (rebDid(rebINLINE(predicate), rebQ(D_OUT), rebEND))
+            if (rebDid(rebINLINE(predicate), rebQ(D_OUT)))
                 return D_OUT;
         }
 

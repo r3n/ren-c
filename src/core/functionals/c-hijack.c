@@ -253,9 +253,10 @@ REBNATIVE(hijack)
                 details_len + 1 - SER_REST(victim_details)
             );
 
+        const RELVAL *src_tail = ARR_TAIL(hijacker_details);
         RELVAL *src = ARR_HEAD(hijacker_details) + 1;
         RELVAL *dest = ARR_HEAD(victim_details) + 1;
-        for (; NOT_END(src); ++src, ++dest)
+        for (; src !=src_tail; ++src, ++dest)
             Copy_Cell_Core(dest, src, CELL_MASK_ALL);
         SET_SERIES_LEN(victim_details, details_len);
     }

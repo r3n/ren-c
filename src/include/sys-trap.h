@@ -175,7 +175,7 @@
 //
 #define PUSH_TRAP_SO_FAIL_CAN_JUMP_BACK_HERE(j) \
     do { \
-        assert(TG_Jump_List or DSP == 0); \
+        /* assert(TG_Jump_List or DSP == 0); */ \
         Snap_State_Core(j); \
         (j)->frame = FS_TOP; \
         (j)->last_jump = TG_Jump_List; \

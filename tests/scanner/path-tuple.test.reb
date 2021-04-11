@@ -62,6 +62,10 @@
         "~/projects/"  ->  [~ projects _]
         "~a~.~b~/~c~"  !!  <scan-invalid>
 
+        ; === Comma Tests ===
+
+        "/a/, b."  -> [_ a _] , (b _)
+
         ; === Bad Path Element Tests ===
         ;
         ; TUPLE! can go in PATH! but not vice-versa.  Besides that, only

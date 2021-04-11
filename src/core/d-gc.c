@@ -52,7 +52,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         assert(VAL_QUOTED_DEPTH(v) >= 3);
         REBCEL(const*) cell = VAL_UNESCAPED(v);
         if (ANY_WORD_KIND(CELL_KIND(cell)))
-            assert(IS_SYMBOL(BINDING(cell)));  // unbound
+            assert(BINDING(cell) == UNBOUND);  // escaped cell has no binding
         return;
     }
 
@@ -131,6 +131,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_BITSET: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
         REBSER *s = SER(VAL_NODE1(v));
+        Assert_Series_Term_Core(s);
         if (GET_SERIES_FLAG(s, INACCESSIBLE))
             assert(Is_Marked(s));  // TBD: clear out reference and GC `s`?
         else
@@ -331,8 +332,9 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         // !!! Optimization abandoned
 
         assert(ARR_LEN(a) >= 2);
-        RELVAL *item = ARR_HEAD(a);
-        for (; NOT_END(item); ++item)
+        const RELVAL *tail = ARR_TAIL(a);
+        const RELVAL *item = ARR_HEAD(a);
+        for (; item != tail; ++item)
             assert(not ANY_PATH_KIND(KIND3Q_BYTE_UNCHECKED(item)));
         assert(Is_Marked(a));
         break; }
@@ -342,14 +344,6 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_GET_WORD:
       case REB_SYM_WORD: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-
-        REBSPC *cache = VAL_WORD_CACHE(v);
-        if (cache) {
-            assert(
-                IS_PATCH(cache)
-                or (IS_VARLIST(cache) and IS_PATCH(Singular_From_Cell(v)))
-            );
-        }
 
         const REBSTR *spelling = VAL_WORD_SYMBOL(v);
         assert(Is_Series_Frozen(spelling));

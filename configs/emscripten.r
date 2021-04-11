@@ -71,7 +71,6 @@ extensions: make map! [
     DNS -
     Event -
     Filesystem -
-    FFI -
     GIF -
     Gob -
     Image -
@@ -83,7 +82,6 @@ extensions: make map! [
     ODBC -
     PNG -
     Process -
-    Serial -
     Signal -
     Stdio -
     TCC -
@@ -92,7 +90,6 @@ extensions: make map! [
     UTF -
     Vector -
     View -
-    ZeroMQ -
 ]
 
 
@@ -108,6 +105,7 @@ cflags: compose [
 
         {-DDEBUG_STDIO_OK}
         {-DDEBUG_HAS_PROBE}
+        {-DDEBUG_FANCY_PANIC}
         {-DDEBUG_COUNT_TICKS}
         {-DDEBUG_PRINTF_FAIL_LOCATIONS}
 
@@ -186,7 +184,7 @@ ldflags: compose [
 
     ((if false [[
         ; In theory, using the closure compiler will reduce the amount of
-        ; unused support code in %libr3.js, at the cost of slower compilation. 
+        ; unused support code in %libr3.js, at the cost of slower compilation.
         ; Level 2 is also available, but is not recommended as it impedes
         ; various optimizations.  See the published limitations:
         ;
@@ -310,9 +308,9 @@ ldflags: compose [
         ;
         {-s ASYNCIFY_BLACKLIST=@prep/include/asyncify-blacklist.json}
 
-    ; whitelist needs true function names
-
-    {--profiling-funcs}
+        ; whitelist needs true function names
+        ;
+        {--profiling-funcs}
     ]]
     else [[
         {-s USE_PTHREADS=1}  ; must be in both cflags and ldflags if used

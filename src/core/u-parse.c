@@ -8,7 +8,7 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Ren-C Open Source Contributors
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -19,7 +19,28 @@
 //
 // https://www.gnu.org/licenses/lgpl-3.0.html
 //
-//=////////////////////////////////////////////////////////////////////////=//
+//=//// !!! NOTICE !!! /////////////////////////////////////////////////////=//
+//
+// The PARSE code in R3-Alpha was a fairly organic codebase, and was largely
+// concerned with being performant (to make it a viable competitor to things
+// like RegEx).  Since it did flag-fiddling in lieu of enforcing a generalized
+// architecture, there were significant irregularities...and compositions of
+// rules that seemed like they should be legal wouldn't work.  Many situations
+// that should have been errors would be ignored or have strange behaviors.
+//
+// The code was patched to make its workings clearer over time in Ren-C, and
+// to try and eliminate mechanical bugs (such as bad interactions with the GC).
+// But the basic method was not attacked from the ground up.  Recursions of
+// the parser were unified with the frame model of recursing the evaluator...
+// but that was the only true big change.
+//
+// However, a full redesign has been started with %scripts/uparse.reb.  This
+// is in the spirit of "parser combinators" as defined in many other languages,
+// but brings in the PARSE dialect's succinct symbolic nature.  That design is
+// extremely slow, however--and will need to be merged in with some of the
+// ideas in this file.
+//
+//=/////////////////////////////////////////////////////////////////////////=//
 //
 // As a major operational difference from R3-Alpha, each recursion in Ren-C's
 // PARSE runs using a "Rebol Stack Frame"--similar to how the DO evaluator
@@ -45,14 +66,6 @@
 //
 // But as far as a debugging tool is concerned, the "where" of each frame
 // in the call stack is what you would expect.
-//
-// !!! The PARSE code in R3-Alpha had gone through significant churn, and
-// had a number of cautionary remarks and calls for review.  During Ren-C
-// development, several edge cases emerged about interactions with the
-// garbage collector or throw mechanics...regarding responsibility for
-// temporary values or other issues.  The code has become more clear in many
-// ways, though it is also more complex due to the frame mechanics...and is
-// under ongoing cleanup as time permits.
 //
 
 #include "sys-core.h"
@@ -230,8 +243,8 @@ enum parse_flags {
     PF_SET = 1 << 3,
     PF_COPY = 1 << 4,
     PF_NOT = 1 << 5,
-    PF_NOT2 = 1 << 6,
-    PF_THEN = 1 << 7,
+    PF_NOT2 = 1 << 6,  // #1246
+    PF_7 = 1 << 7,
     PF_AHEAD = 1 << 8,
     PF_REMOVE = 1 << 9,
     PF_INSERT = 1 << 10,
@@ -303,8 +316,8 @@ static bool Subparse_Throws(
 
     f->key = nullptr;  // informs infix lookahead
     f->key_tail = nullptr;
-    f->arg = m_cast(REBVAL*, END_NODE);
-    f->param = cast_PAR(END_NODE);
+    f->arg = m_cast(REBVAL*, END_CELL);
+    f->param = cast_PAR(END_CELL);
 
     // This needs to be set before INCLUDE_PARAMS_OF_SUBPARSE; it is what
     // ensures that usermode accesses to the frame won't be able to fiddle
@@ -336,7 +349,7 @@ static bool Subparse_Throws(
     }
 
     if (inside)
-        Copy_Cell(Prep_Cell(ARG(inside)), CTX_ARCHETYPE(inside));
+        Copy_Cell(Prep_Cell(ARG(inside)), CTX_ARCHETYPE(unwrap(inside)));
     else
         Init_Nulled(Prep_Cell(ARG(inside)));
 
@@ -445,20 +458,20 @@ static void Print_Parse_Index(REBFRM *frame_) {
     //
     if (IS_END(P_RULE)) {
         if (P_POS >= cast(REBIDX, P_INPUT_LEN))
-            rebElide("print {[]: ** END **}", rebEND);
+            rebElide("print {[]: ** END **}");
         else
-            rebElide("print [{[]:} mold", input, "]", rebEND);
+            rebElide("print [{[]:} mold", input, "]");
     }
     else {
         DECLARE_LOCAL (rule);
         Derelativize(rule, P_RULE, P_RULE_SPECIFIER);
 
         if (P_POS >= cast(REBIDX, P_INPUT_LEN))
-            rebElide("print [mold", rule, "{** END **}]", rebEND);
+            rebElide("print [mold", rule, "{** END **}]");
         else {
             rebElide("print ["
                 "mold", rule, "{:} mold", input,
-            "]", rebEND);
+            "]");
         }
     }
 }
@@ -855,8 +868,9 @@ static REBIXO To_Thru_Block_Rule(
         VAL_INDEX_RAW(iter) <= cast(REBIDX, P_INPUT_LEN);
         ++VAL_INDEX_RAW(iter)
     ){  // see note
+        const RELVAL *blk_tail = ARR_TAIL(VAL_ARRAY(rule_block));
         const RELVAL *blk = ARR_HEAD(VAL_ARRAY(rule_block));
-        for (; NOT_END(blk); blk++) {
+        for (; blk != blk_tail; blk++) {
             if (IS_BAR(blk))
                 fail (Error_Parse_Rule());  // !!! Shouldn't `TO [|]` succeed?
 
@@ -887,7 +901,7 @@ static REBIXO To_Thru_Block_Rule(
                         or cmd == SYM_QUOTE // temporarily same for bootstrap
                     ){
                         rule = ++blk;  // next rule is the literal value
-                        if (IS_END(rule))
+                        if (rule == blk_tail)
                             fail (Error_Parse_Rule());
                     }
                     else
@@ -902,7 +916,7 @@ static REBIXO To_Thru_Block_Rule(
                 rule = Get_Parse_Value(cell, rule, P_RULE_SPECIFIER);
 
             // Try to match it:
-            if (ANY_ARRAY_OR_PATH_KIND(P_TYPE)) {
+            if (ANY_ARRAY_OR_SEQUENCE_KIND(P_TYPE)) {
                 if (ANY_ARRAY(rule))
                     fail (Error_Parse_Rule());
 
@@ -1054,7 +1068,7 @@ static REBIXO To_Thru_Block_Rule(
 
             do {
                 ++blk;
-                if (IS_END(blk))
+                if (blk == blk_tail)
                     goto next_input_position;
             } while (not IS_BAR(blk));
         }
@@ -1559,6 +1573,7 @@ REBNATIVE(subparse)
                 P_FLAGS |= PF_SET;
                 goto set_or_copy_pre_rule;
 
+              case SYM_LET:
               set_or_copy_pre_rule:
 
                 FETCH_NEXT_RULE(f);
@@ -1569,15 +1584,29 @@ REBNATIVE(subparse)
                 if (VAL_CMD(P_RULE))  // set set [...]
                     fail (Error_Parse_Command(f));
 
+                // We need to add a new binding before we derelativize w.r.t.
+                // the in-effect specifier.
+                //
+                if (cmd == SYM_LET) {
+                    mutable_BINDING(FEED_SINGLE(f->feed)) = Make_Let_Patch(
+                        VAL_WORD_SYMBOL(P_RULE),
+                        P_RULE_SPECIFIER
+                    );
+                    if (IS_WORD(P_RULE)) {  // no further action
+                        FETCH_NEXT_RULE(f);
+                        goto pre_rule;
+                    }
+                    goto handle_set;
+                }
+
                 FETCH_NEXT_RULE_KEEP_LAST(&set_or_copy_word, f);
                 goto pre_rule;
 
               case SYM_COLLECT: {
-                FETCH_NEXT_RULE(f);
-                if (not (IS_WORD(P_RULE) or IS_SET_WORD(P_RULE)))
-                    fail (Error_Parse_Variable(f));
+                fail ("COLLECT should only follow a SET-WORD! in PARSE");
 
-                FETCH_NEXT_RULE_KEEP_LAST(&set_or_copy_word, f);
+              handle_collect:
+                FETCH_NEXT_RULE(f);
 
                 REBARR *collection = Make_Array_Core(
                     10,  // !!! how big?
@@ -1641,11 +1670,11 @@ REBNATIVE(subparse)
 
                 rule = Get_Parse_Value(P_SAVE, P_RULE, P_RULE_SPECIFIER);
 
-                if (IS_GET_BLOCK(rule)) {
+                if (IS_SYM_GROUP(rule)) {
                     //
-                    // !!! Experimental use of GET-BLOCK! to mean ordinary
-                    // evaluation of material that is not matched as
-                    // a PARSE rule.
+                    // !!! SYM-GROUP! means ordinary evaluation of material
+                    // that is not matched as a PARSE rule; this is an idea
+                    // which is generalized in UPARSE
                     //
                     assert(IS_END(D_OUT));  // should be true until finish
                     if (Do_Any_Array_At_Throws(
@@ -1666,9 +1695,7 @@ REBNATIVE(subparse)
                         );
                     }
                     else
-                        rebElide(
-                            "append", ARG(collection), rebQ(D_OUT),
-                        rebEND);
+                        rebElide("append", ARG(collection), rebQ(D_OUT));
 
                     SET_END(D_OUT);  // since we didn't throw, put it back
 
@@ -1771,11 +1798,6 @@ REBNATIVE(subparse)
                 FETCH_NEXT_RULE(f);
                 goto pre_rule;
 
-              case SYM_THEN:
-                P_FLAGS |= PF_THEN;
-                FETCH_NEXT_RULE(f);
-                goto pre_rule;
-
               case SYM_REMOVE:
                 P_FLAGS |= PF_REMOVE;
                 FETCH_NEXT_RULE(f);
@@ -1871,13 +1893,6 @@ REBNATIVE(subparse)
               case SYM_RETURN:
                 fail ("RETURN removed from PARSE, use (THROW ...)");
 
-              case SYM_MARK: {
-                FETCH_NEXT_RULE(f);  // skip the MARK word
-                // !!! what about `mark @(first [x])` ?
-                Handle_Mark_Rule(f, P_RULE, P_RULE_SPECIFIER);
-                FETCH_NEXT_RULE(f);  // e.g. skip the `x` in `mark x`
-                goto pre_rule; }
-
               case SYM_SEEK: {
                 FETCH_NEXT_RULE(f);  // skip the SEEK word
                 // !!! what about `seek @(first x)` ?
@@ -1897,33 +1912,56 @@ REBNATIVE(subparse)
         else {
             // It's not a PARSE command, get or set it
 
-            // word: - set a variable to the series at current index
+            // Historically SET-WORD! was used to capture the parse position.
+            // However it is being repurposed as the tool for any form of
+            // assignment...a new generalized SET.
+            //
+            // UPARSE2 should be used with code that wants the old semantics.
+            // The performance on that should increase with time.
+            //
             if (IS_SET_WORD(rule)) {
                 //
                 // !!! Review meaning of marking the parse in a slot that
                 // is a target of a rule, e.g. `thru pos: xxx`
                 //
                 // https://github.com/rebol/rebol-issues/issues/2269
+
+            handle_set:
+                FETCH_NEXT_RULE_KEEP_LAST(&set_or_copy_word, f);
+
+                // As an interim measure, permit `pos: here` to act as
+                // setting the position, just as `pos:` did historically.
+                // This will change to be generic SET after this has had some
+                // time to settle.
                 //
-                // if (flags != 0) fail (Error_Parse_Rule());
+                if (IS_WORD(P_RULE) and VAL_WORD_ID(P_RULE) == SYM_HERE)
+                    FETCH_NEXT_RULE(f);
+                else if (IS_WORD(P_RULE) and VAL_WORD_ID(P_RULE) == SYM_ACROSS) {
+                    FETCH_NEXT_RULE(f);
+                    P_FLAGS |= PF_COPY;
+                    goto pre_rule;
+                }
+                else if (IS_WORD(P_RULE) and VAL_WORD_ID(P_RULE) == SYM_COLLECT)
+                    goto handle_collect;
+                else
+                    fail ("PARSE SET-WORD! usable with HERE, COLLECT, ACROSS");
 
-                Handle_Mark_Rule(f, rule, P_RULE_SPECIFIER);
-                FETCH_NEXT_RULE(f);
+                Handle_Mark_Rule(f, set_or_copy_word, P_RULE_SPECIFIER);
                 goto pre_rule;
             }
-
-            // :word - change the index for the series to a new position
-            if (IS_GET_WORD(rule)) {
-                HANDLE_SEEK_RULE_UPDATE_BEGIN(f, rule, P_RULE_SPECIFIER);
-                FETCH_NEXT_RULE(f);
-                goto pre_rule;
+            else if (IS_GET_WORD(rule)) {
+                //
+                // :word - change the index for the series to a new position
+                //
+                fail ("PARSE GET-WORD! must be used with SEEK only for now");
             }
+            else {
+                assert(IS_WORD(rule));  // word - some other variable
 
-            assert(IS_WORD(rule));  // word - some other variable
-
-            if (rule != P_SAVE) {
-                Get_Word_May_Fail(P_SAVE, rule, P_RULE_SPECIFIER);
-                rule = P_SAVE;
+                if (rule != P_SAVE) {
+                    Get_Word_May_Fail(P_SAVE, rule, P_RULE_SPECIFIER);
+                    rule = P_SAVE;
+                }
             }
         }
     }
@@ -2084,9 +2122,10 @@ REBNATIVE(subparse)
                 if (not subrule)  // capture only on iteration #1
                     FETCH_NEXT_RULE_KEEP_LAST(&subrule, f);
 
+                const RELVAL *input_tail = ARR_TAIL(ARR(P_INPUT));
                 const RELVAL *cmp = ARR_AT(ARR(P_INPUT), P_POS);
 
-                if (IS_END(cmp))
+                if (cmp == input_tail)
                     i = END_FLAG;
                 else if (
                     0 == Cmp_Value(cmp, subrule, did (P_FLAGS & AM_FIND_CASE))
@@ -2135,9 +2174,10 @@ REBNATIVE(subparse)
                 if (not subrule)  // capture only on iteration #1
                     FETCH_NEXT_RULE_KEEP_LAST(&subrule, f);
 
+                const RELVAL *input_tail = ARR_TAIL(ARR(P_INPUT));
                 const RELVAL *cmp = ARR_AT(ARR(P_INPUT), P_POS);
 
-                if (IS_END(cmp))
+                if (cmp == input_tail)
                     i = END_FLAG;
                 else {
                     DECLARE_LOCAL (temp);
@@ -2175,8 +2215,9 @@ REBNATIVE(subparse)
                 if (not IS_SER_ARRAY(P_INPUT))
                     fail (Error_Parse_Rule());
 
+                const RELVAL *input_tail = ARR_TAIL(ARR(P_INPUT));
                 const RELVAL *into = ARR_AT(ARR(P_INPUT), P_POS);
-                if (IS_END(into)) {
+                if (into == input_tail) {
                     i = END_FLAG;  // `parse [] [into [...]]`, rejects
                     break;
                 }
@@ -2189,7 +2230,7 @@ REBNATIVE(subparse)
                     // !!! Review faster way of sharing the AS transform.
                     //
                     Derelativize(D_SPARE, into, P_INPUT_SPECIFIER);
-                    into = rebValueQ("as block!", D_SPARE, rebEND);
+                    into = rebValueQ("as block!", D_SPARE);
                 }
                 else if (
                     not ANY_SERIES_KIND(CELL_KIND(VAL_UNESCAPED(into)))
@@ -2371,14 +2412,8 @@ REBNATIVE(subparse)
             }
         }
 
-        if (IS_NULLED(ARG(position))) {
-            if (P_FLAGS & PF_THEN) {
-                FETCH_TO_BAR_OR_END(f);
-                if (NOT_END(P_RULE))
-                    FETCH_NEXT_RULE(f);
-            }
-        }
-        else {
+        if (not IS_NULLED(ARG(position))) {
+            //
             // Set count to how much input was advanced
             //
             count = (begin > P_POS) ? 0 : P_POS - begin;
@@ -2433,8 +2468,10 @@ REBNATIVE(subparse)
                 // is collecting items in a neutral container.  It is less
                 // obvious what marking a position should do.
             }
-            else if ((P_FLAGS & PF_SET) and (count != 0)) {  // 0 => no-op
-                //
+            else if (P_FLAGS & PF_SET) {
+                if (count > 1)
+                    fail (Error_Parse_Multiple_Set_Raw());
+
                 // We waited to eval the SET-GROUP! until we knew we had
                 // something we wanted to set.  Do so, and then go through
                 // a normal setting procedure.
@@ -2460,7 +2497,14 @@ REBNATIVE(subparse)
                     set_or_copy_word = D_SPARE;
                 }
 
-                if (IS_SER_ARRAY(P_INPUT)) {
+                if (count == 0) {
+                    Init_Nulled(
+                        Sink_Word_May_Fail(set_or_copy_word, P_RULE_SPECIFIER)
+                    );
+                }
+                else if (IS_SER_ARRAY(P_INPUT)) {
+                    assert(count == 1);  // check for > 1 would have errored
+
                     Derelativize(
                         Sink_Word_May_Fail(set_or_copy_word, P_RULE_SPECIFIER),
                         ARR_AT(ARR(P_INPUT), begin),
@@ -2468,6 +2512,8 @@ REBNATIVE(subparse)
                     );
                 }
                 else {
+                    assert(count == 1);  // check for > 1 would have errored
+
                     REBVAL *var = Sink_Word_May_Fail(
                         set_or_copy_word, P_RULE_SPECIFIER
                     );
@@ -2491,7 +2537,7 @@ REBNATIVE(subparse)
                         Copy_Cell(var, DS_TOP);
                         DS_DROP();
                         if (DSP != f->dsp_orig)
-                            fail ("SET for datatype only allows 1 value");
+                            fail (Error_Parse_Multiple_Set_Raw());
                     }
                     else if (P_TYPE == REB_BINARY)
                         Init_Integer(var, *BIN_AT(BIN(P_INPUT), begin));
@@ -2742,7 +2788,7 @@ REBNATIVE(parse)
             // it got in the input before failing.
             //
             Init_Void(D_SPARE, SYM_VOID);
-            rebElideQ("set", progress, D_SPARE, rebEND);
+            rebElideQ("set", progress, D_SPARE);
         }
         return nullptr;
     }
@@ -2773,7 +2819,7 @@ REBNATIVE(parse)
     VAL_INDEX_UNBOUNDED(D_SPARE) = index;  // cell guaranteed not REB_QUOTED
     Quotify(D_SPARE, num_quotes);  // put quotes back
 
-    rebElideQ("set", progress, D_SPARE, rebEND);
+    rebElideQ("set", progress, D_SPARE);
 
     RETURN (ARG(input));  // main return value is input at original position
 }

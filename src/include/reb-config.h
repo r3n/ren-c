@@ -250,6 +250,7 @@ Special internal defines used by RT, not Host-Kit developers:
     #endif
 
     #define DEBUG_HAS_PROBE
+    #define DEBUG_FANCY_PANIC
     #define DEBUG_MONITOR_SERIES
     #define DEBUG_COUNT_TICKS
     #define DEBUG_FRAME_LABELS
@@ -339,7 +340,7 @@ Special internal defines used by RT, not Host-Kit developers:
     // you can change this in the compiler settings.  We should either sync
     // with that setting or just skip it, and assume that we do enough
     // checking on the 64-bit builds.
-    // 
+    //
     // https://stackoverflow.com/q/14893802/
     //
     // !!! We are overpaying for the ALIGN_SIZE if it's not needed for double,
@@ -413,6 +414,17 @@ Special internal defines used by RT, not Host-Kit developers:
     // explicitly...only Address Sanitizer can be detected here.
     //
     #define DEBUG_SERIES_ORIGINS
+#else
+    // In order to make sure that a good mix of debug settings get tested,
+    // this does array termination checks on non-sanitizer debug builds.
+    // Arrays are not usually marked at their tails (unlike R3-Alpha which
+    // used END! cells to terminate)...but the residual functionality can
+    // help catch overruns when they occur.
+    //
+    #if !defined(NDEBUG)
+        #define DEBUG_TERM_ARRAYS
+        #define DEBUG_CHECK_ENDS
+    #endif
 #endif
 
 #ifdef DEBUG_MEMORY_ALIGN

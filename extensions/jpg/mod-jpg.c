@@ -102,8 +102,8 @@ REBNATIVE(decode_jpeg)
         "make image! compose [",
             "(make pair! [", rebI(w), rebI(h), "])",
             binary,
-        "]",
-    rebEND);
+        "]"
+    );
 
     rebRelease(binary);
 

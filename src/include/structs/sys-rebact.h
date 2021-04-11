@@ -26,19 +26,6 @@
 //
 
 
-#ifdef CPLUSPLUS_11
-    struct Reb_Action : public Reb_Node {
-        struct Reb_Series_Base details;
-    };
-#else
-    struct Reb_Action {
-        struct Reb_Series details;
-    };
-#endif
-
-#define ACT_DETAILS(a) \
-    cast(REBARR*, &(a)->details)
-
 
 #define MISC_DetailsMeta_TYPE      REBCTX*
 #define MISC_DetailsMeta_CAST      CTX
@@ -206,3 +193,7 @@
         | SERIES_FLAG_LINK_NODE_NEEDS_MARK  /* details */ \
         | FLAG_FLAVOR(PARTIALS) \
         /* MISC is unused at this time (could be paramlist cache?) */ )
+
+
+inline static REBARR *ACT_DETAILS(REBACT *a)
+  { return x_cast(REBARR*, a); }  // ARR() has debug cost, not defined yet

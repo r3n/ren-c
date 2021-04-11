@@ -266,8 +266,9 @@ void Mold_Array_At(
 
     bool first_item = true;
 
+    const RELVAL *item_tail = ARR_TAIL(a);
     const RELVAL *item = ARR_AT(a, index);
-    while (NOT_END(item)) {
+    while (item != item_tail) {
         if (GET_CELL_FLAG(item, NEWLINE_BEFORE)) {
            if (not indented and (sep[1] != '\0')) {
                 ++mo->indent;
@@ -287,7 +288,7 @@ void Mold_Array_At(
         Mold_Value(mo, item);
 
         ++item;
-        if (IS_END(item))
+        if (item == item_tail)
             break;
 
         if (NOT_CELL_FLAG(item, NEWLINE_BEFORE))

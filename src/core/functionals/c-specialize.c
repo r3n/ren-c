@@ -124,9 +124,10 @@ REBCTX *Make_Context_For_Action_Push_Partials(
     //
     REBARR *specialty = ACT_SPECIALTY(act);
     if (IS_PARTIALS(specialty)) {
-        const REBVAL *word = SPECIFIC(ARR_HEAD(specialty));
-        for (; NOT_END(word); ++word)
-            Copy_Cell(DS_PUSH(), word);
+        const RELVAL *word_tail = ARR_TAIL(specialty);
+        const RELVAL *word = ARR_HEAD(specialty);
+        for (; word != word_tail; ++word)
+            Copy_Cell(DS_PUSH(), SPECIFIC(word));
     }
 
     const REBKEY *tail;
@@ -560,8 +561,9 @@ void For_Each_Unspecialized_Param(
         REBFLGS flags = 0;
 
         if (partials) {  // even normal parameters can appear in partials
-            REBVAL *partial = SPECIFIC(ARR_HEAD(unwrap(partials)));
-            for (; NOT_END(partial); ++partial) {
+            const RELVAL *partial_tail = ARR_TAIL(unwrap(partials));
+            const RELVAL *partial = ARR_HEAD(unwrap(partials));
+            for (; partial != partial_tail; ++partial) {
                 if (Are_Synonyms(
                     VAL_WORD_SYMBOL(partial),
                     KEY_SYMBOL(key)
@@ -592,12 +594,12 @@ void For_Each_Unspecialized_Param(
 
     if (partials) {
         assert(ARR_LEN(unwrap(partials)) > 0);  // no partials means no array
- 
+
         // the highest priority are at *top* of stack, so we have to go
         // "downward" in the push order...e.g. the reverse of the array.
 
-        REBVAL *partial = SPECIFIC(ARR_TAIL(unwrap(partials)));
-        REBVAL *head = SPECIFIC(ARR_HEAD(unwrap(partials)));
+        RELVAL *partial = ARR_TAIL(unwrap(partials));
+        RELVAL *head = ARR_HEAD(unwrap(partials));
         for (; partial-- != head; ) {
             const REBKEY *key = ACT_KEY(act, VAL_WORD_INDEX(partial));
             const REBPAR *param = ACT_PARAM(act, VAL_WORD_INDEX(partial));
@@ -610,11 +612,11 @@ void For_Each_Unspecialized_Param(
     // Finally, output any fully unspecialized refinements
 
   blockscope {
-    const REBKEY *tail;
-    const REBKEY *key = ACT_KEYS(&tail, act);
+    const REBKEY *key_tail;
+    const REBKEY *key = ACT_KEYS(&key_tail, act);
     const REBPAR *param = ACT_PARAMS_HEAD(act);
 
-    for (; key != tail; ++key, ++param) {
+    for (; key != key_tail; ++key, ++param) {
         if (Is_Param_Hidden(param))
             continue;
 
@@ -626,8 +628,9 @@ void For_Each_Unspecialized_Param(
         }
 
         if (partials) {
-            REBVAL *partial = SPECIFIC(ARR_HEAD(unwrap(partials)));
-            for (; NOT_END(partial); ++partial) {
+            const RELVAL *partial_tail = ARR_TAIL(unwrap(partials));
+            const RELVAL *partial = ARR_HEAD(unwrap(partials));
+            for (; partial != partial_tail; ++partial) {
                 if (Are_Synonyms(
                     VAL_WORD_SYMBOL(partial),
                     KEY_SYMBOL(key)
@@ -704,7 +707,7 @@ const REBPAR *First_Unspecialized_Param(const REBKEY ** key, REBACT *act)
     For_Each_Unspecialized_Param(act, &First_Param_Hook, &s);
 
     if (key)
-        *key = s.key; 
+        *key = s.key;
     return s.param;  // may be nullptr
 }
 

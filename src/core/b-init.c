@@ -7,8 +7,8 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2019 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -37,7 +37,18 @@
 // is to be usable as a library that may be initialized and shutdown within
 // a process that's not exiting, so the ability to clean up is important.)
 //
-
+//=//// NOTES //////////////////////////////////////////////////////////////=//
+//
+// * The core language startup process does not include any command-line
+//   processing.  That is left up to the API client and whether such processing
+//   is relevant.  If it is, then tools like PARSE are available to use.  So
+//   if any switches are needed to affect the boot process itself, those are
+//   currently done with environment variables.
+//
+// * In order to make sure startup and shutdown can balance, during shutdown
+//   the libRebol API will call shutdown, then startup, then shutdown again.
+//   So if you're seeing slow performance on shutdown, check the debug flag.
+//
 
 #include "sys-core.h"
 
@@ -251,9 +262,8 @@ static void Shutdown_Action_Spec_Tags(void)
 //
 static void Startup_End_Node(void)
 {
-    PG_End_Node.header.bits = Endlike_Header(0);  // no NODE_FLAG_CELL, R/O
-    USED(TRACK_CELL_IF_DEBUG(&PG_End_Node));
-    assert(IS_END(END_NODE));  // sanity check
+    SET_END(Prep_Cell(&PG_End_Cell));
+    assert(IS_END(END_CELL));  // sanity check
 }
 
 
@@ -511,7 +521,7 @@ static void Init_Contexts_Object(void)
     Copy_Cell(Get_System(SYS_CONTEXTS, CTX_SYS), Sys_Context);
 
     Copy_Cell(Get_System(SYS_CONTEXTS, CTX_LIB), Lib_Context);
-    Copy_Cell(Get_System(SYS_CONTEXTS, CTX_USER), Lib_Context);
+    Copy_Cell(Get_System(SYS_CONTEXTS, CTX_USER), User_Context);
 }
 
 
@@ -674,6 +684,12 @@ static void Startup_Sys(REBARR *boot_sys) {
 
     if (not IS_BLANK(result))
         panic (result);
+
+    // !!! It was a stated goal at one point that it should be possible to
+    // protect the entire system object and still run the interpreter.  That
+    // was commented out in R3-Alpha
+    //
+    //    comment [if :lib/secure [protect-system-object]]
 }
 
 
@@ -705,29 +721,13 @@ static REBVAL *Startup_Mezzanine(BOOT_BLK *boot)
 
     Startup_Sys(VAL_ARRAY_KNOWN_MUTABLE(&boot->sys));
 
-    REBVAL *finish_init = Get_Sys_Function(FINISH_INIT_CORE);
-    assert(IS_ACTION(finish_init));
+    rebElide(
+        "bind/only/set", SPECIFIC(&boot->mezz), Lib_Context,   // not BIND/NEW !
+        "bind", SPECIFIC(&boot->mezz), Lib_Context,
+        "do", SPECIFIC(&boot->mezz)
+    );
 
-    // The FINISH-INIT-CORE function should likely do very little.  But right
-    // now it is where the user context is created from the lib context (a
-    // copy with some omissions), and where the mezzanine definitions are
-    // bound to the lib context and DO'd.
-    //
-    DECLARE_LOCAL (result);
-    if (RunQ_Throws(
-        result,
-        true, // fully = true (error if all arguments aren't consumed)
-        rebU(finish_init), // %sys-start.r function to call
-        SPECIFIC(&boot->mezz), // boot-mezz argument
-        rebEND
-    )){
-        fail (Error_No_Catch_For_Throw(result));
-    }
-
-    if (not IS_VOID(result))
-        panic (result); // FINISH-INIT-CORE is a PROCEDURE, returns void
-
-    return NULL;
+    return nullptr;
 }
 
 
@@ -910,6 +910,10 @@ void Startup_Core(void)
     Sys_Context = Alloc_Value();
     Init_Object(Sys_Context, sys);
 
+    REBCTX *user = Alloc_Context_Core(REB_OBJECT, 320, NODE_FLAG_MANAGED);
+    User_Context = Alloc_Value();
+    Init_Object(User_Context, user);
+
     REBARR *datatypes_catalog = Startup_Datatypes(
         VAL_ARRAY_KNOWN_MUTABLE(&boot->types),
         VAL_ARRAY_KNOWN_MUTABLE(&boot->typespecs)
@@ -1062,6 +1066,7 @@ void Shutdown_Core(void)
 
     rebRelease(Lib_Context);
     rebRelease(Sys_Context);
+    rebRelease(User_Context);
 
     Shutdown_Frame_Stack();  // all API calls (e.g. rebRelease()) before this
     Shutdown_Api();

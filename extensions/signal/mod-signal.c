@@ -100,7 +100,7 @@ static int sig_word_num(const REBVAL *word)
         "sigxcpu", rebI(SIGXCPU),
         "sigxfsz", rebI(SIGXFSZ),
         "fail [{Unknown SIG:} just", word, "]",
-    "]", rebEND);
+    "]");
 }
 
 
@@ -150,7 +150,7 @@ static REB_R Signal_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
                 if (not IS_WORD(sig))
                     fail (Error_Invalid_Spec_Raw(sig));
 
-                if (rebDidQ(sig, "== 'all", rebEND)) {
+                if (rebDidQ(sig, "== 'all")) {
                     if (sigfillset(&ReqPosixSignal(signal)->mask) < 0)
                         fail (Error_Invalid_Spec_Raw(sig));
                     break;

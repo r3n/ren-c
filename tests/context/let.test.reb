@@ -112,12 +112,123 @@
 (
     maker: func [name] [
         frame: binding of 'return
-        set (add-let-binding frame to word! unspaced [name 1]) <one>
-        set (add-let-binding frame to word! unspaced [name 2]) <two>
+        add-let-binding frame (to word! unspaced [name 1]) <one>
+        add-let-binding frame (to word! unspaced [name 2]) <two>
     ]
     maker "demo"
     did all [
         demo1 = <one>
         demo2 = <two>
+    ]
+)
+
+(
+    bar: func [] [
+        let x: 10
+        let y: [x + z]
+
+        let foo: func [] compose [let z: 20, ((y))]
+        foo
+    ]
+    bar = 30
+)
+
+(
+    bar: func [] [
+        let x: 10
+        let y: [x + z]
+
+        let foo: func [] compose [let z: 20, (y)]
+        func [] compose collect [keep [let z: 2000], keep y, keep [do (y)]]
+    ]
+    baz: bar
+    baz = 2010
+)
+
+; we want to create a situation where two LET based chains of patches need
+; to be merged.  Such merging only is necessary when a specifier is being
+; derived, e.g. the meeting of two blocks with LET chains in their binding.
+(
+    block1: do [let x: 10, [x + y]]
+    block2: do compose/deep [let y: 20, [(block1)]]
+    30 = do first block2
+)
+
+; Slightly more complex version...use functions
+(
+    block1: reeval func [] [let x: 10, [x + y]]
+    block2: reeval func [] compose/deep [let y: 20, [(block1)]]
+    30 = do first block2
+)
+
+; REEVAL presents a different case to the "wave of binding" a LET introduces
+; to the evaluation.  The execution of the GROUP! needs to be able to discern
+; if it was part of the input feed or not...e.g. REEVAL needs be different.
+[
+    (
+        bar: func [b] [
+            let n: 10
+            reeval b/1  ; should not apply LET of N to fetched result
+        ]
+
+        foo: func [n] [
+           bar [(n)]
+        ]
+
+        1 = foo 1
+    )
+    (
+        bar: func [b] [
+            do compose [
+                let n: 10
+                reeval (b/1)  ; updated LET of N should apply (LET "sees" (n))
+            ]
+        ]
+
+        foo: func [n] [
+           bar [(n)]
+        ]
+
+        10 = foo 1
+    )
+
+    ; Same goes for WORD!, SET-WORD!, etc.
+    (
+        x: 10
+        y: 'x
+        10 = do [let x: 20, reeval y]
+    )
+    (
+        x: 10
+        y: 'x
+        20 = do compose [let x: 20, reeval '(y)]
+    )
+    (
+        x: 10
+        20 = do compose [let x: 20, reeval 'x]  ; sanity check
+    )
+]
+
+; LET is also a PARSE keyword.  It means the variable will only be visible
+; inside the rules and subrules
+(
+    x: <before>
+    did all [
+        #a = catch [
+            parse "a" [let x: skip (throw x)]
+        ]
+        x = <before>
+    ]
+)
+
+; LET in parse with a non-set works like LET usually does; declares but leaves
+; as unset.
+(
+    x: <before>
+    did all [
+        10 = catch [
+            parse "a" [let x (x: 10) "a" (throw x)]
+        ]
+        x = <before>
     ]
 )

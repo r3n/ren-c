@@ -185,7 +185,7 @@ REBNATIVE(bind)
         return Quotify(D_OUT, num_quotes);
     }
 
-    if (not ANY_ARRAY_OR_PATH(v)) {  // QUOTED! could have wrapped any type
+    if (not ANY_ARRAY_OR_SEQUENCE(v)) {  // QUOTED! could have wrapped any type
         Quotify(v, num_quotes);  // put quotes back on
         fail (Error_Invalid_Arg(frame_, PAR(value)));
     }
@@ -741,7 +741,7 @@ REBNATIVE(set)
             VAL_SPECIFIER(target),
             v == v_tail  // R3-Alpha/Red blank after END
                 ? BLANK_VALUE
-                : v, 
+                : v,
             (IS_BLOCK(value) and not REF(single))
                 ? VAL_SPECIFIER(value)
                 : SPECIFIED,
@@ -875,7 +875,7 @@ REBNATIVE(enfixed)
             " https://forum.rebol.info/t/1156"
         );
 
-    REBVAL *copy = rebValueQ("copy", ARG(action), rebEND);
+    REBVAL *copy = rebValueQ("copy", ARG(action));
     SET_ACTION_FLAG(VAL_ACTION(copy), ENFIXED);
     return copy;
 }
@@ -981,7 +981,7 @@ REBNATIVE(free_q)
     // !!! Technically speaking a PAIR! could be freed as an array could, it
     // would mean converting the node.  Review.
     //
-    if (n == nullptr or Is_Node_Cell(n))  // VAL_WORD_CACHE() can be null
+    if (n == nullptr or Is_Node_Cell(n))
         return Init_False(D_OUT);
 
     return Init_Logic(D_OUT, GET_SERIES_FLAG(SER(n), INACCESSIBLE));
@@ -1112,7 +1112,7 @@ bool Try_As_String(
         REBLEN len;
         REBSIZ size;
         REBCHR(const*) utf8 = VAL_UTF8_LEN_SIZE_AT(&len, &size, v);
-        assert(size + 1 < sizeof(PAYLOAD(Bytes, v).at_least_8));  // must fit
+        assert(size + 1 <= sizeof(PAYLOAD(Bytes, v).at_least_8));  // must fit
 
         REBSTR *str = Make_String_Core(size, SERIES_FLAGS_NONE);
         memcpy(SER_DATA(str), utf8, size + 1);  // +1 to include '\0'

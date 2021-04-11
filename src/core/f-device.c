@@ -152,11 +152,11 @@ REBVAL *OS_Do_Device(REBREQ *req)
 {
     REBDEV *dev = Req(req)->device;
     if (dev == NULL)
-        rebJumps("fail {Rebol Device Not Found}", rebEND);
+        rebJumps("fail {Rebol Device Not Found}");
 
     if (not (dev->flags & RDF_INIT)) {
         if (dev->flags & RDO_MUST_INIT)
-            rebJumps("fail {Rebol Device Uninitialized}", rebEND);
+            rebJumps("fail {Rebol Device Uninitialized}");
 
         if (
             !dev->commands[RDC_INIT]
@@ -167,7 +167,7 @@ REBVAL *OS_Do_Device(REBREQ *req)
     }
 
     if (dev->commands[Req(req)->command] == NULL)
-        rebJumps("fail {Invalid Command for Rebol Device}", rebEND);
+        rebJumps("fail {Invalid Command for Rebol Device}");
 
     // !!! R3-Alpha had it so when an error was raised from a "device request"
     // it would give back DR_ERROR and the caller would have to interpret an
@@ -188,7 +188,7 @@ REBVAL *OS_Do_Device(REBREQ *req)
 
     REBVAL *error_or_int = rebRescue(cast(REBDNG*, &Dangerous_Command), req);
 
-    if (rebDid("error?", error_or_int, rebEND)) {
+    if (rebDid("error?", error_or_int)) {
         if (dev->pending)
             Detach_Request(&dev->pending, req); // "often a no-op", it said
 
@@ -198,7 +198,7 @@ REBVAL *OS_Do_Device(REBREQ *req)
         // do not want to get involved?
     }
 
-    int result = rebUnboxInteger(rebR(error_or_int), rebEND);
+    int result = rebUnboxInteger(rebR(error_or_int));
 
     // If request is pending, attach it to device for polling:
     //

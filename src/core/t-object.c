@@ -347,8 +347,8 @@ REB_R MAKE_Context(
     if (ANY_NUMBER(arg)) {
         REBCTX *context = Make_Context_Detect_Managed(
             kind,
-            END_NODE,  // values to scan for toplevel set-words (empty)
-            END_NODE,
+            END_CELL,  // values to scan for toplevel set-words (empty)
+            END_CELL,
             parent_ctx
         );
 
@@ -406,7 +406,7 @@ REB_R PD_Context(
     // no need to go hunting).  'x
     //
     REBLEN n;
-    if (VAL_WORD_BINDING(picker) == CTX_VARLIST(c))
+    if (BINDING(picker) == c)
         n = VAL_WORD_INDEX(picker);
     else {
         const bool strict = false;
@@ -421,7 +421,7 @@ REB_R PD_Context(
         // the word is an evaluative product, as the bits live in the cell
         // and it will be discarded.
         //
-        INIT_VAL_WORD_BINDING(m_cast(RELVAL*, picker), CTX_VARLIST(c));
+        INIT_VAL_WORD_BINDING(m_cast(RELVAL*, picker), c);
         INIT_VAL_WORD_PRIMARY_INDEX(m_cast(RELVAL*, picker), n);
     }
 
@@ -533,7 +533,7 @@ REBCTX *Copy_Context_Extra_Managed(
         SERIES_MASK_VARLIST | NODE_FLAG_MANAGED,
         nullptr // original_array, N/A because LINK()/MISC() used otherwise
     );
-    REBVAL *dest = SPECIFIC(ARR_HEAD(varlist));
+    RELVAL *dest = ARR_HEAD(varlist);
 
     // The type information and fields in the rootvar (at head of the varlist)
     // get filled in with a copy, but the varlist needs to be updated in the
@@ -547,8 +547,9 @@ REBCTX *Copy_Context_Extra_Managed(
     // Now copy the actual vars in the context, from wherever they may be
     // (might be in an array, or might be in the chunk stack for FRAME!)
     //
-    REBVAL *src = CTX_VARS_HEAD(original);
-    for (; NOT_END(src); ++src, ++dest) {
+    const REBVAR *src_tail;
+    REBVAL *src = CTX_VARS(&src_tail, original);
+    for (; src != src_tail; ++src, ++dest) {
         Copy_Cell_Core(  // trying to duplicate slot precisely
             dest,
             src,
@@ -903,7 +904,7 @@ REBTYPE(Context)
                 D_OUT,
                 Copy_Context_Extra_Managed(c, 0, types),
                 VAL_FRAME_LABEL(context)
-            ); 
+            );
         }
 
         return Init_Any_Context(

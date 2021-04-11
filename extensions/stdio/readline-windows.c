@@ -380,8 +380,8 @@ void Quit_Terminal(STD_TERM *t)
             "for-each c", t->buffer, "[",
                 "if (to integer! c) > 65535 [break]",
                 "true",
-            "]",
-        rebEND)){
+            "]"
+        )){
             return;  // assume emoji/etc. will mess up Windows Terminal
         }
         assert(!"Console position is not coherent with terminal state");
@@ -1094,4 +1094,4 @@ void Term_Beep(STD_TERM *t)
     Write_Char(BEL, 1);
 }
 
-#endif  // end guard against readline in pre-C99 compilers (would need rebEND)
+#endif

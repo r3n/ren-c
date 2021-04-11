@@ -79,7 +79,7 @@
         assert(error == nullptr); \
         int mbedtls_ret = (call);  /* don't use (call) more than once! */ \
         if (mbedtls_ret != 0) { \
-            error = rebValue("make error! {mbedTLS error}", rebEND); \
+            error = rebValue("make error! {mbedTLS error}"); \
             goto label; \
         } \
     } while (0)
@@ -129,7 +129,7 @@ int get_random(void *p_rng, unsigned char *output, size_t output_len)
         return 0;  // success
   #endif
 
-  rebJumps ("fail {Random number generation did not succeed}", rebEND);
+  rebJumps ("fail {Random number generation did not succeed}");
 }
 
 
@@ -211,8 +211,8 @@ REBNATIVE(checksum)
         "all [", REF(method), REF(settings), "] then [",
             "fail {Specify SETTINGS or /METHOD for CHECKSUM, not both}",
         "]",
-        "uppercase try to text! try any [", REF(method), REF(settings), "]",
-    rebEND);
+        "uppercase try to text! try any [", REF(method), REF(settings), "]"
+    );
     if (method_name == nullptr)
         fail ("Must specify SETTINGS for CHECKSUM");
 
@@ -223,7 +223,7 @@ REBNATIVE(checksum)
     }
 
     if (REF(key))  // old methods do not support HMAC keying
-        rebJumps ("fail {/METHOD does not support HMAC keying}", rebEND);
+        rebJumps ("fail {/METHOD does not support HMAC keying}");
 
     // Look up some internally available methods.
     //
@@ -236,7 +236,7 @@ REBNATIVE(checksum)
         /*
         rebFree(method_name);
         Init_Integer(D_SPARE, Compute_CRC24(data, size));
-        return rebValue("enbin [le + 3]", D_SPARE, rebEND); */
+        return rebValue("enbin [le + 3]", D_SPARE); */
     }
     if (0 == strcmp(method_name, "CRC32")) {
         //
@@ -249,7 +249,7 @@ REBNATIVE(checksum)
         //
         rebFree(method_name);
         Init_Integer(D_SPARE, crc32_z(0L, data, size));
-        return rebValue("enbin [le + 4]", D_SPARE, rebEND);
+        return rebValue("enbin [le + 4]", D_SPARE);
     }
     else if (0 == strcmp(method_name, "ADLER32")) {
         //
@@ -260,7 +260,7 @@ REBNATIVE(checksum)
         //
         rebFree(method_name);
         Init_Integer(D_SPARE, z_adler32(1L, data, size));  // Note the 1L (!)
-        return rebValue("enbin [le + 4]", D_SPARE, rebEND);
+        return rebValue("enbin [le + 4]", D_SPARE);
     }
     else if (0 == strcmp(method_name, "TCP")) {
         //
@@ -270,12 +270,12 @@ REBNATIVE(checksum)
         //
         rebFree(method_name);
         Init_Integer(D_SPARE, Compute_IPC(data, size));
-        return rebValue("enbin [le + 2]", D_SPARE, rebEND);
+        return rebValue("enbin [le + 2]", D_SPARE);
     }
 
     rebJumps (
-        "fail [{Unknown CHECKSUM method:}", rebQ(ARG(method)), "]",
-    rebEND);
+        "fail [{Unknown CHECKSUM method:}", rebQ(ARG(method)), "]"
+    );
 
   found_tls_info: {
     int hmac = REF(key) ? 1 : 0;  // !!! int, but seems to be a boolean?
@@ -311,7 +311,7 @@ REBNATIVE(checksum)
   cleanup:
     mbedtls_md_free(&ctx);
     if (error)
-        rebJumps ("fail", error, rebEND);
+        rebJumps ("fail", error);
 
     return result;
   }
@@ -400,7 +400,7 @@ REBNATIVE(rc4_stream)
     REBVAL *data = ARG(data);
 
     if (VAL_HANDLE_CLEANER(ARG(ctx)) != cleanup_rc4_ctx)
-        rebJumps ("fail [{Not a RC4 Context:}", ARG(ctx), "]", rebEND);
+        rebJumps ("fail [{Not a RC4 Context:}", ARG(ctx), "]");
 
     struct mbedtls_arc4_context *ctx
         = VAL_HANDLE_POINTER(struct mbedtls_arc4_context, ARG(ctx));
@@ -419,7 +419,7 @@ REBNATIVE(rc4_stream)
 
   cleanup:
      if (error)
-        rebJumps ("fail", error, rebEND);
+        rebJumps ("fail", error);
 
     return rebVoid();
 }
@@ -431,7 +431,7 @@ REBNATIVE(rc4_stream)
 static int Mpi_From_Binary(mbedtls_mpi* X, const REBVAL *binary)
 {
     size_t size;
-    REBYTE *buf = rebBytes(&size, binary, rebEND);  // allocates w/rebMalloc()
+    REBYTE *buf = rebBytes(&size, binary);  // allocates w/rebMalloc()
 
     int result = mbedtls_mpi_read_binary(X, buf, size);
 
@@ -466,8 +466,8 @@ REBNATIVE(rsa)
 
     // N and E are required
     //
-    REBVAL *n = rebValue("ensure binary! pick", obj, "'n", rebEND);
-    REBVAL *e = rebValue("ensure binary! pick", obj, "'e", rebEND);
+    REBVAL *n = rebValue("ensure binary! pick", obj, "'n");
+    REBVAL *e = rebValue("ensure binary! pick", obj, "'e");
 
     int hash_id = MBEDTLS_MD_NONE;  // could pass a hash here...
     struct mbedtls_rsa_context ctx;
@@ -483,24 +483,24 @@ REBNATIVE(rsa)
     IF_NOT_0(cleanup, error, Mpi_From_Binary(&ctx.N, n));
     IF_NOT_0(cleanup, error, Mpi_From_Binary(&ctx.E, e));
 
-    binary_len = rebUnboxInteger("length of", n, rebEND);
+    binary_len = rebUnboxInteger("length of", n);
     ctx.len = binary_len;
     rebRelease(n);
     rebRelease(e);
 
     if (REF(private)) {
-        REBVAL *d = rebValue("ensure binary! pick", obj, "'d", rebEND);
+        REBVAL *d = rebValue("ensure binary! pick", obj, "'d");
 
         if (not d)
             fail ("No d returned BLANK, can we assume error for cleanup?");
 
-        REBVAL *p = rebValue("ensure binary! pick", obj, "'p", rebEND);
-        REBVAL *q = rebValue("ensure binary! pick", obj, "'q", rebEND);
-        REBVAL *dp = rebValue("ensure binary! pick", obj, "'dp", rebEND);
-        REBVAL *dq = rebValue("ensure binary! pick", obj, "'dq", rebEND);
-        REBVAL *qinv = rebValue("ensure binary! pick", obj, "'qinv", rebEND);
+        REBVAL *p = rebValue("ensure binary! pick", obj, "'p");
+        REBVAL *q = rebValue("ensure binary! pick", obj, "'q");
+        REBVAL *dp = rebValue("ensure binary! pick", obj, "'dp");
+        REBVAL *dq = rebValue("ensure binary! pick", obj, "'dq");
+        REBVAL *qinv = rebValue("ensure binary! pick", obj, "'qinv");
 
-        binary_len = rebUnbox("length of", d, rebEND);
+        binary_len = rebUnbox("length of", d);
 
         IF_NOT_0(cleanup, error, Mpi_From_Binary(&ctx.D, d));
 
@@ -538,7 +538,7 @@ REBNATIVE(rsa)
     // the data from relocation or resize).
     //
     REBSIZ data_len;
-    REBYTE *dataBuffer = rebBytes(&data_len, ARG(data), rebEND);
+    REBYTE *dataBuffer = rebBytes(&data_len, ARG(data));
 
     // Buffer suitable for recapturing as a BINARY! for either the encrypted
     // or decrypted data
@@ -579,7 +579,7 @@ REBNATIVE(rsa)
   cleanup:
     mbedtls_rsa_free(&ctx);
     if (error)
-        rebJumps ("fail", error, rebEND);
+        rebJumps ("fail", error);
 
     return result;
 }
@@ -642,8 +642,8 @@ REBNATIVE(dh_generate_keypair)
             "fail [",
                 "{Don't use base >= modulus in Diffie-Hellman.}",
                 "{e.g. `2 mod 7` is the same as `9 mod 7` or `16 mod 7`}",
-            "]",
-        rebEND);
+            "]"
+        );
 
     // If you remove all the leading #{00} bytes from `p`, then the private
     // and public keys will be guaranteed to be no larger than that (due to
@@ -690,9 +690,7 @@ REBNATIVE(dh_generate_keypair)
     //
     if (ret == MBEDTLS_ERR_DHM_BAD_INPUT_DATA) {
         if (mbedtls_mpi_cmp_int(&ctx.P, 0) == 0)
-            rebJumps (
-                "fail {Cannot use 0 as modulus for Diffie-Hellman}",
-            rebEND);
+            rebJumps ("fail {Cannot use 0 as modulus for Diffie-Hellman}");
 
         if (REF(insecure))
             goto try_again_even_if_poor_primes;  // for educational use only!
@@ -703,14 +701,14 @@ REBNATIVE(dh_generate_keypair)
                 "{It's unwise to use arbitrary primes vs. constructed ones:}",
                 "{https://www.cl.cam.ac.uk/~rja14/Papers/psandqs.pdf}",
                 "{/INSECURE can override (for educational purposes, only!)}",
-            "]",
-            rebEND);
+            "]"
+        );
     }
     else if (ret == MBEDTLS_ERR_DHM_MAKE_PUBLIC_FAILED) {
         if (mbedtls_mpi_cmp_int(&ctx.P, 5) < 0)
             rebJumps (
-                "fail {Modulus cannot be less than 5 for Diffie-Hellman}",
-            rebEND);
+                "fail {Modulus cannot be less than 5 for Diffie-Hellman}"
+            );
 
         // !!! Checking for safe primes is should probably be done by default,
         // but here's some code using a probabilistic test after failure.
@@ -729,16 +727,16 @@ REBNATIVE(dh_generate_keypair)
                 "fail [",
                     "{Couldn't use base and modulus to generate keys.}",
                     "{Probabilistic test suggests modulus likely not prime?}"
-                "]",
-                rebEND);
+                "]"
+            );
         }
 
         rebJumps (
             "fail [",
                 "{Couldn't use base and modulus to generate keys,}",
                 "{even though modulus does appear to be prime...}",
-            "]",
-            rebEND);
+            "]"
+        );
     }
     else
         IF_NOT_0(cleanup, error, ret);
@@ -754,15 +752,15 @@ REBNATIVE(dh_generate_keypair)
             "modulus:", p,
             "private-key:", rebR(rebRepossess(x, x_size)),
             "public-key:", rebR(rebRepossess(gx, gx_size)),
-        "]",
-    rebEND);
+        "]"
+    );
   }
 
   cleanup:
     mbedtls_dhm_free(&ctx);  // should free any assigned bignum fields
 
     if (error)
-        rebJumps ("fail", error, rebEND);
+        rebJumps ("fail", error);
 
     return result;
 }
@@ -793,8 +791,8 @@ REBNATIVE(dh_compute_secret)
     // !!! used to ensure object only had other fields SELF, PUB-KEY, G
     // otherwise gave Error(RE_EXT_CRYPT_INVALID_KEY_FIELD)
     //
-    REBVAL *p = rebValue("ensure binary! pick", obj, "'modulus", rebEND);
-    REBVAL *x = rebValue("ensure binary! pick", obj, "'private-key", rebEND);
+    REBVAL *p = rebValue("ensure binary! pick", obj, "'modulus");
+    REBVAL *x = rebValue("ensure binary! pick", obj, "'private-key");
 
     REBVAL *gy = ARG(peer_key);
 
@@ -849,8 +847,8 @@ REBNATIVE(dh_compute_secret)
                 "{It's unwise to use random primes vs. constructed ones.}",
                 "{https://www.cl.cam.ac.uk/~rja14/Papers/psandqs.pdf}",
                 "{If keys originated from Rebol, please report this!}",
-            "]",
-            rebEND);
+            "]"
+        );
     }
     else
         IF_NOT_0(cleanup, error, ret);
@@ -868,7 +866,7 @@ REBNATIVE(dh_compute_secret)
     mbedtls_dhm_free(&ctx);
 
     if (error)
-        rebJumps ("fail", error, rebEND);
+        rebJumps ("fail", error);
 
     return result;
 }
@@ -901,15 +899,15 @@ REBNATIVE(aes_key)
     CRYPT_INCLUDE_PARAMS_OF_AES_KEY;
 
     REBSIZ p_size;
-    REBYTE *p_key = rebBytes(&p_size, ARG(key), rebEND);
+    REBYTE *p_key = rebBytes(&p_size, ARG(key));
 
     REBINT keybits = p_size * 8;
     if (keybits != 128 and keybits != 192 and keybits != 256) {
         DECLARE_LOCAL (i);
         Init_Integer(i, keybits);
         rebJumps(
-            "fail [{AES bits must be [128 192 256], not}", rebI(keybits), "]",
-        rebEND);
+            "fail [{AES bits must be [128 192 256], not}", rebI(keybits), "]"
+        );
     }
 
     const mbedtls_cipher_info_t *info = mbedtls_cipher_info_from_values(
@@ -943,14 +941,14 @@ REBNATIVE(aes_key)
 
   blockscope {
     size_t blocksize = mbedtls_cipher_get_block_size(ctx);
-    if (rebDid("binary?", ARG(iv), rebEND)) {
+    if (rebDid("binary?", ARG(iv))) {
         REBSIZ iv_size;
-        REBYTE *iv = rebBytes(&iv_size, ARG(iv), rebEND);
+        REBYTE *iv = rebBytes(&iv_size, ARG(iv));
 
         if (iv_size != blocksize) {
             error = rebValue("make error! [",
                 "Initialization vector block size not", rebI(blocksize),
-            "]", rebEND);
+            "]");
             goto cleanup;
         }
 
@@ -958,13 +956,13 @@ REBNATIVE(aes_key)
         rebFree(iv);
     }
     else
-        assert(rebDid("blank?", ARG(iv), rebEND));
+        assert(rebDid("blank?", ARG(iv)));
   }
 
   cleanup:
     if (error) {
         mbedtls_cipher_free(ctx);
-        rebJumps ("fail", error, rebEND);
+        rebJumps ("fail", error);
     }
 
     return Init_Handle_Cdata_Managed(
@@ -994,14 +992,14 @@ REBNATIVE(aes_stream)
 
     if (VAL_HANDLE_CLEANER(ARG(ctx)) != cleanup_aes_ctx)
         rebJumps(
-            "fail [{Not a AES context:}", ARG(ctx), "]", rebEND
+            "fail [{Not a AES context:}", ARG(ctx), "]"
         );
 
     struct mbedtls_cipher_context_t *ctx
         = VAL_HANDLE_POINTER(struct mbedtls_cipher_context_t, ARG(ctx));
 
     REBSIZ ilen;
-    REBYTE *input = rebBytes(&ilen, ARG(data), rebEND);
+    REBYTE *input = rebBytes(&ilen, ARG(data));
 
     if (ilen == 0) {
         rebFree(input);
@@ -1055,7 +1053,7 @@ REBNATIVE(aes_stream)
         rebFree(pad_data);
 
     if (error)
-        rebJumps ("fail", error, rebEND);
+        rebJumps ("fail", error);
 
     return result;
 }
@@ -1076,18 +1074,18 @@ static const struct mbedtls_ecp_curve_info *Ecp_Curve_Info_From_Word(
 ){
     const struct mbedtls_ecp_curve_info *info;
 
-    if (rebDidQ("'curve25519 =", word, rebEND))
+    if (rebDidQ("'curve25519 =", word))
         info = &curve25519_info;
     else {
-        char *name = rebSpellQ("lowercase to text!", word, rebEND);
+        char *name = rebSpellQ("lowercase to text!", word);
         info = mbedtls_ecp_curve_info_from_name(name);
         rebFree(name);
     }
 
     if (not info)
         rebJumpsQ (
-            "fail [{Unknown ECC curve specified:}", word, "]",
-        rebEND);
+            "fail [{Unknown ECC curve specified:}", word, "]"
+        );
 
     return info;
 }
@@ -1153,14 +1151,14 @@ REBNATIVE(ecc_generate_keypair)
                 "y:", rebR(rebRepossess(p_publicY, num_bytes)),
             "]",
             "private-key:", rebR(rebRepossess(p_privateKey, num_bytes)),
-        "]",
-    rebEND);
+        "]"
+    );
   }
 
   cleanup:
     mbedtls_ecdh_free(&ctx);
     if (error)
-        rebJumps ("fail", error, rebEND);
+        rebJumps ("fail", error);
 
     return result;
 }
@@ -1197,7 +1195,7 @@ REBNATIVE(ecdh_shared_secret)
                 "{bytes total for}", rebQ(ARG(group)), "]",
         "]",
         "bin",
-    "]", rebEND);
+    "]");
 
     // A change in mbedTLS ecdh code means there's a context variable inside
     // the context (ctx.ctx) when not using MBEDTLS_ECDH_LEGACY_CONTEXT
@@ -1229,8 +1227,8 @@ REBNATIVE(ecdh_shared_secret)
             "fail [{Size of PRIVATE key must be}",
                 rebI(num_bytes), "{for}", rebQ(ARG(group)), "]"
         "]",
-        ARG(private),
-    rebEND);
+        ARG(private)
+    );
 
     IF_NOT_0(cleanup, error,
         Mpi_From_Binary(&ctx.ctx.mbed_ecdh.d, ARG(private)));
@@ -1255,7 +1253,7 @@ REBNATIVE(ecdh_shared_secret)
     mbedtls_ecdh_free(&ctx);
 
     if (error)
-        rebJumps ("fail", error, rebEND);
+        rebJumps ("fail", error);
 
     return result;
 }

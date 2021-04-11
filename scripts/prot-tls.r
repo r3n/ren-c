@@ -214,9 +214,8 @@ emit: func [
     ]
 
     while [code] [
-        if set-word? code/1 [
-            let rebound: add-let-binding (binding of 'return) code/1
-            set rebound tail ctx/msg  ; save position
+        if set-word? code/1 [  ; set the word to the binary at current position
+            add-let-binding (binding of 'return) code/1 (tail ctx/msg)
             code: my next
         ]
         else [
@@ -584,7 +583,7 @@ client-hello: func [
             to-2bin (length of server-name-bin)  ; server name length
             server-name-bin             ; server name
         ]
-        change extension_length to-2bin (length of list_length) 
+        change extension_length to-2bin (length of list_length)
         change list_length to-2bin (length of list_item_1)
     ]
 
@@ -1616,23 +1615,25 @@ do-commands: func [
     let arg
     parse commands [
         some [
-            set cmd [
-                <client-hello> (
+            ; redundant `set cmd`, consider how ELIDE might improve it
+            ; https://forum.rebol.info/t/1534/5
+            [
+                set cmd <client-hello> (
                     client-hello/version ctx [1.0 1.2]  ; min/max versioning
                 )
-                | <client-key-exchange> (
+                | set cmd <client-key-exchange> (
                     client-key-exchange ctx
                 )
-                | <change-cipher-spec> (
+                | set cmd <change-cipher-spec> (
                     change-cipher-spec ctx
                 )
-                | <finished> (
+                | set cmd <finished> (
                     encrypted-handshake-msg ctx finished ctx
                 )
-                | #application set arg [text! | binary!] (
+                | set cmd #application set arg [text! | binary!] (
                     application-data ctx arg
                 )
-                | <close-notify> (
+                | set cmd <close-notify> (
                     alert-close-notify ctx
                 )
             ] (

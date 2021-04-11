@@ -188,7 +188,7 @@ REBVAL *Append_Context(
         assert(not symbol);
 
         REBLEN len = CTX_LEN(context); // length we just bumped
-        INIT_VAL_WORD_BINDING(unwrap(any_word), CTX_VARLIST(context));
+        INIT_VAL_WORD_BINDING(unwrap(any_word), context);
         INIT_VAL_WORD_PRIMARY_INDEX(unwrap(any_word), len);
     }
 
@@ -367,7 +367,7 @@ REBSER *Collect_Keylist_Managed(
             num_collected,  // no terminator
             SERIES_MASK_KEYLIST | NODE_FLAG_MANAGED
         );
-        
+
         STKVAL(*) word = DS_AT(cl->dsp_orig) + 1;
         REBKEY* key = SER_HEAD(REBKEY, keylist);
         for (; word != DS_TOP + 1; ++word, ++key)
@@ -589,8 +589,9 @@ REBCTX *Make_Context_Detect_Managed(
         // strings, replace their series components with deep copies.
         //
         REBVAL *dest = CTX_VARS_HEAD(context);
-        REBVAL *src = CTX_VARS_HEAD(unwrap(parent));
-        for (; NOT_END(src); ++dest, ++src) {
+        const REBVAR *src_tail;
+        REBVAL *src = CTX_VARS(&src_tail, unwrap(parent));
+        for (; src != src_tail; ++dest, ++src) {
             REBFLGS flags = NODE_FLAG_MANAGED;  // !!! Review, what flags?
             Copy_Cell(dest, src);
             Clonify(dest, flags, TS_CLONE);
@@ -1071,16 +1072,20 @@ void Assert_Context_Core(REBCTX *c)
         if (not IS_SYMBOL(*key))
             panic (*key);
 
-        if (IS_END(var)) {
+      #ifdef DEBUG_TERM_ARRAYS
+        if (IS_TRASH_DEBUG(var)) {
             printf("** Early var end at index: %d\n", cast(int, n));
             panic (c);
         }
+      #endif
     }
 
-    if (NOT_END(var)) {
+  #ifdef DEBUG_TERM_ARRAYS
+    if (not IS_TRASH_DEBUG(var)) {
         printf("** Missing var end at index: %d\n", cast(int, n));
         panic (var);
     }
+  #endif
 }
 
 #endif

@@ -37,7 +37,7 @@ REBOL [
 ; This script makes some assumptions about the structure of the repo.
 ;
 
-do %../../tools/common.r
+do %../../tools/common.r  ; sets REPO-DIR (among other things)
 
 do %% (repo-dir)/tools/common-parsers.r
 do %% (repo-dir)/tools/text-lines.reb
@@ -163,7 +163,7 @@ rebsource: context [
 
                 malloc-found: copy []
 
-                malloc-check: [
+                malloc-check: here, [
                     and identifier "malloc" (
                         append malloc-found try text-line-of position
                     )
@@ -171,7 +171,7 @@ rebsource: context [
 
                 parse/case data [
                     some [
-                        position:
+                        position: here
                         malloc-check
                         | c-pp-token
                     ]
@@ -325,7 +325,7 @@ rebsource: context [
                     ]
                     line: 1 + line
                 )
-                bol:
+                bol: here
             ]
 
             tabbed: copy []
@@ -336,13 +336,16 @@ rebsource: context [
 
             parse/case data [
 
-                last-pos:
+                last-pos: here
 
-                opt [bol: skip (line: 1) :bol]
+                opt [
+                    bol: here, skip (line: 1)
+                    seek :bol  ; !!! GET-WORD! for bootstrap (SEEK is no-op)
+                ]
 
                 any [
                     to stop-char
-                    position:
+                    position: here
                     [
                         eol count-line
                         | #"^-" (append tabbed line)
@@ -352,7 +355,7 @@ rebsource: context [
                         | skip
                     ]
                 ]
-                position:
+                position: here
 
                 to end
             ]

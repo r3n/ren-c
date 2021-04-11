@@ -42,17 +42,18 @@ void Startup_Data_Stack(REBLEN capacity)
     Init_Unreadable_Void(ARR_HEAD(DS_Array));
     SET_CELL_FLAG(ARR_HEAD(DS_Array), PROTECTED);
 
-    // The END marker will signal DS_PUSH() that it has run out of space,
+    // The tail marker will signal DS_PUSH() that it has run out of space,
     // and it will perform the allocation at that time.
     //
     SET_SERIES_LEN(DS_Array, 1);
+    DS_Movable_Tail = ARR_TAIL(DS_Array);
     ASSERT_ARRAY(DS_Array);
 
     // Reuse the expansion logic that happens on a DS_PUSH() to get the
     // initial stack size.  It requires you to be on an END to run.
     //
     DS_Index = 1;
-    DS_Movable_Top = SPECIFIC(ARR_AT(DS_Array, DS_Index));  // can't push RELVALs
+    DS_Movable_Top = SPECIFIC(ARR_AT(DS_Array, DS_Index));  // no RELVALs
     Expand_Data_Stack_May_Fail(capacity);
 
     DS_DROP();  // drop the hypothetical thing that triggered the expand
@@ -257,9 +258,11 @@ void Expand_Data_Stack_May_Fail(REBLEN amount)
     // is at its end.  Sanity check that.
     //
     assert(len_old == DS_Index);
-    assert(IS_END(DS_Movable_Top));
-    assert(DS_Movable_Top == SPECIFIC(ARR_TAIL(DS_Array)));
-    assert(DS_Movable_Top - SPECIFIC(ARR_HEAD(DS_Array)) == cast(int, len_old));
+    assert(DS_Movable_Top == ARR_TAIL(DS_Array));
+    assert(
+        cast(RELVAL*, DS_Movable_Top) - ARR_HEAD(DS_Array)
+        == cast(int, len_old)
+    );
 
     // If adding in the requested amount would overflow the stack limit, then
     // give a data stack overflow error.
@@ -297,6 +300,7 @@ void Expand_Data_Stack_May_Fail(REBLEN amount)
     //
     SET_SERIES_LEN(DS_Array, len_new);
     assert(cell == ARR_TAIL(DS_Array));
+    DS_Movable_Tail = ARR_TAIL(DS_Array);
 
     ASSERT_ARRAY(DS_Array);
 }

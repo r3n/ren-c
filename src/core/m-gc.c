@@ -150,14 +150,6 @@ static void Queue_Mark_Pairing_Deep(REBVAL *paired)
     Queue_Mark_Opt_Value_Deep(paired);
     Queue_Mark_Opt_Value_Deep(PAIRING_KEY(paired));
 
-    // Caution note: We are writing this bit through the uint_fast32_t `bits`
-    // of a REBVAL* header pointer, but we visit the series pool with a
-    // REBSER*.  It would be unsafe to read it back via the `bits` field and
-    // expect it to work -except- we are reading as a byte, and byte access
-    // gets past strict aliasing.  Watch out for any non-byte accesses that
-    // try to work with this flag.  (Perhaps all MARKED access should go
-    // through a byte-oriented API, as with IS_END()?)
-    //
     paired->header.bits |= NODE_FLAG_MARKED;
 
   #if !defined(NDEBUG)
@@ -399,7 +391,7 @@ static void Propagate_All_GC_Marks(void)
             //
             if (
                 KIND3Q_BYTE_UNCHECKED(v) == REB_NULL
-                and not (IS_VARLIST(a) or IS_PATCH(a))
+                and not (IS_VARLIST(a) or IS_PATCH(a) or IS_PAIRLIST(a))
             ){
                 panic (a);
             }
@@ -594,8 +586,9 @@ static void Mark_Root_Series(void)
                     if (node_MISC(Node, a))
                         Queue_Mark_Node_Deep(node_MISC(Node, a));
 
-                RELVAL *item = SER_HEAD(RELVAL, a);
-                for (; NOT_END(item); ++item)
+                const RELVAL *item_tail = ARR_TAIL(a);
+                RELVAL *item = ARR_HEAD(a);
+                for (; item != item_tail; ++item)
                     Queue_Mark_Value_Deep(item);
             }
 
@@ -625,7 +618,7 @@ static void Mark_Root_Series(void)
 //
 static void Mark_Data_Stack(void)
 {
-    REBVAL *head = SPECIFIC(ARR_HEAD(DS_Array));
+    const RELVAL *head = ARR_HEAD(DS_Array);
     ASSERT_UNREADABLE_IF_DEBUG(head);  // DS_AT(0) is deliberately invalid
 
     REBVAL *stackval = DS_Movable_Top;
@@ -782,11 +775,11 @@ static void Mark_Frame_Stack_Deep(void)
         if (f->label)  // nullptr if anonymous
             Queue_Mark_Node_Deep(m_cast(REBSYM*, unwrap(f->label)));
 
-        // special can be used to GC protect an arbitrary value while a
+        // param can be used to GC protect an arbitrary value while a
         // function is running, currently.  nullptr is permitted as well
         // (e.g. path frames use nullptr to indicate no set value on a path)
         //
-        if (f->param)
+        if (f->key != f->key_tail and f->param)
             Queue_Mark_Opt_End_Cell_Deep(f->param);
 
         if (f->varlist and GET_SERIES_FLAG(f->varlist, MANAGED)) {
@@ -1046,7 +1039,7 @@ REBLEN Fill_Sweeplist(REBSER *sweeplist)
                     pairing->header.bits &= ~NODE_FLAG_MARKED;
                 else {
                     EXPAND_SERIES_TAIL(sweeplist, 1);
-                    *SER_AT(REBNOD*, sweeplist, count) = NOD(pairing);
+                    *SER_AT(REBNOD*, sweeplist, count) = pairing;
                     ++count;
                 }
                 break; }

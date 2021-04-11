@@ -45,20 +45,6 @@
 
 #include "libtcc.h"
 
-#if defined(NEEDS_FAKE_STRTOLD)
-    //
-    // strtold() was added in C99.  Some older Android NDKs don't have it, but
-    // TCC depends upon it.  It defines it as an extern in %tcc.h with
-    // different return type than Android NDK's strtod, hence you can't
-    // do `-Dstrtold-strtod` without getting a conflicting definition warning.
-    //
-    // This proxy definition can get past the linker error, and keeps the
-    // workaround isolated to the TCC extension.
-    //
-    long double strtold (const char *nptr, char **endptr) {
-        return strtod(nptr, endptr);
-    }
-#endif
 
 #if defined(TCC_RELOCATE_AUTO)
     #define tcc_relocate_auto(s) \
@@ -86,7 +72,7 @@
             "{tcc extension was built with an older libtcc that was assumed}"
             "{to not have tcc_set_options() (it lacked TCC_RELOCATE_AUTO).}"
             "{You'll need to rebuild the tcc extension with a newer lib.}"
-        "]", rebEND);
+        "]");
     }
 #endif
 
@@ -147,7 +133,7 @@ static void Error_Reporting_Hook(
 
     rebJumps ("fail [",
         "{TCC errors/warnings, '-w' to stop warnings:}", rebT(msg_utf8),
-    "]", rebEND);
+    "]");
 }
 
 
@@ -166,14 +152,14 @@ static void Process_Text_Helper_Core(
 ){
     assert(IS_TEXT(text));
 
-    char* utf8 = rebSpell(text, rebEND);
+    char* utf8 = rebSpell(text);
     int status = some_tcc_api(state, utf8);
     rebFree(utf8);
 
     if (status < 0)  // !!! When is this called vs. Error_Reporting_Hook?
         rebJumps ("fail [",
             "{TCC}", rebT(label), "{rejected:}", text,
-        "]", rebEND);
+        "]");
 }
 static void Process_Text_Helper(
     TCC_CSTR_API some_tcc_api,
@@ -182,8 +168,8 @@ static void Process_Text_Helper(
     const char *label
 ){
     REBVAL *text = rebValue(
-        "opt ensure [blank! text!] select", config, "as word!", rebT(label),
-    rebEND);
+        "opt ensure [blank! text!] select", config, "as word!", rebT(label)
+    );
 
     if (text) {
         Process_Text_Helper_Core(some_tcc_api, state, text, label);
@@ -204,8 +190,8 @@ static void Process_Block_Helper(
     const char *label
 ){
     REBVAL *block = rebValue(
-        "ensure block! select", config, "as word!", rebT(label),
-    rebEND);
+        "ensure block! select", config, "as word!", rebT(label)
+    );
 
     const RELVAL *tail;
     const RELVAL *text = VAL_ARRAY_AT(&tail, block);
@@ -231,7 +217,7 @@ static void Add_API_Symbol_Helper(
     if (tcc_add_symbol(state, symbol, void_ptr) < 0)
         rebJumps ("fail [",
             "{tcc_add_symbol failed for}", rebT(symbol),
-        "]", rebEND);
+        "]");
 }
 
 
@@ -279,7 +265,7 @@ REB_R Pending_Native_Dispatcher(REBFRM *f) {
     // known correct COMPILE Rebol function has to be done (NATIVE_VAL() is
     // not in extensions yet, and may not be, so no NATIVE_VAL(compile).)
     //
-    rebElide("compile [", action, "]", rebEND);
+    rebElide("compile [", rebQ(action), "]");
     //
     // ^-- !!! Today's COMPILE doesn't return a result on success (just fails
     // on errors), but if it changes to return one consider what to do.
@@ -368,8 +354,8 @@ REBNATIVE(make_native)
 
         intptr_t heapaddr = cast(intptr_t, details);
         REBVAL *linkname = rebValue(
-            "unspaced [{N_} as text! to-hex", rebI(heapaddr), "]",
-        rebEND);
+            "unspaced [{N_} as text! to-hex", rebI(heapaddr), "]"
+        );
 
         Copy_Cell(ARR_AT(details, IDX_TCC_NATIVE_LINKNAME), linkname);
         rebRelease(linkname);
@@ -445,17 +431,6 @@ REBNATIVE(compile_p)
     //
     Process_Block_Helper(tcc_add_include_path, state, config, "include-path");
 
-    // Add library paths (same as using `-L` in the options?)
-    //
-    Process_Block_Helper(tcc_add_library_path, state, config, "library-path");
-
-    // Add individual library files (same as using -l in the options?  e.g.
-    // the actual file is "libxxx.a" but you'd pass just `xxx` here)
-    //
-    // !!! Does this work for fully specified file paths as well?
-    //
-    Process_Block_Helper(tcc_add_library, state, config, "library");
-
     // Though it is called `tcc_set_lib_path()`, it says it sets CONFIG_TCCDIR
     // at runtime of the built code, presumably so libtcc1.a can be found.
     //
@@ -480,13 +455,13 @@ REBNATIVE(compile_p)
             "'OBJ [", rebI(TCC_OUTPUT_OBJ), "]",
             "'PREPROCESS [", rebI(TCC_OUTPUT_PREPROCESS), "]",
             "-1",
-        "]",
-    rebEND);
+        "]"
+    );
 
     if (tcc_set_output_type(state, output_type) < 0)
         rebJumps("fail [",
             "{TCC failed to set output to} pick", config, "'output-type",
-        "]", rebEND);
+        "]");
 
 
   //=//// SPECIFY USER NATIVES (OR DISK FILES) TO COMPILE /////////////////=//
@@ -502,7 +477,7 @@ REBNATIVE(compile_p)
             if (not IS_TEXT(item))
                 fail ("If COMPILE*/FILES, compilables must be TEXT! paths");
 
-            char *filename_utf8 = rebSpell(SPECIFIC(item), rebEND);
+            char *filename_utf8 = rebSpell(SPECIFIC(item));
             tcc_add_file(state, filename_utf8);
             rebFree(filename_utf8);
         }
@@ -597,11 +572,28 @@ REBNATIVE(compile_p)
         ){
             rebJumps ("fail [",
                 "{TCC failed to compile the code}", compilables,
-            "]", rebEND);
+            "]");
         }
 
         Drop_Mold(mo);  // discard the combined source (no longer needed)
     }
+
+  //=//// LINKING STEPS (Libraries) ///////////////////////////////////////=//
+
+    // TCC compiles the code first, so it knows what symbols it needs...and
+    // only then can it narrow down which symbols in a library it needs.  So
+    // these steps have to come *after* the compilation.
+
+    // Add library paths (same as using `-L` in the options?)
+    //
+    Process_Block_Helper(tcc_add_library_path, state, config, "library-path");
+
+    // Add individual library files (same as using -l in the options?  e.g.
+    // the actual file is "libxxx.a" but you'd pass just `xxx` here)
+    //
+    // !!! Does this work for fully specified file paths as well?
+    //
+    Process_Block_Helper(tcc_add_library, state, config, "library");
 
     // We could export just one symbol ("RL" for the Ext_Lib RL_LIB table) and
     // tell the API to use indirect calls like RL->rebXXX with #define REB_EXT
@@ -645,8 +637,8 @@ REBNATIVE(compile_p)
         assert(DSP == dsp_orig);  // no user natives if outputting file!
 
         char *output_file_utf8 = rebSpell(
-            "ensure text! pick", config, "'output-file",
-        rebEND);
+            "ensure text! pick", config, "'output-file"
+        );
 
         if (tcc_output_file(state, output_file_utf8) < 0)
             fail ("TCC failed to output the file");
@@ -662,16 +654,16 @@ REBNATIVE(compile_p)
         assert(Is_User_Native(action));  // can't cache stack pointer, extract
 
         REBARR *details = ACT_DETAILS(action);
-        REBVAL *linkname = SPECIFIC(ARR_AT(details, IDX_TCC_NATIVE_LINKNAME));
+        REBVAL *linkname = DETAILS_AT(details, IDX_TCC_NATIVE_LINKNAME);
 
-        char *name_utf8 = rebSpell("ensure text!", linkname, rebEND);
+        char *name_utf8 = rebSpell("ensure text!", linkname);
         void *sym = tcc_get_symbol(state, name_utf8);
         rebFree(name_utf8);
 
         if (not sym)
             rebJumps ("fail [",
                 "{TCC failed to find symbol:}", linkname,
-            "]", rebEND);
+            "]");
 
         // Circumvent ISO C++ forbidding cast between function/data pointers
         //
@@ -679,7 +671,7 @@ REBNATIVE(compile_p)
         assert(sizeof(c_func) == sizeof(void*));
         memcpy(&c_func, &sym, sizeof(c_func));
 
-        ACT_DISPATCHER(action) = c_func;
+        INIT_ACT_DISPATCHER(action, c_func);
         Copy_Cell(ARR_AT(details, IDX_TCC_NATIVE_STATE), handle);
 
         DS_DROP();

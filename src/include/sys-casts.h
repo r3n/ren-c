@@ -79,6 +79,10 @@
 
 #else
 
+  #if !defined(CPLUSPLUS_11)
+    #error "DEBUG_CHECK_CASTS requires C++11 (or later)"
+  #endif
+
     // The C++ variants are more heavyweight, and beyond the scope of writing
     // a long explanation here.  Suffice to say that these are templates
     // which enforce that a const base-class pointer input will result in
@@ -100,18 +104,13 @@
         >::type
     >
     inline static N *NOD(T *p) {
-        constexpr bool derived =
-            std::is_same<T0, REBNOD>::value
-            or std::is_base_of<REBRAW, T0>::value
-            or std::is_same<T0, REBFRM>::value;
-
         constexpr bool base =
             std::is_same<T0, void>::value
             or std::is_same<T0, REBYTE>::value;
 
         static_assert(
-            derived or base,
-            "NOD() works on void* or REBFRM*"
+            base,
+            "NOD() works on void* or REBYTE*"
         );
 
         if (not p)

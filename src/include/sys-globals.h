@@ -55,6 +55,7 @@ PVAR const REBSYM *PG_Bar_Canon;  // fast canon value for testing for `|`
 
 PVAR REBVAL *Lib_Context;
 PVAR REBVAL *Sys_Context;
+PVAR REBVAL *User_Context;
 
 //-- Various char tables:
 PVAR REBYTE *White_Chars;
@@ -80,7 +81,7 @@ PVAR REB_OPTS *Reb_Opts;
 
 // These are some canon BLANK, TRUE, and FALSE values (and nulled/end cells).
 
-PVAR RELVAL PG_End_Node;
+PVAR REBVAL PG_End_Cell;
 PVAR REBVAL PG_Nulled_Cell;
 
 PVAR REBVAL PG_Blank_Value;
@@ -223,6 +224,7 @@ TVAR REBARR *TG_Reuse;
 TVAR REBARR *DS_Array;
 TVAR REBDSP DS_Index;
 TVAR REBVAL *DS_Movable_Top;
+TVAR const RELVAL *DS_Movable_Tail;
 
 TVAR struct Reb_State *TG_Jump_List; // Saved state for TRAP (CPU state, etc.)
 

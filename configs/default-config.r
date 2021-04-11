@@ -28,7 +28,6 @@ extensions: make map! [
     DNS +
     Event +
     Filesystem +
-    FFI -
     GIF +
     Gob +
     JavaScript -
@@ -39,7 +38,6 @@ extensions: make map! [
     ODBC -
     PNG +
     Process +
-    Serial +
     Signal -
     TCC -
     Time +
@@ -47,7 +45,6 @@ extensions: make map! [
     UTF +
     Vector +
     View +
-    ZeroMQ -
 ]
 
 rebol-tool: _ ; fallback value if system/options/boot fails
@@ -77,11 +74,6 @@ rigorous: no
 
 static: no
 pkg-config: try get-env "PKGCONFIG" ;path to pkg-config, or default
-
-; The original default for WITH-FFI was 'dynamic, but this would cause it to
-; try building the FFI on all configurations.
-;
-with-ffi: no
 
 odbc-requires-ltdl: no
 

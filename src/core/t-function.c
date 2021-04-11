@@ -88,7 +88,7 @@ REB_R MAKE_Action(
         // hidden fields are parameter specifications.  Review if there is
         // some middle ground.
         //
-        REBVAL *frame_copy = rebValue("copy", arg, rebEND);
+        REBVAL *frame_copy = rebValue("copy", arg);
         REBCTX *exemplar = VAL_CONTEXT(frame_copy);
         rebRelease(frame_copy);
 
@@ -212,9 +212,10 @@ REBTYPE(Action)
         // where we can bit-copy a possibly-relative value.
         //
       blockscope {
+        const RELVAL *src_tail = ARR_TAIL(ACT_DETAILS(act));
         RELVAL *src = ARR_HEAD(ACT_DETAILS(act)) + 1;
         RELVAL *dest = ARR_HEAD(ACT_DETAILS(proxy)) + 1;
-        for (; NOT_END(src); ++src, ++dest)
+        for (; src != src_tail; ++src, ++dest)
             Copy_Cell(dest, src);
         SET_SERIES_LEN(ACT_DETAILS(proxy), details_len);
       }

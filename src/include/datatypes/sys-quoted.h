@@ -137,7 +137,7 @@ inline static RELVAL *Quotify_Core(
         mutable_KIND3Q_BYTE(unquoted) = kind;  // escaping only in literal
 
         unquoted->payload = v->payload;
- 
+
         Manage_Pairing(unquoted);
 
         RESET_VAL_HEADER(v, REB_QUOTED, CELL_FLAG_FIRST_IS_NODE);
@@ -146,11 +146,8 @@ inline static RELVAL *Quotify_Core(
 
         if (ANY_WORD_KIND(CELL_HEART(cast(REBCEL(const*), unquoted)))) {
             //
-            // Words that are bound find their spellings by means of their
-            // PRIMARY_INDEX.  If a word is shared by several QUOTED!
-            // then that index can be different in each one.  So the shared
-            // word is put in an unbound state, which means the binding is
-            // to the spelling, which VAL_WORD_SYMBOL() of REBCEL can work.
+            // The shared word is put in an unbound state, since each quoted
+            // instance can be bound differently.
             //
             VAL_WORD_INDEXES_U32(v) |=
                 VAL_WORD_PRIMARY_INDEX_UNCHECKED(unquoted);
@@ -222,10 +219,11 @@ inline static void Collapse_Quoted_Internal(RELVAL *v)
         // kept in its QUOTED! form), but sync with the virtual binding
         // information in the escaped form.
         //
+        INIT_VAL_WORD_SYMBOL(v, VAL_WORD_SYMBOL(unquoted));
+        // Note: leave binding as is...
         VAL_WORD_INDEXES_U32(v) &= 0x000FFFFF;  // wipe out quote depth
         VAL_WORD_INDEXES_U32(v) |=
             (VAL_WORD_INDEXES_U32(unquoted) & 0xFFF00000);
-        INIT_VAL_WORD_CACHE(v, VAL_WORD_CACHE(unquoted));
     }
     else {
         v->payload = unquoted->payload;

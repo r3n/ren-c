@@ -1,0 +1,345 @@
+#
+# File: %linux-tcc-build.yml
+#
+#=============================================================================#
+#
+# GitHub Workflow for using TCC to build Ren-C with the TCC extension, and then
+# use that executable to bootstrap.  A demonstration of this ability was first
+# made in July 2019, video here:
+#
+# https://youtu.be/PT3GOe1pj9I?t=163
+#
+# The bootstrapping executable is not deployed to AWS for downloading, as it's
+# more a stunt than being intended for use (since there's not much
+# optimization in TCC, it's better to build with GCC or Clang).
+#
+#====# PLEASE READ THE README #===============================================#
+#
+# Whenever this file says "See README", that is referring to the notes in the
+# %.github/workflows/README.md file.  If something appears in multiple GitHub
+# Workflow files, it's best to document it there instead of repeating it:
+#
+# https://github.com/metaeducation/ren-c/blob/master/.github/workflows/README.md
+#
+
+name: Linux TCC
+
+
+# See README: When To Trigger Builds
+#
+on:
+  push:
+    branches: [
+      #master,
+      tcc  # pushing to tcc won't build other workflows, use to debug
+    ]
+  pull_request:
+    branches: [
+      master
+    ]
+  workflow_dispatch:  # Allows running this workflow manually from Actions tab
+
+
+# Standardize to use bash on all platforms.
+#
+# See README: Using The Strict Erroring Bash Shell
+#
+defaults:
+  run:
+    shell: bash
+
+
+# Each "Job" runs in its own VM, and a workflow run is made up of one or more
+# jobs that can run sequentially or in parallel.
+#
+# See README: Jobs
+#
+jobs:
+  linux-tcc-build:  # Name of this workflow's only job
+
+    # https://github.com/actions/virtual-environments#available-environments
+    #
+    runs-on: ubuntu-20.04
+
+    # See README: Build Matrix
+    #
+    strategy:
+      matrix:
+       include:
+
+         - os-id: 0.4.40  # 64-bit Linux (can run executable on this container)
+           config-file: tcc.r
+           debug: none
+
+         - os-id: 0.4.40  # 64-bit Linux (can run executable on this container)
+           config-file: tcc.r
+           debug: normal
+
+
+    # See README: Environment Variables
+    #
+    env:
+      AWS_S3_BUCKET_NAME: metaeducation
+
+      # See README: Minimize GitHub-Specific Syntax
+      #
+      OS_ID: ${{ matrix.os-id }}
+      CONFIG_FILE: ${{ matrix.config-file }}
+      DEBUG: ${{ matrix.debug }}
+
+
+    # Steps are a sequence of tasks that will be executed within a single VM
+    # as part of the job.
+    #
+    # See README: Steps
+    #
+    steps:  # (no indentatation needed below; so indent the minimum!)
+
+
+  #====# CHECKOUT STEPS #=====================================================#
+
+
+    # https://github.com/actions/checkout
+    #
+    # See README: Checkout Action
+    #
+    - uses: actions/checkout@v2  # See README: Trusted Actions
+
+
+    # The full commit is passed to make to build into the binary, and the
+    # abbreviated commit is used to name the executable.
+    #
+    # See README: Portably Capturing Git Hashes
+    #
+    - name: Grab Git Hash and Short Hash Into Environment Variables
+      run: |
+        git_commit="$(git show --format="%H" --no-patch)"
+        git_commit_short="$(git show --format="%h" --no-patch)"
+        echo "GIT_COMMIT=$git_commit" >> $GITHUB_ENV
+        echo "GIT_COMMIT_SHORT=$git_commit_short" >> $GITHUB_ENV
+
+
+  #====# TOOLCHAIN INSTALLATION STEPS #=======================================#
+
+
+    # !!! Ideally this would use the same step that clients can use to build
+    # the system with `make.sh`.  Unfortunately, something about the GitHub
+    # Ubuntus do not like the old bootstrap executable.  Make sure the
+    # ordinary path works, but for the moment patch over it just to get
+    # to a point where the action works.
+    #
+    - name: Fetch R3 To Use For "Prep" Build Steps as $R3MAKE
+      run: |
+        repo_dir=$(pwd)/
+        source tools/bash/fetch-prebuilt.sh
+        r3make=$(fetch_prebuilt)
+        echo "R3MAKE is set to $r3make"
+        echo "But that executable won't run on GitHub for some reason"
+        # "$r3make" --do "print {TESTING 1 2 3}"  # NOT WORKING, dunno why
+        cd prebuilt
+        wget http://hostilefork.com/media/shared/github/r3-linux-dec-2020
+        chmod +x r3-linux-dec-2020
+        r3make=$(pwd)/r3-linux-dec-2020
+        echo "So now R3MAKE is $r3make"
+        echo "R3MAKE=$r3make" >> $GITHUB_ENV  # pass to next step
+
+
+    - name: Stop the build early if the R3MAKE is no good
+      run: |
+        "$R3MAKE" --do "print {R3MAKE is Working} quit 0"
+
+
+    # Refer to the TCC Extension's README.md for an explanation of what's in
+    # the `tcc` and `libtcc-dev` packages, and the little group of files they
+    # use to patch over the GCC include and lib files so it can use them.
+    #
+    # https://github.com/metaeducation/ren-c/blob/master/extensions/tcc/README.md
+    #
+    - name: Install TinyC (tcc) and its LibC Helper Includes and Lib
+      run: |
+        sudo apt install tcc libtcc-dev
+
+
+    # Knowing the magic path here to set CONFIG_TCCDIR is really something
+    # that could change arbitrarily based on how the packages install.  But
+    # this seems to be right on 64-bit Ubuntu for the versions we've tried.
+    # (Building TCC from source could obviously put the files somewhere else.)
+    #
+    - name: Set CONFIG_TCCDIR During First Phase To Use Ubuntu's TCC Files
+      run: |
+        echo "CONFIG_TCCDIR=/usr/lib/x86_64-linux-gnu/tcc/" >> $GITHUB_ENV
+
+
+    # Show a little bit of sanity check information
+    #
+    - name: Output System Information
+      run: |
+        echo "Current directory is: $(pwd)"
+        echo "TCC version check:"
+        tcc -vv
+
+
+  #====# BUILD STEPS #========================================================#
+
+
+    # See README: {Braces} For %make.r String Parameters
+    #
+    - name: Generate Makefile for a TCC-Built R3 Including the TCC Extension
+      run: |
+        mkdir build
+        cd build
+
+        # We use a makefile target here because the bootstrap process itself
+        # enforces using the no-makefile form.  So we just exercise more code
+        # by doing this, even though it's a little more long winded.
+        #
+        # NOTE: The GIT_COMMIT must be in {} not just "" that the shell might
+        # get rid of.  Or you get weird bugs when the hex starts with numbers
+        # and doesn't make a WORD!.  Frustrating to debug because each
+        # diagnostic changes the hash to maybe a WORD!
+        #
+        "$R3MAKE" ../make.r \
+            config="../configs/$CONFIG_FILE" \
+            target=makefile \
+            standard=c \
+            os_id=$OS_ID \
+            debug=$DEBUG \
+            git_commit="{$GIT_COMMIT}" \
+            rigorous=no \
+            static=no \
+            extensions="TCC +"
+
+
+    - name: Create Folders For Build Products (Compiler Won't Create Them)
+      run: |
+        cd build
+        make folders
+
+
+    - name: Prep the Build By Making Various Auto-Generated .h and .c Files
+      run: |
+        cd build
+        make prep
+
+
+    # https://github.com/actions/upload-artifact
+    #
+    - name: Optional Download of Prep Files Before They Can Cause Build Failure
+      if: false  # Change this to true to download a file
+      uses: actions/upload-artifact@v2  # See README: Trusted Actions
+      with:
+        name: tmp-internals.h
+        path: build/prep/include/tmp-internals.h
+
+
+    - name: Compile and Link the C Files to into R3ONE (first build)
+      run: |
+        cd build
+        make
+        echo "R3ONE=$(pwd)/r3" >> $GITHUB_ENV
+
+
+  #====# BOOTSTRAP STEPS #====================================================#
+  #
+  # Here we want to pull of the trick of using the single produced exe to
+  # download the .ZIP file from GitHub (using the network layer, HTTP, and TLS
+  # cryptography all implemented in Ren-C)...and then unzip it using the
+  # usermode .ZIP code, and then build it.
+  #
+  # To help reinforce the validity of the stunt, we remove anything that could
+  # be interpreted as helping...including the TCC compiler we just used,
+  # and the source code that the `git` executable had been used to cloned.
+  #
+  #===========================================================================#
+
+
+    - name: Delete Ren-C Source Cloned With Git (let Bootstrap EXE Fetch It)
+      run: |
+        export TOP_DIR=$(pwd)
+        mv build/r3 ../r3-with-tcc
+        cd ..
+        rm -rf $TOP_DIR
+        mkdir $TOP_DIR
+        mv r3-with-tcc $TOP_DIR
+
+
+    # Note: We don't uninstall `libtcc-dev` because we are choosing to build
+    # the TCC extension into the executable we are building with r3-with-tcc.
+    # One doesn't have to do that, but by doing so we prove this bootstrapping
+    # could continue on indefinitely...
+    #
+    - name: Uninstall Prebuilt R3, TinyC, GCC, wget, etc. (Mimic Clean System)
+      run: |
+        sudo apt remove tcc gcc clang wget curl
+
+
+    # Note: The BOOTSTRAP command downloads a ZIP file from GitHub.  The
+    # format of such zip files is that they contain a single directory of
+    # `$PROJECT-$BRANCH`, so it uncompresses the sources into a subdirectory
+    # here of %ren-c-master/
+    #
+    # Then BOOTSTRAP will make a %build/ directory underneath that, where
+    # the build products will be put.
+    #
+    - name: Use R3 We Built to Download Source Over HTTPS, Unzip, and Compile!
+      run: |
+        ./r3-with-tcc --do "bootstrap/options" -- debug=$DEBUG extensions="TCC +"
+        echo "R3TWO=$(pwd)/ren-c-master/build/r3" >> $GITHUB_ENV
+
+
+    # We uninstalled TCC, which had libtcc1.a and some header overloads we
+    # require.  To better understand "compiler intrinsics" and why those files
+    # are necessary, see the TCC extension's README.md.
+    #
+    # https://github.com/metaeducation/ren-c/blob/master/extensions/tcc/README.md
+    #
+    # Ideally these would be encapped into executables that are built with the
+    # TCC extension.  Right now we settle for a .zip file which is downloaded
+    # as part of the BOOTSTRAP command, and put in the %tccencap/ directory.
+    # Set that to the CONFIG_TCCDIR.
+    #
+    # Long-term, this would be handled behind-the-scenes so the user would
+    # not have to see it.
+    #
+    # Also, in order to build user natives, one of the headers used by the
+    # process needs to be `librebol.h`.  We don't use a fixed version in the
+    # `tccencap` that BOOTSTRAP from the web, because we'd like an up to the
+    # minute version from the build we just made.
+    #
+    # The long-term answer to this is for that encapping process to include
+    # the librebol.h and the precise libtcc files from the build.  So a test
+    # like this would effectively be using the file it just made, just like
+    # we are doing here.
+    #
+    # Modifications have been proposed which would make the "Standalone
+    # Building" feature for Rebol better:
+    #
+    # http://lists.nongnu.org/archive/html/tinycc-devel/2018-12/msg00011.html
+    #
+    # But given priorities, there are not enough Rebol dev resources to
+    # develop and maintain a separate fork of TCC for that.
+    #
+    - name: Set CONFIG_TCCDIR and LIBREBOL_INCLUDE_DIR for Test Phase
+      run: |
+        echo "CONFIG_TCCDIR=$(pwd)/tccencap/" >> $GITHUB_ENV
+        echo "LIBREBOL_INCLUDE_DIR=$(pwd)/ren-c-master/build/prep/include/" >> $GITHUB_ENV
+
+
+  #===# TESTING STEPS #=======================================================#
+
+    - name: Basic Smoke Test (Print A Message And Quit)
+      run: |
+        "$R3TWO" --do "print {Hello, Bootstrapped World!}"
+
+
+    - name: HTTPS Read Test (If This Works, A Lot Of Things Are Working)
+      run: |
+        "$R3TWO" --do "quit either find to-text read https://example.com {<h1>Example Domain</h1>} [0] [1]"
+
+
+    - name: Fibonnacci Test (Build a New Native From String of C Code)
+      run: |
+        echo "Note: CONFIG_TCCDIR is ${CONFIG_TCCDIR}"
+        echo "Note: LIBREBOL_INCLUDE_DIR is ${LIBREBOL_INCLUDE_DIR}"
+
+        "$R3TWO" ren-c-master/extensions/tcc/tests/fib.r

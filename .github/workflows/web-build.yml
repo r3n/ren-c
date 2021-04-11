@@ -1,0 +1,362 @@
+#
+# File: %web-build.yml
+#
+#=============================================================================#
+#
+# GitHub Workflow for building the Wasm version of Ren-C.  It *builds* all pull
+# requests to master, but only *deploys* commits that are actually merged in.
+#
+# Deployments will become "live" in the Web REPL demonstration directly from
+# this action...but only if they are "greenlit" after running a test in a
+# headless Firefox browser that is automated via Python and "Marionette".
+#
+#====# PLEASE READ THE README #===============================================#
+#
+# Whenever this file says "See README", that is referring to the notes in the
+# %.github/workflows/README.md file.  If something appears in multiple GitHub
+# Workflow files, it's best to document it there instead of repeating it:
+#
+# https://github.com/metaeducation/ren-c/blob/master/.github/workflows/README.md
+#
+
+name: Emscripten Web
+
+
+# See README: When To Trigger Builds
+#
+on:
+  push:
+    branches: [
+      master,  # The web build is top priority, needs to always be checked!
+      web  # pushing to web won't build other workflows, use to debug
+    ]
+  pull_request:
+    branches: [
+      master
+    ]
+  workflow_dispatch:  # Allows running this workflow manually from Actions tab
+
+
+# Standardize to use bash on all platforms.
+#
+# See README: Using The Strict Erroring Bash Shell
+#
+defaults:
+  run:
+    shell: bash
+
+
+# Each "Job" runs in its own VM, and a workflow run is made up of one or more
+# jobs that can run sequentially or in parallel.
+#
+# See README: Jobs
+#
+jobs:
+  web-build:  # Name of this workflow's only job
+
+    # https://github.com/actions/virtual-environments#available-environments
+    #
+    runs-on: ubuntu-20.04
+
+
+    # See README: Build Matrix
+    #
+    strategy:
+      matrix:
+       include:
+         - os-id: 0.16.1  # "asyncify" Emscripten build (only variant ATM)
+           config-file: emscripten.r
+
+
+    # See README: Environment Variables
+    #
+    env:
+      AWS_S3_BUCKET_NAME: metaeducation
+
+      # See README: Minimize GitHub-Specific Syntax
+      #
+      OS_ID: ${{ matrix.os-id }}
+      CONFIG_FILE: ${{ matrix.config-file }}
+
+
+    # Steps are a sequence of tasks that will be executed within a single VM
+    # as part of the job.
+    #
+    # See README: Steps
+    #
+    steps:  # (no indentatation needed below; so indent the minimum!)
+
+
+  #====# CHECKOUT STEPS #=====================================================#
+
+
+    # https://github.com/actions/checkout
+    #
+    # See README: Checkout Action
+    #
+    - uses: actions/checkout@v2  # See README: Trusted Actions
+
+
+    # The full commit is passed to make to build into the binary, and the
+    # abbreviated commit is used to name the executable.
+    #
+    # See README: Portably Capturing Git Hashes
+    #
+    - name: Grab Git Hash and Short Hash Into Environment Variables
+      run: |
+        git_commit="$(git show --format="%H" --no-patch)"
+        git_commit_short="$(git show --format="%h" --no-patch)"
+        echo "GIT_COMMIT=$git_commit" >> $GITHUB_ENV
+        echo "GIT_COMMIT_SHORT=$git_commit_short" >> $GITHUB_ENV
+
+
+  #====# TOOLCHAIN INSTALLATION STEPS #=======================================#
+
+
+    # !!! Ideally this would use the same step that clients can use to build
+    # the system with `make.sh`.  Unfortunately, something about the GitHub
+    # Ubuntus do not like the old bootstrap executable.  Make sure the
+    # ordinary path works, but for the moment patch over it just to get
+    # to a point where the action works.
+    #
+    - name: Fetch R3 To Use For "Prep" Build Steps as $R3MAKE
+      run: |
+        repo_dir=$(pwd)/
+        source tools/bash/fetch-prebuilt.sh
+        r3make=$(fetch_prebuilt)
+        echo "R3MAKE is set to $r3make"
+        echo "But that executable won't run on GitHub for some reason"
+        # "$r3make" --do "print {TESTING 1 2 3}"  # NOT WORKING, dunno why
+        cd prebuilt
+        wget http://hostilefork.com/media/shared/github/r3-linux-dec-2020
+        chmod +x r3-linux-dec-2020
+        r3make=$(pwd)/r3-linux-dec-2020
+        echo "So now R3MAKE is $r3make"
+        echo "R3MAKE=$r3make" >> $GITHUB_ENV  # pass to next step
+
+
+    - name: Stop the build early if the R3MAKE is no good
+      run: |
+        "$R3MAKE" --do "print {R3MAKE is Working} quit 0"
+
+
+    # This action will install the Emscripten SDK, which makes the `emcc`
+    # compilation command available.  This compiler takes in C files and will
+    # emit wasm, for producing libr3.js
+    #
+    # https://github.com/mymindstorm/setup-emsdk
+    #
+    # See README: !!! IMPORTANT - Untrusted Actions, Use Audited Hash !!!
+    #
+    - uses: mymindstorm/setup-emsdk@f9068d69f3908ddd991f32b8c8818d5781fe0c78
+
+
+    # Show a little bit of sanity check information
+    #
+    - name: Output System Information
+      run: |
+        echo "Current directory is: $(pwd)"
+        echo "EMCC version check:"
+        emcc -v
+
+
+  #====# BUILD STEPS #========================================================#
+
+
+    # !!! optimization is currently hardcoded in the web build config files as
+    # `s`.  Review if `z` would be better (it cannot be passed in the options
+    # here at time of writing, and would be ignored even if it could be due to
+    # that ldflags config hardcoding).
+    #
+    # See README: {Braces} For %make.r String Parameters
+    #
+    - name: Generate Makefile for Emscripten-Based Build
+      run: |
+        mkdir build
+        cd build
+
+        "$R3MAKE" ../make.r \
+            config="../configs/$CONFIG_FILE" \
+            target=makefile \
+            standard=gnu99 \
+            os_id=$OS_ID \
+            debug=none \
+            git_commit="{$GIT_COMMIT}" \
+            rigorous=no \
+            static=no \
+            extensions=""
+
+
+    - name: Create Folders For Build Products (Compiler Won't Create Them)
+      run: |
+        cd build
+        make folders
+
+
+    - name: Prep the Build By Making Various Auto-Generated .h and .c Files
+      run: |
+        cd build
+        make prep
+
+
+    # https://github.com/actions/upload-artifact
+    #
+    - name: Optional Download of Prep Files Before They Can Cause Build Failure
+      if: false  # Change this to true to download a file
+      uses: actions/upload-artifact@v2  # See README: Trusted Actions
+      with:
+        name: tmp-internals.h
+        path: build/prep/include/tmp-internals.h
+
+
+    - name: Compile and Link the C Sources to To Make .wasm and .js Files
+      run: |
+        cd build
+        make
+
+
+  #====# UPLOAD STEPS #=======================================================#
+
+    # We only want to build pull requests, we do not want to upload them to
+    # the AWS server.  Deployment should happen only once a commit has been
+    # accepted and pushed to master.  And then, it should only be greenlit
+    # (to be the version the web console uses) if it passes the smoke test in
+    # a headless browser.
+    #
+    # Unfortunately...there's no particularly great way to exit the steps
+    # cleanly now if it's only a pull request.  We can stop the steps, but
+    # it would look like an error:
+    #
+    # https://github.com/actions/runner/issues/662
+    #
+    # So either we write one giant monolithic step, or every subsequent step
+    # has to be qualified with an `if: github.ref == 'refs/heads/master'`.
+    # Though the latter is not *ideal*, it's good enough for government work.
+    #
+    # Note: Steps will be stopped by default if any fail, but you can turn
+    # a step back on with an `if: failure()` condition.
+
+
+    # This action configures the AWS keys stored in GitHub's "Secrets" for
+    # the repository so that `aws s3` allows us to do uploads, without needing
+    # to publish any passwords publicly:
+    #
+    # https://github.com/aws-actions/configure-aws-credentials
+    #
+    # See README: Trusted Actions
+    #
+    - name: Configure AWS Credentials
+      if: github.ref == 'refs/heads/master'  # see notes on DEPLOY STEPS
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        aws-access-key-id: ${{ secrets.METAEDUCATION_AWS_ACCESS_KEY }}
+        aws-secret-access-key: ${{ secrets.METAEDUCATION_AWS_SECRET_KEY }}
+        aws-region: us-east-1
+
+
+    # Here we upload the files to AWS, but we don't bump the special file
+    # that is used by %load-r3.js to decide which library commit to use yet.
+    #
+    # The commit ID is included in the upload because the AWS bucket holds
+    # many versions of the build products at once.  To ask the web console to
+    # use a specific commit ID, say:
+    #
+    # http://hostilefork.com/media/shared/replpad-js/?git_commit=<<shorthash>>
+    #
+    # The .js file contains the loading and setup code, which includes "cwrap"
+    # functions that offer friendly JS function interfaces that take types
+    # like JS strings, instead of being limited to the "integer heap address
+    # parameters only" nature of Wasm functions.
+    #
+    # The .wasm file bundles both the compiled C code for the interpreter and
+    # memory image (C constants, including compressed mezzanine code).
+    #
+    # There used to be more files, but this has streamlined over time...and
+    # the pthread build is no longer supported so there's no `.worker.js`.
+    # The only remaining potential build products would be debug files.  (This
+    # would change if extensions are built as their own "DLL"s.)
+    #
+    # Note: %load-r3.js is a weak link in the test-before-greenlight strategy.
+    # There's not a way to select the singular loader, so any changes must be
+    # deployed before we can test any build (even a non-"greenlit" one).
+    #
+    # !!! The repl could be adjusted to use an alternate load-r3.js, which
+    # would mean not naming it statically in the HTML.  To keep file variants
+    # from accruing in the root directory, it could use some constant second
+    # name (like %load-r3-preflight.js).  Review.
+    #
+    - name: Upload Files To AWS (Don't Bump Version Used By load-r3.js Yet)
+      if: github.ref == 'refs/heads/master'  # see notes on UPLOAD STEPS
+      run: |
+        ls -alF build  # so you can see what was built
+
+        local=build/libr3.js
+        remote=s3://${AWS_S3_BUCKET_NAME}/travis-builds/${OS_ID}/libr3-${GIT_COMMIT_SHORT}.js
+        aws s3 cp $local $remote
+
+        # We have to set the MIME type on .wasm files, or the browser will not
+        # load them as .wasm (it uses a fallback mechanism that is slower)
+        #
+        local=build/libr3.wasm
+        remote=s3://${AWS_S3_BUCKET_NAME}/travis-builds/${OS_ID}/libr3-${GIT_COMMIT_SHORT}.wasm
+        aws s3 cp $local $remote --content-type application/wasm
+
+        # (not in subdir of 0.16.x because loader needs to pick between them)
+        # See note above about how changes to this file undermines greenlight
+        #
+        local=extensions/javascript/load-r3.js
+        remote=s3://${AWS_S3_BUCKET_NAME}/travis-builds/
+        aws s3 cp $local $remote
+
+
+  #====# TESTING STEPS #======================================================#
+
+    # Check the deployment before "green-lighting" the %last-deploy.short-hash
+    #
+    # The ren-c-action is able to deploy a web browser and use the commit of
+    # a non-greenlit hash.  It does this via a local Firefox, which it talks
+    # to through Python equipped with the "Marionette" protocol.  (Ren-C can't
+    # be used at time of writing, because it lacks websockets...which are
+    # needed to remote-control Firefox).
+    #
+    - name: Test ReplPad Against Uploaded Lib By Running In Headless Firefox
+      if: github.ref == 'refs/heads/master'  # see notes on UPLOAD STEPS
+      uses: metaeducation/ren-c-action@release
+      with:
+        web: true
+        commit: ${{ env.GIT_COMMIT_SHORT }}
+        timeout: 10
+        script: |
+          x: 10
+          watch x
+          assert [10 = watch 1]
+          redbol
+
+
+  #====# GREENLIGHT STEP (MARK THE UPLOADED BUILD AS CURRENT) #===============#
+
+    # Each ${OS_ID} directory contains several builds for recent commits.
+    # Since they are served statically from S3, we don't have a query to
+    # serve the most recent one that successfully built (based on a date
+    # or other property).  So we write a file with a fixed name in that
+    # directory to identify the last build...it can be obtained via a
+    # CORS fetch() request.
+    #
+    # However, the upload might take a while...or fail part way through.
+    # Hence, we make this the last file uploaded--so that when the browser
+    # tries to fetch files for that ID, they'll all be there.
+    #
+    - name: Greenlight Build for load-r3.js To Use If Tests Passed
+      if: github.ref == 'refs/heads/master'  # see notes on UPLOAD STEPS
+      run: |
+        cd build
+        local=last-deploy.short-hash
+
+        # -n option to echo means "no newline at end" (it's not a "text file"
+        # so there is no standard enforcing that it have one...and it's
+        # easier in the client to not have it)
+        #
+        echo -n "${GIT_COMMIT_SHORT}" > $local
+
+        remote=s3://${AWS_S3_BUCKET_NAME}/travis-builds/${OS_ID}/$local
+        aws s3 cp $local $remote  # upload

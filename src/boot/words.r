@@ -184,7 +184,9 @@ subparse  ; recursions of parse use this for REBNATIVE(subparse) in backtrace
 ; index numbers are used by PARSE to detect keywords.
 ;
 set  ; must be first first (SYM_SET referred to by GET_VAR() in %u-parse.c)
-copy
+let
+copy  ; `copy x rule` deprecated, use `x: across rule` for this intent
+across
 collect  ; Variant in Red, but Ren-C's acts SET-like, suggested by @rgchris
 keep
 some
@@ -193,7 +195,6 @@ opt
 not  ; turned to _not_ for SYM__NOT_, see TO-C-NAME for why this is weird
 and  ; turned to _and_ for SYM__AND_, see TO-C-NAME for why this is weird
 ahead  ; Ren-C addition (also in Red)
-then
 remove
 insert
 change
@@ -203,7 +204,7 @@ reject
 while
 limit
 seek  ; Ren-C addition
-mark  ; Ren-C addition
+here  ; Ren-C addition
 ??
 |
 accept

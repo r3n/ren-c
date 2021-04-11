@@ -82,8 +82,9 @@ REBVAL *Try_Init_Any_Sequence_At_Arraylike_Core(
         return cast(REBVAL*, out);
     }
 
+    const RELVAL *tail = ARR_TAIL(a);
     const RELVAL *v = ARR_HEAD(a);
-    for (; NOT_END(v); ++v) {
+    for (; v != tail; ++v) {
         if (not Is_Valid_Sequence_Element(kind, v)) {
             Derelativize(out, v, specifier);
             return nullptr;
@@ -304,7 +305,7 @@ bool Next_Path_Throws(REBPVS *pvs)
 
         const REBVAL *r = hook(pvs, PVS_PICKER(pvs), nullptr);  // no "setval"
 
-        if (r and r != END_NODE) {
+        if (r and r != END_CELL) {
             assert(r->header.bits & NODE_FLAG_CELL);
             /* assert(not (r->header.bits & NODE_FLAG_ROOT)); */
         }
@@ -651,12 +652,9 @@ bool Eval_Path_Throws_Core(
             assert(IS_WORD(bottom) and not IS_WORD_BOUND(bottom));
             assert(IS_WORD(top) and not IS_WORD_BOUND(top));
 
-            // Optimize the swap here so that it just swaps the spellings of
-            // the words (unbound words keep their spelling in the binding).
-            //
-            const REBSTR *spelling = STR(BINDING(bottom));
-            mutable_BINDING(bottom) = STR(BINDING(top));
-            mutable_BINDING(top) = spelling;
+            Move_Cell(f_spare, bottom);
+            Move_Cell(bottom, top);
+            Move_Cell(top, f_spare);
 
             top--;
             bottom++;
@@ -1078,8 +1076,8 @@ REB_R TO_Sequence(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
         // (Inefficient!  But just see how it feels before optimizing.)
         //
         return rebValue(
-            "as", Datatype_From_Kind(kind), "load-value", arg,
-        rebEND);
+            "as", Datatype_From_Kind(kind), "load-value", arg
+        );
     }
 
     if (ANY_PATH_KIND(arg_kind)) {  // e.g. `to set-path! 'a/b/c`

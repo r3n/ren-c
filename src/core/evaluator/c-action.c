@@ -132,9 +132,10 @@ static bool Handle_Modal_In_Out_Throws(REBFRM *f) {
     // not followed by a refinement.  That would cost
     // extra, but avoid the test on every call.
     //
-    const REBPAR *enable = f->param + 1;
-    if (IS_END(enable))
+    if (f->key + 1 == f->key_tail)
         fail ("Modal parameter can't be at end of parameter list");
+
+    const REBPAR *enable = f->param + 1;
 
     if (Is_Param_Hidden(enable)) {
         if (not (IS_NULLED(enable) or Is_Blackhole(enable)))
@@ -353,7 +354,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 // from the global empty array.
                 //
                 if (Is_Param_Variadic(f->param)) {
-                    Init_Varargs_Untyped_Enfix(f->arg, END_NODE);
+                    Init_Varargs_Untyped_Enfix(f->arg, END_CELL);
                     goto continue_fulfilling;
                 }
 
@@ -718,7 +719,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         goto continue_fulfilling;
     }
 
-    assert(IS_END(f->arg));  // arg can otherwise point to any arg cell
+  #ifdef DEBUG_TERM_ARRAYS
+    assert(IS_TRASH_DEBUG(f->arg));  // arg can otherwise point to any arg cell
+  #endif
 
     // There may have been refinements that were skipped because the
     // order of definition did not match the order of usage.  They were

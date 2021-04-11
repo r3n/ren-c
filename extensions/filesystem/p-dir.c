@@ -47,7 +47,17 @@ static REBARR *Read_Dir_May_Fail(REBREQ *dir)
     REBDSP dsp_orig = DSP;
 
     while (true) {
-        OS_DO_DEVICE_SYNC(dir, RDC_READ);
+        //
+        // This is OS_DO_DEVICE_SYNC(), but inlined because we want to make
+        // the filename part of the error (vs. a generic "cannot find the
+        // file specified" message)
+        //
+        REBVAL *result = OS_DO_DEVICE(dir, RDC_READ);
+        assert(result != nullptr);  // should be synchronous
+        if (rebDid("error?", result))
+            fail (Error_Cannot_Open_Raw(ReqFile(dir)->path, result));
+
+        rebRelease(result);  // ignore result
 
         if (req->flags & RRF_DONE)
             break;
@@ -200,7 +210,7 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
         Free_Req(dir);
 
-        if (rebDid("error?", result, rebEND)) {
+        if (rebDid("error?", result)) {
             rebRelease(result); // !!! throws away details
             fail (Error_No_Create_Raw(path)); // higher level error
         }
@@ -231,7 +241,7 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
         Free_Req(dir);
 
-        if (rebDid("error?", result, rebEND)) {
+        if (rebDid("error?", result)) {
             rebRelease(result); // !!! throws away details
             fail (Error_No_Rename_Raw(path)); // higher level error
         }
@@ -254,7 +264,7 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
 
         Free_Req(dir);
 
-        if (rebDid("error?", result, rebEND)) {
+        if (rebDid("error?", result)) {
             rebRelease(result); // !!! throws away details
             fail (Error_No_Delete_Raw(path)); // higher level error
         }
@@ -300,7 +310,7 @@ REB_R Dir_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         REBVAL *result = OS_DO_DEVICE(dir, RDC_QUERY);
         assert(result != NULL); // should be synchronous
 
-        if (rebDid("error?", result, rebEND)) {
+        if (rebDid("error?", result)) {
             Free_Req(dir);
             rebRelease(result); // !!! R3-Alpha threw out error, returns null
             return nullptr;

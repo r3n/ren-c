@@ -163,7 +163,7 @@ inline static void RESET_ARRAY(REBARR *a) {
 //
 inline static void Prep_Array(
     REBARR *a,
-    REBLEN capacity_plus_one // Expand_Series passes 0 on dynamic reallocation
+    REBLEN capacity  // Expand_Series passes 0 on dynamic reallocation
 ){
     assert(IS_SER_DYNAMIC(a));
 
@@ -176,48 +176,29 @@ inline static void Prep_Array(
         // expansion and un-prepping them on every shrink.
         //
         REBLEN n;
-        for (n = 0; n < a->content.dynamic.rest - 1; ++n, ++prep)
+        for (n = 0; n < a->content.dynamic.rest; ++n, ++prep)
             Prep_Cell(prep);
+
+      #ifdef DEBUG_TERM_ARRAYS  // allocation deliberately oversized by 1
+        Init_Trash_Debug(ARR_AT(a, a->content.dynamic.rest - 1));
+      #endif
     }
     else {
-        assert(capacity_plus_one != 0);
-
         REBLEN n;
-        for (n = 1; n < capacity_plus_one; ++n, ++prep)
+        for (n = 0; n < capacity; ++n, ++prep)
             Prep_Cell(prep);  // have to prep cells in useful capacity
 
         // If an array isn't expandable, let the release build not worry
-        // about the bits in the excess capacity.  But set them to trash in
+        // about the bits in the excess capacity.  But poison them in
         // the debug build.
         //
-        prep->header.bits = Endlike_Header(0); // unwritable
-        USED(TRACK_CELL_IF_DEBUG(prep));
       #if !defined(NDEBUG)
-        while (n < a->content.dynamic.rest) { // no -1 (n is 1-based)
-            ++n;
-            prep = TRACK_CELL_IF_DEBUG(prep + 1);
-            prep->header.bits =
-                FLAG_KIND3Q_BYTE(REB_T_TRASH)
-                | FLAG_HEART_BYTE(REB_T_TRASH); // unreadable
+        for (; n < a->content.dynamic.rest; ++n, ++prep) {
+            USED(TRACK_CELL_IF_DEBUG(prep));
+            prep->header.bits = CELL_MASK_POISON;  // unwritable + unreadable
         }
       #endif
-
-        // Currently, release build also puts an unreadable end at capacity.
-        // It may not be necessary, but doing it for now to have an easier
-        // invariant to work with.  Review.
-        //
-        prep = ARR_AT(a, a->content.dynamic.rest - 1);
-        // fallthrough
     }
-
-    // Although currently all dynamically allocated arrays use a full REBVAL
-    // cell for the end marker, it could use everything except the second byte
-    // of the first `uintptr_t` (which must be zero to denote end).  To make
-    // sure no code depends on a full cell in the last location,  make it
-    // an unwritable end--to leave flexibility to use the rest of the cell.
-    //
-    prep->header.bits = Endlike_Header(0);
-    USED(TRACK_CELL_IF_DEBUG(prep));
 }
 
 
@@ -226,59 +207,24 @@ inline static void Prep_Array(
 //
 inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags)
 {
-    const REBLEN wide = sizeof(REBVAL);
+  #ifdef DEBUG_TERM_ARRAYS
+    if (capacity > 1 or (flags & SERIES_FLAG_DYNAMIC))  // space for term
+        capacity += 1;  // account for cell needed for terminator (END)
+  #endif
 
-    REBSER *s = Alloc_Series_Node(flags);
+    REBSER *s = Make_Series(capacity, flags);
     assert(IS_SER_ARRAY(s));  // flavor should have been an array flavor
 
-    if (
-        (flags & SERIES_FLAG_DYNAMIC)  // inlining will constant fold
-        or capacity > 1
-    ){
-        capacity += 1;  // account for cell needed for terminator (END)
-
-        SET_SERIES_FLAG(s, DYNAMIC);
-
-        if (not Did_Series_Data_Alloc(s, capacity)) {  // expects USED_BYTE=255
-            s->leader.bits &= ~NODE_FLAG_MANAGED;  // can't kill if managed
-            SET_SERIES_FLAG(s, INACCESSIBLE);
-            GC_Kill_Series(s);  // ^-- needs non-null data unless INACCESSIBLE
-
-            fail (Error_No_Memory(capacity * wide));
-        }
-
+    if (IS_SER_DYNAMIC(s)) {
         Prep_Array(ARR(s), capacity);
-        SET_END(ARR_HEAD(ARR(s)));
 
-      #if defined(DEBUG_COLLECT_STATS)
-        PG_Reb_Stats->Series_Memory += capacity * wide;
+      #ifdef DEBUG_TERM_ARRAYS
+        Init_Trash_Debug(ARR_HEAD(ARR(s)));
       #endif
     }
     else {
         RELVAL *cell = TRACK_CELL_IF_DEBUG(SER_CELL(s));
         cell->header.bits = CELL_MASK_PREP_END;
-    }
-
-    if (GET_SERIES_FLAG(s, INFO_NODE_NEEDS_MARK))
-        TRASH_POINTER_IF_DEBUG(s->info.node);
-    else 
-        SER_INFO(s) = Endlike_Header(
-            FLAG_USED_BYTE_ARRAY()  // reserved for future use
-        );
-
-    // It is more efficient if you know a series is going to become managed to
-    // create it in the managed state.  But be sure no evaluations are called
-    // before it's made reachable by the GC, or use PUSH_GC_GUARD().
-    //
-    // !!! Code duplicated in Make_Series_Core ATM.
-    //
-    if (not (flags & NODE_FLAG_MANAGED)) {  // most callsites const fold this
-        if (SER_FULL(GC_Manuals))
-            Extend_Series(GC_Manuals, 8);
-
-        cast(REBSER**, GC_Manuals->content.dynamic.data)[
-            GC_Manuals->content.dynamic.used++
-        ] = s;  // start with NODE_FLAG_MANAGED to not need to remove later
     }
 
     // Arrays created at runtime default to inheriting the file and line

@@ -117,6 +117,7 @@
 %control/map-each.test.reb
 %control/match.test.reb
 %control/reduce.test.reb
+%control/reeval.test.reb
 %control/remove-each.test.reb
 %control/repeat.test.reb
 %control/return.test.reb

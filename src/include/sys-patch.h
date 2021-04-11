@@ -55,56 +55,6 @@
 //
 
 
-// The virtual binding patches keep a circularly linked list of their variants
-// that have distinct next pointers.  This way, they can look through that
-// list before creating an equivalent chain to one that already exists.
-//
-#define MISC_Variant_TYPE        REBARR*
-#define MISC_Variant_CAST        ARR
-#define HAS_MISC_Variant         FLAVOR_PATCH
-
-
-//=//// PATCH_FLAG_REUSED /////////////////////////////////////////////////=//
-//
-// It's convenient to be able to know when a patch returned from a make call
-// is reused or not.  But adding that parameter to the interface complicates
-// it.  There's plenty of bits free on patch array flags, so just use one.
-//
-// !!! This could use a cell marking flag on the patch's cell, but putting
-// it here as a temporary measure.
-//
-#define PATCH_FLAG_REUSED \
-    SERIES_FLAG_24
-
-
-//=//// PATCH_FLAG_LET ////////////////////////////////////////////////////=//
-//
-// This signifies that a patch was made using LET, and hence it doesn't point
-// to an object...rather the contents are the variable itself.  The LINK()
-// holds the symbol.
-//
-#define PATCH_FLAG_LET \
-    SERIES_FLAG_25
-
-
-
-// The link slot for patches is available for use...
-//
-#define LINK_PatchSymbol_TYPE           const REBSYM*
-#define LINK_PatchSymbol_CAST           SYM
-#define HAS_LINK_PatchSymbol            FLAVOR_PATCH
-
-#define INODE_NextPatch_TYPE            REBARR*
-#define INODE_NextPatch_CAST            ARR
-#define HAS_INODE_NextPatch             FLAVOR_PATCH
-
-// Next node is either to another patch, a frame specifier REBCTX, or nullptr.
-//
-
-#define NextPatch(patch) \
-    INODE(NextPatch, patch)
-
-
 #ifdef NDEBUG
     #define SPC(p) \
         cast(REBSPC*, (p)) // makes UNBOUND look like SPECIFIED
@@ -149,14 +99,17 @@
 // list, and bumping the meta out of the misc into the misc if needed.
 //
 inline static REBARR *Make_Patch_Core(
-    REBCTX *ctx,
-    REBLEN limit,
+    REBARR *binding,  // must be a varlist or a LET patch
+    REBLEN limit,  // if patch, must be 1
     REBSPC *next,
     enum Reb_Kind kind,
     bool reuse
 ){
     assert(kind == REB_WORD or kind == REB_SET_WORD);
-    assert(limit <= CTX_LEN(ctx));
+    if (IS_VARLIST(binding))
+        assert(limit <= CTX_LEN(CTX(binding)));
+    else
+        assert(GET_SUBCLASS_FLAG(PATCH, binding, LET));
 
     // 0 happens with `make object! []` and similar cases.
     //
@@ -178,10 +131,20 @@ inline static REBARR *Make_Patch_Core(
     // Over the long run, this needs to be legal, though.
     //
     if (next and IS_PATCH(next)) {
-        assert(BINDING(ARR_SINGLE(next)) != CTX_VARLIST(ctx));
+        assert(BINDING(ARR_SINGLE(next)) != binding);
     }
 
-    REBARR *patches = BONUS(Patches, CTX_VARLIST(ctx));
+    // The list of circularly-linked synonym patches is pointed to by the
+    // object bonus (if varlist) or is the circularly linked list of patches
+    // itself via MISC (if a LET).  Remember the links are weak...they do
+    // not keep things GC live.
+    //
+    REBARR *patches;
+    if (IS_VARLIST(binding))
+        patches = BONUS(Patches, binding);
+    else
+        patches = MISC(Variant, binding);
+
     if (patches) {
         //
         // There's a list of variants in place.  Search it to see if any of
@@ -194,7 +157,7 @@ inline static REBARR *Make_Patch_Core(
         do {
             if (
                 NextPatch(variant) == next
-                and BINDING(ARR_SINGLE(variant)) == CTX_VARLIST(ctx) and
+                and BINDING(ARR_SINGLE(variant)) == binding and
                 VAL_WORD_PRIMARY_INDEX_UNCHECKED(ARR_SINGLE(variant)) == limit
             ){
                 // The reused flag isn't initially set, but becomes set on
@@ -248,7 +211,12 @@ inline static REBARR *Make_Patch_Core(
             | SERIES_FLAG_INFO_NODE_NEEDS_MARK
     );
 
-    Init_Any_Word_Bound(ARR_SINGLE(patch), kind, ctx, limit);
+    Init_Any_Word_Bound_Core(
+        TRACK_CELL_IF_DEBUG(ARR_SINGLE(patch)),
+        kind,
+        binding,
+        limit
+    );
 
     // The way it is designed, the list of patches terminates in either a
     // nullptr or a context pointer that represents the specifying frame for
@@ -270,11 +238,14 @@ inline static REBARR *Make_Patch_Core(
     }
 
     // Make the last looked for patch the first one that would be found if
-    // the same search is used again (assume that's a good strategy)
+    // the same search is used again (assume that's a good strategy).  This
+    // is only needed for context patches.
     //
-    mutable_BONUS(Patches, CTX_VARLIST(ctx)) = patch;
+    if (IS_VARLIST(binding))
+        mutable_BONUS(Patches, binding) = patch;
 
-    // The LINK field is still available.
+    // The LINK field is only used in LET patches for the symbol, so no
+    // purpose found for the non-LET patches yet.
     //
     mutable_LINK(PatchSymbol, patch) = nullptr;
 
@@ -283,10 +254,10 @@ inline static REBARR *Make_Patch_Core(
 
 
 #define Make_Or_Reuse_Patch(ctx,limit,next,kind) \
-    Make_Patch_Core((ctx), (limit), (next), (kind), true)
+    Make_Patch_Core(CTX_VARLIST(ctx), (limit), (next), (kind), true)
 
 #define Make_Original_Patch(ctx,limit,next,kind) \
-    Make_Patch_Core((ctx), (limit), (next), (kind), false)
+    Make_Patch_Core(CTX_VARLIST(ctx), (limit), (next), (kind), false)
 
 
 //

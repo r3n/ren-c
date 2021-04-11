@@ -25,14 +25,9 @@
     do [success: true]
     success
 )
-(1 == reeval :abs -1)
 (
     a-value: to binary! "1 + 1"
     2 == do a-value
-)
-(
-    a-value: charset ""
-    same? a-value reeval a-value
 )
 ; do block start
 (:abs = do [:abs])
@@ -129,82 +124,10 @@
 (0.0.0 == do [0.0.0])
 (null? do [()])
 ('a == do ['a])
-; do block end
-(
-    a-value: blank!
-    same? a-value reeval a-value
-)
-(1/Jan/0000 == reeval 1/Jan/0000)
-(0.0 == reeval 0.0)
-(1.0 == reeval 1.0)
-(
-    a-value: me@here.com
-    same? a-value reeval a-value
-)
 (error? trap [do trap [1 / 0] 1])
-(
-    a-value: does [5]
-    5 == reeval :a-value
-)
-(
-    a: 12
-    a-value: first [:a]
-    :a == reeval :a-value
-)
-(NUL == reeval NUL)
-(
-    a-value: make image! 0x0
-    same? a-value reeval a-value
-)
-(0 == reeval 0)
-(1 == reeval 1)
-(#a == reeval #a)
-
-[#2101 #1434 (
-    a-value: first ['a/b]
-    all [
-        lit-path? a-value
-        path? reeval :a-value
-        (as path! unquote :a-value) == (reeval :a-value)
-    ]
-)]
-
-(
-    a-value: first ['a]
-    all [
-        lit-word? a-value
-        word? reeval :a-value
-        (to-word unquote :a-value) == (reeval :a-value)
-    ]
-)
-(true = reeval true)
-(false = reeval false)
-($1 == reeval $1)
-(null? reeval (specialize :of [property: 'type]) null)
-(null? do _)
-(
-    a-value: make object! []
-    same? :a-value reeval :a-value
-)
 (
     a-value: first [(2)]
     2 == do as block! :a-value
-)
-(
-    a-value: 'a/b
-    a: make object! [b: 1]
-    1 == reeval :a-value
-)
-(
-    a-value: make port! http://
-    port? reeval :a-value
-)
-(
-    a-value: first [a/b:]
-    all [
-        set-path? :a-value
-        error? trap [reeval :a-value]  ; no value to assign after it...
-    ]
 )
 (
     a-value: "1"
@@ -213,17 +136,7 @@
 (null? do "")
 (1 = do "1")
 (3 = do "1 2 3")
-(
-    a-value: make tag! ""
-    same? :a-value reeval :a-value
-)
-(0:00 == reeval 0:00)
-(0.0.0 == reeval 0.0.0)
-(
-    a-value: 'b-value
-    b-value: 1
-    1 == reeval :a-value
-)
+
 ; RETURN stops the evaluation
 (
     f1: func [] [do [return 1 2] 2]

@@ -452,11 +452,14 @@ stripload: function [
         end
     ]
 
+    let file
     either text? source [
         contents: source  ; useful for debugging STRIPLOAD from console
+        file: <textual source>
     ][
         text: as text! read source
         contents: find/tail text "^/]"
+        file: source
     ]
 
     ; This is a somewhat dodgy substitute for finding "top-level declarations"

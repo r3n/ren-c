@@ -205,6 +205,11 @@ REBLEN Modify_Array(
         SET_CELL_FLAG(ARR_HEAD(dst_arr), NEWLINE_BEFORE);
     }
 
+  #ifdef DEBUG_TERM_ARRAYS
+    if (IS_SER_DYNAMIC(dst_arr))
+        Init_Trash_Debug(ARR_TAIL(dst_arr));
+  #endif
+
     ASSERT_ARRAY(dst_arr);
 
     return tail_idx;

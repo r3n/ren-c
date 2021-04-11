@@ -70,7 +70,7 @@ void Bind_Values_Inner_Loop(
                 // We're overwriting any previous binding, which may have
                 // been relative.
 
-                INIT_VAL_WORD_BINDING(v, CTX_VARLIST(context));
+                INIT_VAL_WORD_BINDING(v, context);
                 INIT_VAL_WORD_PRIMARY_INDEX(v, n);
             }
             else if (type_bit & add_midstream_types) {
@@ -186,10 +186,7 @@ void Unbind_Values_Core(
 
         if (
             ANY_WORD_KIND(heart)
-            and (
-                not context
-                or VAL_WORD_BINDING(v) == CTX_VARLIST(unwrap(context))
-            )
+            and (not context or BINDING(v) == unwrap(context))
         ){
             Unbind_Any_Word(v);
         }
@@ -217,7 +214,7 @@ REBLEN Try_Bind_Word(const RELVAL *context, REBVAL *word)
         strict
     );
     if (n != 0) {
-        INIT_VAL_WORD_BINDING(word, CTX_VARLIST(VAL_CONTEXT(context)));
+        INIT_VAL_WORD_BINDING(word, VAL_CONTEXT(context));
         INIT_VAL_WORD_PRIMARY_INDEX(word, n);  // ^-- may have been relative
     }
     return n;
@@ -524,6 +521,7 @@ REBNATIVE(let)
 //      return: [any-word!]
 //      frame [frame!]
 //      word [any-word!]
+//      value [<opt> any-value!]
 //  ]
 //
 REBNATIVE(add_let_binding) {
@@ -534,6 +532,8 @@ REBNATIVE(add_let_binding) {
     if (f_specifier)
         SET_SERIES_FLAG(f_specifier, MANAGED);
     REBSPC *patch = Make_Let_Patch(VAL_WORD_SYMBOL(ARG(word)), f_specifier);
+
+    Move_Cell(ARR_SINGLE(patch), ARG(value));
 
     mutable_BINDING(FEED_SINGLE(f->feed)) = patch;
 
@@ -619,7 +619,7 @@ static void Clonify_And_Bind_Relative(
             // See notes in Clonify()...need to copy immutable paths so that
             // binding pointers can be changed in the "immutable" copy.
             //
-            if (ANY_PATH_KIND(kind))
+            if (ANY_SEQUENCE_KIND(kind))
                 Freeze_Array_Shallow(ARR(series));
 
             would_need_deep = true;
@@ -642,11 +642,11 @@ static void Clonify_And_Bind_Relative(
         // copied series and "clonify" the values in it.
         //
         if (would_need_deep and (deep_types & FLAGIT_KIND(kind))) {
-            REBVAL *sub = SPECIFIC(ARR_HEAD(ARR(series)));
+            RELVAL *sub = ARR_HEAD(ARR(series));
             RELVAL *sub_tail = ARR_TAIL(ARR(series));
             for (; sub != sub_tail; ++sub)
                 Clonify_And_Bind_Relative(
-                    sub,
+                    SPECIFIC(sub),
                     flags,
                     deep_types,
                     binder,
@@ -672,11 +672,11 @@ static void Clonify_And_Bind_Relative(
             // Word' symbol is in frame.  Relatively bind it.  Note that the
             // action bound to can be "incomplete" (LETs still gathering)
             //
-            INIT_VAL_WORD_BINDING(v, ACT_DETAILS(relative));
+            INIT_VAL_WORD_BINDING(v, relative);
             INIT_VAL_WORD_PRIMARY_INDEX(v, n);
         }
     }
-    else if (ANY_ARRAY_OR_PATH_KIND(heart)) {
+    else if (ANY_ARRAY_KIND(heart)) {
 
         // !!! Technically speaking it is not necessary for an array to
         // be marked relative if it doesn't contain any relative words
@@ -736,7 +736,7 @@ REBARR *Copy_And_Bind_Relative_Deep_Managed(
         index = tail;
 
     REBFLGS flags = ARRAY_MASK_HAS_FILE_LINE | NODE_FLAG_MANAGED;
-    REBU64 deep_types = (TS_SERIES | TS_PATH) & ~TS_NOT_COPIED;
+    REBU64 deep_types = (TS_SERIES | TS_SEQUENCE) & ~TS_NOT_COPIED;
 
     REBLEN len = tail - index;
 
@@ -793,13 +793,13 @@ void Rebind_Values_Deep(
 ) {
     RELVAL *v = head;
     for (; v != tail; ++v) {
-        if (ANY_ARRAY_OR_PATH(v)) {
+        if (ANY_ARRAY_OR_SEQUENCE(v)) {
             const RELVAL *sub_tail;
             RELVAL *sub_at = VAL_ARRAY_AT_MUTABLE_HACK(&sub_tail, v);
             Rebind_Values_Deep(sub_at, sub_tail, from, to, binder);
         }
-        else if (ANY_WORD(v) and VAL_WORD_BINDING(v) == CTX_VARLIST(from)) {
-            INIT_VAL_WORD_BINDING(v, CTX_VARLIST(to));
+        else if (ANY_WORD(v) and BINDING(v) == from) {
+            INIT_VAL_WORD_BINDING(v, to);
 
             if (binder) {
                 INIT_VAL_WORD_PRIMARY_INDEX(
@@ -1056,7 +1056,14 @@ void Virtual_Bind_Deep_To_New_Context(
     //
     // https://github.com/rebol/rebol-issues/issues/2274
     //
-    SET_SERIES_FLAG(CTX_VARLIST(c), DONT_RELOCATE);
+    // !!! Because SERIES_FLAG_DONT_RELOCATE is just a synonym for
+    // SERIES_FLAG_FIXED_SIZE at this time, it means that there has to be
+    // unwritable cells in the extra capacity, to help catch overwrites.  If
+    // we wait too late to add the flag, that won't be true...but if we pass
+    // it on creation we can't make the context via Append_Context().  Review
+    // this mechanic; and for now forego the protection.
+    //
+    /* SET_SERIES_FLAG(CTX_VARLIST(c), DONT_RELOCATE); */
 
     // !!! In virtual binding, there would not be a Bind_Values call below;
     // so it wouldn't necessarily be required to manage the augmented

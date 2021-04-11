@@ -46,10 +46,10 @@
 //             item2, "| print {Close brace separate from content}\n",
 //         "] else [\n",
 //             item3, "| print {Close brace with content}]\n",
-//         rebEND
+//         rebEND  // see note, optional in C99 and C++11
 //     );
 //
-// (The rebEND is needed by the variadic processing, but C99-based macros or
+// (Note: rebEND is needed by the variadic processing, but C99-based macros or
 // other language bindings can inject it automatically...only C89 has no way
 // to work around it.)
 //
@@ -248,8 +248,7 @@ void RL_rebFree(void *ptr)
             "PANIC [",
                 "{rebFree() mismatched with allocator!}"
                 "{Did you mean to use free() instead of rebFree()?}",
-            "]",
-            rebEND
+            "]"
         );
     }
 
@@ -322,7 +321,6 @@ REBVAL *RL_rebRepossess(void *ptr, size_t size)
     TERM_BIN_LEN(s, size);
     return Init_Binary(Alloc_Value(), s);
 }
-
 
 
 //
@@ -680,7 +678,7 @@ REBVAL *RL_rebLengthedTextWide(const REBWCHAR *wstr, unsigned int num_chars)
 //
 //  rebTextWide: RL_API
 //
-// Imports a TEXT! from UCS2 (no UTF16 multi-wchar-encoding, at least not yet)
+// Imports a TEXT! from UTF-16 (potentially multi-wchar-per-codepoint encoding)
 //
 REBVAL *RL_rebTextWide(const REBWCHAR *wstr)
 {
@@ -689,9 +687,22 @@ REBVAL *RL_rebTextWide(const REBWCHAR *wstr)
     DECLARE_MOLD (mo);
     Push_Mold(mo);
 
-    for (; *wstr != 0; ++wstr)
-        Append_Codepoint(mo->series, *wstr);
-
+    while (*wstr != 0) {
+        if (*wstr >= UNI_SUR_HIGH_START and *wstr <= UNI_SUR_HIGH_END) {
+            if (not (
+                *(wstr + 1) >= UNI_SUR_LOW_START
+                and *(wstr + 1) <= UNI_SUR_LOW_END
+            )){
+                fail ("Invalid UTF-16 surrogate pair passed to rebTextWide()");
+            }
+            Append_Codepoint(mo->series, Decode_UTF16_Pair(wstr));
+            wstr += 2;
+        }
+        else {
+            Append_Codepoint(mo->series, *wstr);
+            ++wstr;
+        }
+    }
     return Init_Text(Alloc_Value(), Pop_Molded_String(mo));
 }
 
@@ -1155,7 +1166,7 @@ static size_t Spell_Into(
 
     REBSIZ limit = MIN(buf_size, utf8_size);
     memcpy(buf, utf8, limit);
-    buf[limit] = '\0';
+    buf[limit] = 0;
     return utf8_size;
 }
 
@@ -1219,49 +1230,63 @@ char *RL_rebSpell(
 //
 static unsigned int Spell_Into_Wide(
     REBWCHAR *buf,
-    unsigned int buf_chars,  // chars buf can hold (not including terminator)
+    unsigned int buf_wchars,  // chars buf can hold (not including terminator)
     const REBVAL *v
 ){
     if (not ANY_UTF8(v))
         fail ("rebSpell() APIs require UTF-8 types (strings, words, tokens)");
 
-    REBLEN len;
-    REBCHR(const*) cp = VAL_UTF8_LEN_SIZE_AT(&len, nullptr, v);
+    if (not buf)  // querying for size
+        assert(buf_wchars == 0);
 
-    if (not buf) {  // querying for size
-        assert(buf_chars == 0);
-        return len;  // caller must now allocate buffer of len + 1
-    }
+    unsigned int num_wchars = 0;  // some codepoints need 2 wchars
 
-    REBLEN limit = MIN(buf_chars, len);
+    REBCHR(const*) cp = VAL_UTF8_AT(v);
 
     REBUNI c;
     cp = NEXT_CHR(&c, cp);
 
-    REBLEN i;
-    for (i = 0; i < limit; cp = NEXT_CHR(&c, cp), ++i) {
-        if (c > 0xFFFF)  // !!! Should we do multi-wchar UTF16 encoding?
-            fail ("Codepoint too high for REBWCHAR in rebSpellIntoWide()");
+    REBLEN i = 0;
+    while (c != '\0' and i < buf_wchars) {
+        if (c <= 0xFFFF) {
+            buf[i] = c;
+            ++i;
+            ++num_wchars;
+        }
+        else {  // !!! Should there be a UCS-2 version that fails here?
+            if (i == buf_wchars - 1)
+                break;  // not enough space for surrogate pair
 
-        buf[i] = c;
+            Encode_UTF16_Pair(c, &buf[i]);
+            i += 2;
+            num_wchars += 2;
+        }
+        cp = NEXT_CHR(&c, cp);
     }
 
-    buf[i] = 0;
-    return len;
+    if (buf)
+        buf[i] = 0;
+
+    while (c != '\0') {  // count residual wchars there was no capacity for
+        if (c <= 0xFFFF)
+            num_wchars += 1;  // fits in one 16-bit wchar
+        else
+            num_wchars += 2;  // requires surrogate pair to represent
+
+        cp = NEXT_CHR(&c, cp);
+    }
+
+    return num_wchars;  // if allocating, caller needs space for num_wchars + 1
 }
 
 
 //
 //  rebSpellIntoWide: RL_API
 //
-// Extract UCS-2 data from an ANY-STRING! or ANY-WORD!.  Note this is *not*
-// UTF-16, so codepoints that require more than two bytes to represent will
-// cause errors.
-//
-// !!! Although the rebSpellInto API deals in bytes, this deals in count of
-// characters.  (The use of REBLEN instead of REBSIZ indicates this.)  It may
-// be more useful for the wide string APIs to do this so leaving it that way
-// for now.
+// Extract UTF-16 data from an ANY-STRING! or ANY-WORD!.  Note this is *not*
+// UCS-2, so codepoints that won't fit in one WCHAR will take up two WCHARs
+// by means of a surrogate pair.  Hence the returned value is a count of
+// wchar units...not *necesssarily* a length in codepoints.
 //
 unsigned int RL_rebSpellIntoWide(
     unsigned char quotes,
@@ -1281,15 +1306,8 @@ unsigned int RL_rebSpellIntoWide(
 //
 //  rebSpellWide: RL_API
 //
-// Gives the spelling as WCHARs.  If length in codepoints is needed, use
-// a separate LENGTH OF call.
-//
-// !!! Unlike with rebSpell(), there is not an alternative for getting
-// the size in UTF-16-encoded characters, just the LENGTH OF result.  While
-// that works for UCS-2 (where all codepoints are two bytes), it would not
-// work if Rebol supported UTF-16.  Which it may never do in the core or
-// API (possible solutions could include usermode UTF-16 conversion to binary,
-// and extraction of that with rebBytes(), then dividing the size by 2).
+// Gives the spelling as WCHARs.  The result is UTF-16, so some codepoints
+// won't fit in single WCHARs.
 //
 REBWCHAR *RL_rebSpellWide(
     unsigned char quotes,
@@ -1713,7 +1731,7 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
         DECLARE_VA_FEED (feed, p, vaptr, feed_flags);
 
         while (NOT_END(feed->value)) {
-            Quotify(Copy_Cell(DS_PUSH(), SPECIFIC(feed->value)), 1);
+            Quotify(Copy_Cell(DS_PUSH(), SPECIFIC(unwrap(feed->value))), 1);
             Fetch_Next_In_Feed(feed);
         }
 
@@ -2052,7 +2070,7 @@ REBVAL *RL_rebError_OS(int errnum)  // see also convenience macro rebFail_OS()
         REBVAL *message = rebTextWide(lpMsgBuf);
         LocalFree(lpMsgBuf);
 
-        error = Error(SYM_0, SYM_0, message, END_NODE);
+        error = Error(SYM_0, SYM_0, message, END_CELL);
         rebRelease(message);
     }
   #elif defined(USE_STRERROR_NOT_STRERROR_R)
@@ -2084,6 +2102,17 @@ REBVAL *RL_rebError_OS(int errnum)  // see also convenience macro rebFail_OS()
     buf[0] = cast(char, 255);  // never valid in UTF-8 sequences
     int old_errno = errno;
     intptr_t r = cast(intptr_t, strerror_r(errnum, buf, MAX_POSIX_ERROR_LEN));
+
+    // !!! TCC appears to use the `int` returning form of strerror_r().  But
+    // it appears to return a random positive or negative value.  It simply
+    // appears to be broken.  More research would be needed, but we can just
+    // give up an go with strerror.  Leaving in the call to strerror_r() to
+    // show that it's there...and it links in TCC.
+    //
+  #if defined(__TINYC__)
+    r = cast(intptr_t, strerror(errnum));
+  #endif
+
     int new_errno = errno;
 
     if (r == -1 or new_errno != old_errno) {
@@ -2124,7 +2153,10 @@ REBVAL *RL_rebError_OS(int errnum)  // see also convenience macro rebFail_OS()
         else
             error = Error_User(buf);
     }
-    else if (r < 256) {  // extremely unlikely to be a string buffer pointer
+    else if (  // small + or - numbers very unlikely to be string buffer
+        (r > 0 and r < 256)
+        or (r < 0 and - r < 256)
+    ){
         assert(false);
         error = Error_User("Unknown POSIX strerror_r error result code");
     }

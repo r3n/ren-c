@@ -43,11 +43,11 @@
 
 
 #define LINK_ApiNext_TYPE       REBNOD*
-#define LINK_ApiNext_CAST       NOD
-#define HAS_LINK_ApiNext       FLAVOR_API
+#define LINK_ApiNext_CAST       // none, just use node (NOD() complains)
+#define HAS_LINK_ApiNext        FLAVOR_API
 
 #define MISC_ApiPrev_TYPE       REBNOD*
-#define MISC_ApiPrev_CAST       NOD
+#define MISC_ApiPrev_CAST       // none, just use node (NOD() complains)
 #define HAS_MISC_ApiPrev        FLAVOR_API
 
 
@@ -75,9 +75,9 @@ inline static void Link_Api_Handle_To_Frame(REBARR *a, REBFRM *f)
     // API freeing operations can update the head of the list in the frame
     // when given only the node pointer.
 
-    mutable_MISC(ApiPrev, a) = NOD(f);  // back pointer for doubly linked list
+    mutable_MISC(ApiPrev, a) = f;  // back pointer for doubly linked list
 
-    bool empty_list = f->alloc_value_list == NOD(f);
+    bool empty_list = f->alloc_value_list == f;
 
     if (not empty_list) {  // head of list exists, take its spot at the head
         assert(Is_Api_Value(ARR_SINGLE(ARR(f->alloc_value_list))));
@@ -103,7 +103,7 @@ inline static void Unlink_Api_Handle_From_Frame(REBARR *a)
 
         if (not at_tail) {  // only set next item's backlink if it exists
             assert(Is_Api_Value(ARR_SINGLE(ARR(LINK(ApiNext, a)))));
-            mutable_MISC(ApiPrev, SER(LINK(ApiNext, a))) = NOD(f);
+            mutable_MISC(ApiPrev, SER(LINK(ApiNext, a))) = f;
         }
     }
     else {

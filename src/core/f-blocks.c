@@ -135,7 +135,7 @@ REBARR *Copy_Values_Len_Extra_Shallow_Core(
 // values we are operating on here live inside of an array.
 //
 void Clonify(
-    REBVAL *v,
+    RELVAL *v,
     REBFLGS flags,
     REBU64 deep_types
 ){
@@ -198,7 +198,7 @@ void Clonify(
             // they are copied from...which requires new cells.  (Also any
             // nested blocks or groups need to be copied deeply.)
             //
-            if (ANY_PATH_KIND(kind))
+            if (ANY_SEQUENCE_KIND(kind))
                 Freeze_Array_Shallow(ARR(series));
 
             INIT_VAL_NODE1(v, series);
@@ -222,8 +222,9 @@ void Clonify(
         // copied series and "clonify" the values in it.
         //
         if (would_need_deep and (deep_types & FLAGIT_KIND(kind))) {
-            REBVAL *sub = SPECIFIC(ARR_HEAD(ARR(series)));
-            for (; NOT_END(sub); ++sub)
+            const RELVAL *sub_tail = ARR_TAIL(ARR(series));
+            RELVAL *sub = ARR_HEAD(ARR(series));
+            for (; sub != sub_tail; ++sub)
                 Clonify(sub, flags, deep_types);
         }
     }
@@ -317,10 +318,11 @@ REBARR *Copy_Rerelativized_Array_Deep_Managed(
     const REBFLGS flags = NODE_FLAG_MANAGED;
 
     REBARR *copy = Make_Array_For_Copy(ARR_LEN(original), flags, original);
+    const RELVAL *src_tail = ARR_TAIL(original);
     const RELVAL *src = ARR_HEAD(original);
     RELVAL *dest = ARR_HEAD(copy);
 
-    for (; NOT_END(src); ++src, ++dest) {
+    for (; src != src_tail; ++src, ++dest) {
         if (not IS_RELATIVE(src)) {
             Copy_Cell(dest, SPECIFIC(src));
             continue;
@@ -333,7 +335,7 @@ REBARR *Copy_Rerelativized_Array_Deep_Managed(
 
         Copy_Cell_Header(dest, src);
 
-        if (ANY_ARRAY_OR_PATH(src)) {
+        if (ANY_ARRAY_OR_SEQUENCE(src)) {
             INIT_VAL_NODE1(
                 dest,
                 Copy_Rerelativized_Array_Deep_Managed(
@@ -387,8 +389,9 @@ void Uncolor_Array(const REBARR *a)
 
     Flip_Series_To_White(a);
 
-    const RELVAL *v;
-    for (v = ARR_HEAD(a); NOT_END(v); ++v) {
+    const RELVAL *tail = ARR_TAIL(a);
+    const RELVAL *v = ARR_HEAD(a);
+    for (; v != tail; ++v) {
         if (ANY_PATH(v) or ANY_ARRAY(v) or IS_MAP(v) or ANY_CONTEXT(v))
             Uncolor(v);
     }

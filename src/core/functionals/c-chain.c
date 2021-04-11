@@ -66,8 +66,8 @@ REBFRM *Push_Downshifted_Frame(REBVAL *out, REBFRM *f) {
     Push_Frame(out, sub);
     assert(sub->varlist == nullptr);
     sub->varlist = f->varlist;
-    assert(LINK(KeySource, sub->varlist) == NOD(f));
-    INIT_LINK_KEYSOURCE(sub->varlist, NOD(sub));
+    assert(LINK(KeySource, sub->varlist) == f);
+    INIT_LINK_KEYSOURCE(sub->varlist, sub);
     sub->rootvar = SPECIFIC(ARR_HEAD(sub->varlist));
 
     // !!! This leaks a dummy varlist, could just reuse a global one that
@@ -81,7 +81,7 @@ REBFRM *Push_Downshifted_Frame(REBVAL *out, REBFRM *f) {
     sub->key = nullptr;
     sub->key_tail = nullptr;
     sub->arg = sub->rootvar + 1;  // !!! enforced by entering Process_Action()
-    sub->param = cast_PAR(END_NODE);
+    sub->param = cast_PAR(END_CELL);
 
     return sub;
 }
@@ -121,7 +121,8 @@ REB_R Chainer_Dispatcher(REBFRM *f)
     assert(ARR_LEN(details) == IDX_CHAINER_MAX);
 
     const REBARR *pipeline = VAL_ARRAY(ARR_AT(details, IDX_CHAINER_PIPELINE));
-    const REBVAL *chained = SPECIFIC(ARR_HEAD(pipeline));
+    const RELVAL *chained_tail = ARR_TAIL(pipeline);
+    const RELVAL *chained = ARR_HEAD(pipeline);
 
     Init_Void(FRM_SPARE(f), SYM_UNSET);
     REBFRM *sub = Push_Downshifted_Frame(FRM_SPARE(f), f);
@@ -157,7 +158,7 @@ REB_R Chainer_Dispatcher(REBFRM *f)
         // incompatible with the next chain step.
 
         ++chained;
-        if (IS_END(chained))
+        if (chained == chained_tail)
             break;
 
         Push_Action(sub, VAL_ACTION(chained), VAL_ACTION_BINDING(chained));

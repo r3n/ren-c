@@ -123,6 +123,10 @@ make-file-block-parts: func [
                 last-was-slash: false
             ]
 
+            integer! [
+                keep item
+            ]
+
             file! [
                 all [
                     last-was-slash
@@ -213,6 +217,10 @@ make-file-path-parts: func [
 
             tuple! [  ; not allowed to have slashes in it
                 keep make-file-tuple-parts item :predicate
+            ]
+
+            integer! [
+                keep item
             ]
 
             block! [

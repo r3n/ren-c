@@ -191,8 +191,8 @@ exclude: generic [
 ; Unary
 
 negate: generic [
-    {Changes the sign of a number.}
-    number [any-number! pair! money! time! bitset!]
+    {Changes the sign of a number (see COMPLEMENT for inversion of sets)}
+    number [any-number! pair! money! time!]
 ]
 
 bitwise-not: generic [

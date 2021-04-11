@@ -314,6 +314,12 @@ inline static const REBKEY *CTX_KEYS(const REBKEY ** tail, REBCTX *c) {
     return SER_HEAD(REBKEY, keylist);
 }
 
+inline static REBVAR *CTX_VARS(const REBVAR ** tail, REBCTX *c) {
+    REBVAR *head = CTX_VARS_HEAD(c);
+    *tail = head + cast(REBSER*, (c))->content.dynamic.used - 1;
+    return head;
+}
+
 
 //=//// FRAME! REBCTX* <-> REBFRM* STRUCTURE //////////////////////////////=//
 //
@@ -388,7 +394,10 @@ inline static REBCTX *VAL_CONTEXT(REBCEL(const*) v) {
 //
 
 inline static void INIT_VAL_FRAME_BINDING(RELVAL *v, REBCTX *binding) {
-    assert(IS_FRAME(v));  // may be marked protected (e.g. archetype)
+    assert(
+        IS_FRAME(v)  // may be marked protected (e.g. archetype)
+        or IS_ACTION(v)  // used by UNWIND
+    );
     EXTRA(Binding, v) = binding;
 }
 
@@ -645,9 +654,7 @@ inline static REBCTX *Steal_Context_Vars(REBCTX *c, REBNOD *keysource) {
         SERIES_MASK_VARLIST
             | SERIES_FLAG_FIXED_SIZE
     );
-    SER_INFO(copy) = Endlike_Header(
-        FLAG_USED_BYTE_ARRAY()  // reserved for future use
-    );
+    SER_INFO(copy) = SERIES_INFO_MASK_NONE;
     TRASH_POINTER_IF_DEBUG(node_LINK(KeySource, copy)); // needs update
     memcpy(  // https://stackoverflow.com/q/57721104/
         cast(char*, &copy->content),

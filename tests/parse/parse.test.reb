@@ -86,31 +86,31 @@
 ; SET-WORD! (store current input position)
 
 (
-    res: did parse ser: [x y] [pos: skip skip]
+    res: did parse ser: [x y] [pos: here, skip, skip]
     all [res, pos = ser]
 )
 (
-    res: did parse ser: [x y] [skip pos: skip]
+    res: did parse ser: [x y] [skip, pos: here, skip]
     all [res, pos = next ser]
 )
 (
-    res: did parse ser: [x y] [skip skip pos:]
+    res: did parse ser: [x y] [skip, skip, pos: here]
     all [res, pos = tail of ser]
 )
 [#2130 (
-    res: did parse ser: [x] [set val pos: word!]
+    res: did parse ser: [x] [pos: here, set val word!]
     all [res, val = 'x, pos = ser]
 )]
 [#2130 (
-    res: did parse ser: [x] [set val: pos: word!]
+    res: did parse ser: [x] [pos: here, set val: word!]
     all [res, val = 'x, pos = ser]
 )]
 [#2130 (
-    res: did parse ser: "foo" [copy val pos: skip]
+    res: did parse ser: "foo" [pos: here, copy val skip]
     all [not res, val = "f", pos = ser]
 )]
 [#2130 (
-    res: did parse ser: "foo" [copy val: pos: skip]
+    res: did parse ser: "foo" [pos: here, copy val: skip]
     all [not res, val = "f", pos = ser]
 )]
 
@@ -189,16 +189,6 @@
     i == 2
 )]
 
-; THEN rule
-
-[#1267 (
-    b: "abc"
-    c: ["a" | "b"]
-    a2: [any [b e: (d: [:e]) then fail | [c | (d: [fail]) fail]] d]
-    a4: [any [b then e: (d: [:e]) fail | [c | (d: [fail]) fail]] d]
-    equal? parse "aaaaabc" a2 parse "aaaaabc" a4
-)]
-
 ; NOT rule
 
 [#1246
@@ -269,12 +259,12 @@
 ; PATH! cannot be PARSE'd due to restrictions of the implementation
 (
     a-value: first [a/b]
-    parse as block! a-value [b-value:]
+    parse as block! a-value [b-value: here]
     a-value = to path! b-value
 )
 (
     a-value: first [()]
-    parse a-value [b-value:]
+    parse a-value [b-value: here]
     same? a-value b-value
 )
 
@@ -345,17 +335,18 @@
 
 
 ; As alternatives to using SET-WORD! to set the parse position and GET-WORD!
-; to get the parse position, Ren-C has MARK and SEEK.  One ability this
-; gives is to mark a variable without having it be a SET-WORD! and thus
-; gathered by FUNCTION.  It also allows seeking to integer positions.
+; to get the parse position, Ren-C has keywords HERE and SEEK.  HERE has
+; precedent in Topaz:
+;
+; https://github.com/giesse/red-topaz-parse
 ;
 ; Unlike R3-Alpha, changing the series being parsed is not allowed.
-;
-; !!! Feature does not currently allow marking a synthesized variable, or
-; seeking a synthesized variable, e.g. `mark @(...)` or `seek @(...)`
 (
     did all [
-        parse "aabbcc" [some "a" mark x some "b" mark y: :x copy z to end]
+        parse "aabbcc" [
+            some "a", x: here, some "b", y: here
+            seek x, copy z to end
+        ]
         x = "bbcc"
         y = "cc"
         z = "bbcc"
@@ -447,9 +438,9 @@
 )]
 
 [(
-    countify: function [things data] [
-        counts: make map! []
-        rules: collect [
+    countify: func [things data] [
+        let counts: make map! []
+        let rules: collect [
             for-each t things [
                 counts/(t): 0
                 keep t
@@ -521,3 +512,27 @@
     byteset: make bitset! [0 16 32]
     did parse #{001020} [some byteset]
 )
+
+; A SET of zero elements gives NULL, a SET of > 1 elements is an error
+[(
+    x: <before>
+    did all [
+        [1] = parse [1] [set x opt text! integer!]
+        x = null
+    ]
+)(
+    x: <before>
+    did all [
+        ["a" 1] = parse ["a" 1] [set x some text! integer!]
+        x = "a"
+    ]
+)(
+    x: <before>
+    e: trap [
+        ["a" "b" 1] = parse ["a" "b" 1] [set x some text! integer!]
+    ]
+    did all [
+        e/id = 'parse-multiple-set
+        x = <before>
+    ]
+)]
