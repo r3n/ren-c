@@ -514,6 +514,7 @@ default-combinators: make map! reduce [
 
     'into combinator [
         {Perform a recursion into another datatype with a rule}
+        result: [<opt> any-value!]
         parser [action!]  ; !!! Easier expression of value-bearing parser?
         subparser [action!]
     ][
@@ -538,7 +539,12 @@ default-combinators: make map! reduce [
         ; If the entirety of the item at the input array is matched by the
         ; supplied parser rule, then we advance past the item.
         ;
-        let pos: subparser subseries
+        let f: make frame! :subparser
+        f/input: subseries
+        if result [
+            f/result: result
+        ]
+        let pos: do f
         if pos = tail subseries [
             return input
         ]
