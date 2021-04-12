@@ -495,3 +495,17 @@
         ]
     )
 ]
+
+; TALLY is a new rule for making counting easier
+[
+    (3 = uparse "aaa" [return tally "a"])
+    (0 = uparse "aaa" [return tally "b"])
+
+    (did all [
+         uparse "<<<stuff>>>" [
+             left: tally "<"
+             x: between here n ">"
+         ]
+         x = "stuff"
+    ])
+]

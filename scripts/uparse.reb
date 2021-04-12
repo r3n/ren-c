@@ -253,6 +253,24 @@ default-combinators: make map! reduce [
         return input
     ]
 
+    'tally combinator [
+        {Count the number of matches (including 0)}
+        result: [integer!]
+        parser [action!]
+    ][
+        let f: make frame! :parser
+        let count: 0
+        cycle [
+            f/input: input
+            input: any [do copy f, stop]
+            count: count + 1
+        ]
+        if result [  ; interesting degree of freedom to not require result?
+            set result count
+        ]
+        return input
+    ]
+
     === MUTATING KEYWORDS ===
 
     ; Topaz moved away from the idea that PARSE was used for doing mutations
