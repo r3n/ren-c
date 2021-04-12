@@ -141,6 +141,22 @@
     ]
 )
 
+; ACROSS is UPARSE's version of historical PARSE COPY.  But it is available as
+; a SYM-BLOCK! as well for a shorthand.
+[
+    (did all [
+        uparse "aaabbb" [x: across some "a", y: across [some "b"]]
+        x = "aaa"
+        y = "bbb"
+    ])
+
+    (did all [
+        uparse "aaabbb" [x: @[some "a"], y: @[some "b"]]
+        x = "aaa"
+        y = "bbb"
+    ])
+]
+
 ; HERE follows Topaz precedent as the new means of capturing positions
 ; (e.g. POS: HERE).  But it is useful for other purposes, when a rule is
 ; needed for capturing the current position.
@@ -415,6 +431,9 @@
     x = "baaabccc"
 )(
     x: uparse "aaabccc" [into [across to "b"] [some "a"] to end]
+    x = "aaabccc"
+)(
+    x: uparse "aaabccc" [into @[to "b"] [some "a"] to end]
     x = "aaabccc"
 )]
 

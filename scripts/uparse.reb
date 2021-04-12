@@ -436,7 +436,9 @@ default-combinators: make map! reduce [
     ; You could thus end up with `y: copy x: ...` and wind up with x and y
     ; being different things, which is not intuitive.
     ;
-    ; Using the name ACROSS is a bit more clear that it's not
+    ; ACROSS is a synonym for @[...] of a parse rule:
+    ;
+    ; https://forum.rebol.info/t/1555/8
 
     'across combinator [
         {Copy from the current parse position through a rule}
@@ -1041,16 +1043,20 @@ default-combinators: make map! reduce [
     ]
 
     sym-block! combinator [
+        {Make a BLOCK! rule value-bearing as if it were an ACROSS rule}
         result: [any-value!]
         value [sym-block!]
     ][
         if not result [
             fail "SYM-XXX rules can only be used in value-bearing contexts"
         ]
-        if null? set result as block! value [  ; !!! should it copy?
-            return null
+        ; Run the combinator for BLOCK!, and then we will see how far it got.
+        ;
+        if let pos: (state.combinators)/(block!) state input (as block! value) [
+            set result copy/part input pos
+            return pos
         ]
-        return input
+        return null
     ]
 
     === INVISIBLE COMBINATORS ===
