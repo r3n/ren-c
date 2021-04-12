@@ -459,3 +459,38 @@
     ("aaa" = uparse "aaa" [:(if false ["bbb"]) "aaa"])
     ("bbbaaa" = uparse "bbbaaa" [:(if true ["bbb"]) "aaa"])
 ]
+
+; a BLOCK! rule combined with SET-WORD! will evaluate to the last value-bearing
+; result in the rule.  This provides compatibility with the historical idea
+; of doing Redbol rules like `set var [integer! | text!]`, but in that case
+; it would set to the first item captured from the original input...more like
+; `copy data [your rule], (var: first data)`.
+;
+; https://forum.rebol.info/t/separating-parse-rules-across-contexts/313/6
+[
+    (2 = uparse [1 2] [return [integer! integer!]])
+    ("a" = uparse ["a"] [return [integer! | text!]])
+]
+
+; A BLOCK! rule is allowed to return NULL, but this is a bit confusing since
+; invisible rules return NULL too...so initializing to null may not be the
+; best.  Reconsider void! behaviors, e.g. should `x: []` give back a void...
+; or maybe even error forcing you to say `x.: []` or some other override if
+; you really meant to take the void?
+[
+    (
+        x: <before>
+        did all [
+            uparse [1] [x: [integer! opt text!]]
+            x = null
+        ]
+    )
+
+    (
+        x: <before>
+        did all [
+            uparse [1] [integer! x: [elide end]]
+            x = null
+        ]
+    )
+]

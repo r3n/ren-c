@@ -31,8 +31,10 @@ Rebol [
         a BLOCK!, there's no SEQUENCE or ALTERNATIVE combinators.  Instead,
         blocks make sequencing implicit just by steps being ordered after one
         another.  The alternates are managed by means of `|` markers, which
-        are detected by the implementation of the block combinator--and not
-        combinators in their own right.
+        are detected by the implementation of the block combinator--and `|` is
+        not a combinator in its own right.  With novel operators and convenient
+        ways of switching into imperative processing, it gets a unique and
+        literate feel with a relatively clean appearance.
 
         By making the combinator list passed to UPARSE as a MAP!, is possible
         to easily create overrides or variations of the dialect.  (For
@@ -455,7 +457,9 @@ default-combinators: make map! reduce [
 
     ; RETURN was removed for a time in Ren-C due to concerns about how it
     ; "contaminated" the interface...when the goal was to make PARSE return
-    ; progress in a series:
+    ; progress in a series.  But it is reintroduced here:
+    ;
+    ;https://forum.rebol.info/t/1561
 
     'return combinator [
         {Return a value explicitly from the parse}
@@ -1098,8 +1102,15 @@ default-combinators: make map! reduce [
         let collect-baseline: tail try state.collecting  ; see COLLECT
         let gather-baseline: tail try state.gathering  ; see GATHER
 
+        ; !!! In DO we allow `x: do [comment "a"]` to come back as X just being
+        ; NULL.  It seemed to outweigh the safety aspect of having `do []`
+        ; return an "ornery" result.  But with parse rules, it seems that
+        ; "invisibles" happen a lot...and people might be confused if they
+        ; say  `x: [to "a"]` and don't get an ornery result or an error.  We
+        ; may need to track an independent "no result" state (?)
+        ;
         if result [
-            set result <nothing>
+            set result null
         ]
         while [not tail? rules] [
             if state.verbose [
@@ -1127,23 +1138,14 @@ default-combinators: make map! reduce [
             ;
             let [action 'rules]: parsify state rules
             let f: make frame! :action
-            let r
-            let use-result: all [result, in f 'result]
-            f.input: pos
-            if use-result [ ; non-result bearing cases ignored
-                f.result: 'r
+            if in f 'result [  ; non-result bearing cases ignored
+                f.result: result
             ]
+            f.input: pos
 
-            if pos: do f [
-                if use-result [
-                    if <nothing> = get result [
-                        set result copy []
-                    ]
-                    append/only get result r  ; might be null, ignore
-                ]
-            ] else [
-                if result [  ; forget accumulated results
-                    set result <nothing>
+            if not pos: do f [
+                if result [  ; forget last result; go back to no-result state
+                    set result null
                 ]
                 if state.collecting [  ; toss collected values from this pass
                     if collect-baseline [  ; we marked how far along we were
@@ -1178,18 +1180,9 @@ default-combinators: make map! reduce [
             ]
         ]
 
-        ; This behavior is a bit questionable, as a BLOCK! rule is accruing
-        ; results yet sometimes giving back a BLOCK! and extracting a single
-        ; item.  Likely not good.  Review
+        ; Deliver errors on block combinator returning no results, e.g.
+        ; x: [to "a"] ?
         ;
-        case [
-            not result []
-            <nothing> = get result [
-                fail "BLOCK! combinator did not yield any results"
-            ]
-            0 = length of get result [set result null]
-            1 = length of get result [set result first get result]
-        ]
         return pos
     ]
 ]
