@@ -40,13 +40,13 @@
     x: _
     did all [
         uparse "aaa" [x: while "a"]
-        x = ["a" "a" "a"]
+        x = "a"
     ]
 )(
     x: _
     did all [
         uparse "aaa" [x: while "b", while "a"]
-        x = []
+        x = null
     ]
 )(
     x: _
@@ -58,7 +58,7 @@
     x: _
     did all [
         uparse "aaa" [x: opt some "a"]
-        x = ["a" "a" "a"]
+        x = "a"
     ]
 )]
 
@@ -152,7 +152,7 @@
 )(
      did all [
          uparse "<<<stuff>>>" [
-             left: some "<"
+             left: across some "<"
              (n: length of left)
              x: between here n ">"
          ]
@@ -288,7 +288,7 @@
     did all [
         uparse [| | while while while | | |] [
             content: between some '| some '|
-            into @content [x: some 'while]
+            into @content [x: collect [some keep 'while]]
         ]
         x = [while while while]
     ]
@@ -319,8 +319,9 @@
     ]
 )]
 
-; !!! Mixing SET-WORD! and BLOCK! is currently up in the air, in terms of
-; exactly how it should work.
+; Mixing SET-WORD! with block returns the last value-bearing rule in the PARSE
+; (Note: more on this later in this file; review when breaking out separate
+; tests for UPARSE into separate files.)
 [(
     x: <before>
     did all [
@@ -331,7 +332,7 @@
     x: <before>
     did all [
         uparse [1 "hello"] [x: [tag! integer! | integer! text!]]
-        x = [1 "hello"]
+        x = "hello"
     ]
 )(
     x: <before>
@@ -355,7 +356,7 @@
 
 (
     did all [
-        uparse [1 2 3] [x: [some integer!]]
+        uparse [1 2 3] [x: collect [some keep integer!]]
         x = [1 2 3]
     ]
 )]

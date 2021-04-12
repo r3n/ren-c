@@ -208,64 +208,47 @@ default-combinators: make map! reduce [
 
     'while combinator [
         {Any number of matches (including 0)}
-        result: [block!]
+        result: [<opt> any-value!]
         parser [action!]
     ][
-        let pos: input
-
+        let f: make frame! :parser
         if result [
-            if not find (parameters of :parser) '/result [
-                fail "Can't get result from ANY with non-value-bearing rule"
+            if in f 'result [
+                f.result: result
             ]
-            set result collect [
-                let temp
-                cycle [
-                    if not [pos temp]: parser input [
-                        stop  ; don't return yet (need to finish collect)
-                    ]
-                    keep :temp
-                    input: pos
-                ]
+            else [
+                fail "Can't get result from WHILE with non-value-bearing rule"
             ]
-        ] else [
-            cycle [
-                input: any [parser input, stop]
-            ]
+            set result null
+        ]
+        cycle [
+            f/input: input
+            input: any [do copy f, stop]
         ]
         return input
     ]
 
     'some combinator [
         {Must run at least one match}
-        result: [block!]
+        result: [<opt> any-value!]
         parser [action!]
     ][
-        let pos
+        let f: make frame! :parser
         if result [
-            if not find (parameters of :parser) '/result [
+            if in f 'result [
+                f.result: result
+            ]
+            else [
                 fail "Can't get result from SOME with non-value-bearing rule"
             ]
-            set result collect [
-                let temp
-                if not [input temp]: parser input [
-                    return null
-                ]
-                keep :temp
-                cycle [
-                    if not [pos temp]: parser input [
-                        stop
-                    ]
-                    keep :temp
-                    input: pos
-                ]
-            ]
-        ] else [
-            if not input: parser input [
-                return null
-            ]
-            cycle [
-                input: any [parser input, stop]
-            ]
+        ]
+        f/input: input
+        if not input: do copy f [
+            return null
+        ]
+        cycle [
+            f/input: input
+            input: any [do copy f, stop]
         ]
         return input
     ]
