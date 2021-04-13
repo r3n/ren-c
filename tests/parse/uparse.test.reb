@@ -6,31 +6,18 @@
 ; using a different set of combinators.  Those combinators can be chosen for
 ; new features, or just to get compatibility with Rebol2/R3-Alpha/Red parse.
 
-; SYM-XXX! are value-bearing rules that do not advance the input and get their
-; argument literally.  They succeed unless their result is null (if you want
-; success in that case with a null result, combine with OPT rule).
+; GROUP! are value-bearing rules that do not advance the input and get their
+; argument literally from a DO evaluation.  They always succeed.
 [(
     three: 3
     did all [
-        "" = uparse "" [x: @three]
+        "" = uparse "" [x: (three)]
         x = 3
     ]
 )(
     did all [
-        "" = uparse "" [x: @(1 + 2)]
+        "" = uparse "" [x: (1 + 2)]
         x = 3
-    ]
-)(
-    x: <before>
-    did all [
-        not uparse "" [x: @(null)]
-        x = <before>
-    ]
-)(
-    x: <before>
-    did all [
-        "" = uparse "" [x: opt @(null)]
-        x = null
     ]
 )]
 
@@ -207,9 +194,9 @@
     x: <before>
     did all [
         uparse "aaa" [x: collect [some [
-            keep opt @(if false [<not kept>])
+            keep (if false [<not kept>])
             keep skip
-            keep @(if true [<kept>])
+            keep (if true [<kept>])
         ]]]
         x = [#a <kept> #a <kept> #a <kept>]
     ]
@@ -233,8 +220,8 @@
     let result
     uparse "aaabbb" [
        result: gather [
-            emit x: collect some ["a", keep @(<a>)]
-            emit y: collect some ["b", keep @(<b>)]
+            emit x: collect some ["a", keep (<a>)]
+            emit y: collect some ["b", keep (<b>)]
        ]
     ] else [
        fail "Parse failed"
@@ -304,7 +291,7 @@
     did all [
         uparse [| | while while while | | |] [
             content: between some '| some '|
-            into @content [x: collect [some keep 'while]]
+            into (content) [x: collect [some keep 'while]]
         ]
         x = [while while while]
     ]
@@ -316,7 +303,7 @@
 [(
     str: "aaa"
     did all [
-        uparse str [change [some "a"] @(if true ["literally"])]
+        uparse str [change [some "a"] (if true ["literally"])]
         str = "literally"
     ]
 )(
@@ -326,7 +313,7 @@
             "("
             change [to ")"] [
                 collect [
-                    some ["a" keep @("A") | skip]
+                    some ["a" keep ("A") | skip]
                 ]
             ]
             ")"
@@ -377,28 +364,32 @@
     ]
 )]
 
-; SOME can call generators, terminating on the null
-[(
-    gen: func [<static> n (0)] [
-        if n < 3 [return n: n + 1]
-        return null
-    ]
-
-    did all [
-        "a" = uparse "a" ["a", data: some @(gen)]
-        data = [1 2 3]
-    ]
-)]
+; !!! There was an idea that SOME could be called on generators, when the
+; SYM-GROUP! was used as plain GROUP! is but would fail on NULL, and would
+; be combined with OPT if you wanted it to succeed.  This was changed, so
+; now the idea doesn't work.  Is it necessary to make a "generator friendly"
+; NULL-means-stop DO-like operator for PARSE?  It's worth thinking about...
+;[(
+;    gen: func [<static> n (0)] [
+;        if n < 3 [return n: n + 1]
+;        return null
+;    ]
+;
+;    did all [
+;        "a" = uparse "a" ["a", data: some @(gen)]
+;        data = [1 2 3]
+;    ]
+;)]
 
 ; RETURN was removed from Ren-C PARSE but is being re-added to UPARSE, as
 ; it seems useful enough to outweigh the interface complexity.
 [(
-    10 = uparse [aaa] [return @(10)]
+    10 = uparse [aaa] [return (10)]
 )(
     let result: uparse "aaabbb" [
         return gather [
-            emit x: collect some ["a", keep @(<a>)]
-            emit y: collect some ["b", keep @(<b>)]
+            emit x: collect some ["a", keep (<a>)]
+            emit y: collect some ["b", keep (<b>)]
         ]
     ] else [
         fail "Parse failed"
@@ -542,17 +533,17 @@
         let arg
         uparse args [while [
             "-a", access-dir: [
-                end @(true)
-                | "true" @(true)
-                | "false" @(false)
-                | dir: skip, @(to-file dir)
+                end (true)
+                | "true" (true)
+                | "false" (false)
+                | dir: skip, (to-file dir)
             ]
             |
             ["-h" | "-help" | "--help" (-help, quit)]
             |
             verbose: [
-                "-q" @(0)
-                | "-v" @(2)
+                "-q" (0)
+                | "-v" (2)
             ]
             |
             port: into skip integer!
@@ -574,3 +565,17 @@
     ([_ 8000 _ 2] = argtest ["8000" "-v"])
     ([_ 8000 %foo/bar 2] = argtest ["8000" "-v" "foo/bar"])
 ]
+
+; SYM-WORD!, SYM-GROUP!, and SYM-PATH! are all used for literal matching.
+; This means to match against the input but don't treat what's given as a rule.
+[(
+    x: [some rule]
+    data: [[some rule] [some rule]]
+    data = uparse data [some @x]
+)(
+    data: [[some rule] [some rule]]
+    data = uparse data [some @([some rule])]
+)(
+    obj: make object! [x: [some rule]]
+    data = uparse data [some @obj.x]
+)]

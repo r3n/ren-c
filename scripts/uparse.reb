@@ -801,46 +801,28 @@ default-combinators: make map! reduce [
 
     === GROUP! COMBINATOR ===
 
-    ; GROUP! does not advance the input, just runs the group.
-    ;
-    ; This currently tests the idea that the GROUP! combinator has no result
-    ; value, hence you can't use it with `keep (1 + 2)` or `x: (1 + 2)`.
-    ; That helps to avoid situations where you might write:
-    ;
-    ;     x: [(print "testing for integer...") integer! | text!]
-    ;
-    ; The problem is that if GROUP! is seen as coming up with values, you
-    ; wouldn't necessarily want to ignore it.
-    ;
-    ; !!! GET-BLOCK! acted like DO in initial Ren-C.  It's preserved here
-    ; for tests, but given how short a word DO is, that doesn't take it
-    ; down by much...especially not `do 'x` as `:['x]`.  Review.
+    ; GROUP! does not advance the input, just runs the group.  It can return
+    ; a value, which is used by value-accepting combinators.  Use ELIDE if
+    ; this would be disruptive in terms of a value-bearing BLOCK! rule.
 
     group! combinator [
+        result: [<opt> any-value!]
         value [group!]
     ][
-        do value
-        return input  ; just give back same input passed in
-    ]
-
-    'do combinator [
-        result: [<opt> any-value!]
-        'arg [any-value!]
-    ][
         if result [
-            set result do arg
+            set result do value
         ]
-        return input  ; input is unchanged, no rules involved
+        else [
+            do value
+        ]
+        return input  ; just give back same input passed in
     ]
 
     get-block! combinator [
         result: [<opt> any-value!]
         value [get-block!]
     ][
-        if result [
-            set result do arg
-        ]
-        return input  ; input is unchanged, no rules involved
+        fail "No current meaning for GET-BLOCK! combinator"
     ]
 
     === BITSET! COMBINATOR ===
@@ -1002,50 +984,55 @@ default-combinators: make map! reduce [
 
     === SYM-XXX! COMBINATORS ===
 
-    ; The concept behind SYM-XXX! is to be a value-bearing rule which is not
-    ; tied to the input.  You could thus say `keep @('stuff)` and it would not
-    ; mean that `stuff` needed to appear in the input.
+    ; The SYM-XXX! combinators are used when you want a variable or expression
+    ; to be used literally as the thing matched.
     ;
-    ; A NULL is interpreted as the rule failing.  If you want to avoid that,
-    ; then say e.g. `keep opt @(null)`.
+    ;    x: [some rule]
+    ;    uparse [[some rule] [some rule]] [some @x]
+    ;
+    ; The behavior is basically as if you had tried to match the thing quoted.
+    ;
+    ;    uparse [[some rule] [some rule]] [some '[some rule]]
+    ;
+    ; !!! What should be done in the case of NULL?
 
     sym-word! combinator [
         result: [any-value!]
         value [sym-word!]
     ][
-        if not result [
-            fail "SYM-XXX rules can only be used in value-bearing contexts"
+        if :input.1 = get value [
+            if result [
+                set result input.1
+            ]
+            return next input
         ]
-        if null? set result get value [
-            return null
-        ]
-        return input
+        return null
     ]
 
-    sym-path! combinator [
+    sym-tuple! combinator [
         result: [any-value!]
-        value [sym-path!]
+        value [sym-tuple!]
     ][
-        if not result [
-            fail "SYM-XXX rules can only be used in value-bearing contexts"
+        if :input.1 = get value [
+            if result [
+                set result input.1
+            ]
+            return next input
         ]
-        if null? set result get value [
-            return null
-        ]
-        return input
+        return null
     ]
 
     sym-group! combinator [
         result: [any-value!]
         value [sym-group!]
     ][
-        if not result [
-            fail "SYM-XXX rules can only be used in value-bearing contexts"
+        if :input.1 = do value [
+            if result [
+                set result input.1
+            ]
+            return next input
         ]
-        if null? set result do value [
-            return null
-        ]
-        return input
+        return null
     ]
 
     sym-block! combinator [
