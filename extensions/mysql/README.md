@@ -77,7 +77,8 @@ If you choose to add the *.renc* extension then add lines to a (new) *.htaccess*
 
     Options +ExecCGI
     AddHandler cgi-script cgi pl reb renc r
-In this example the .renc file extension is added besides the common cgi and Perl (pl) and already present .r and .reb file extensions, that were in use by earlier **Rebol** versions. The *.htaccess* is valid in all subdirectories of the directory it is placed inside.
+
+In this example the .renc file extension is added besides the common cgi and Perl (pl) and already present .r and .reb file extensions, that are in use by earlier **Rebol** versions used to do some cgi. The *.htaccess* is valid in all subdirectories of the directory it is placed inside.
 
 File *mysql-db.renc*
 
@@ -124,6 +125,7 @@ File *mysql-test.renc*
     print "<br />"
     print "DB handle closed!"
     print "</BODY></HTML>"
+
 Note that the result of the compilation is the executable named **r3**, here it is renamed to **renc**.
 
 ## MySQL field types
@@ -150,10 +152,11 @@ offering.
 After installing the correct OS on a VM the MySQL files must be installed.
 
 Example CentOS (7)
+
     su -                           // switch to root user
     yum install mysql mysql-devel
 
-When compiling on CentOS (7) you will need to add 'standard: gnu99' to your compile line. (*1)
+When compiling on CentOS (7) you will need to add `standard: gnu99` to your compile line. (Note ***1**)
 
     "$R3_MAKE" ../make.r config: ../configs/mysql-config.r debug: asserts optimize: 2 standard: gnu99
 
@@ -168,4 +171,4 @@ Use one for the compiling step of the extension itself, one for the linking step
 
 ## Notes
 
-(*1)  The change from my_bool to bool in MySQL8.0 means that the mysql.h header file requires a C++ or C99 compiler to compile. (source: https://dev.mysql.com/doc/c-api/8.0/en/c-api-data-structures.html )
+(***1**)  The change from my_bool to bool in MySQL8.0 means that the mysql.h header file requires a C++ or C99 compiler to compile. (source: https://dev.mysql.com/doc/c-api/8.0/en/c-api-data-structures.html )
