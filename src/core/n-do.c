@@ -256,6 +256,43 @@ REBNATIVE(shove)
 
 
 //
+//  Do_Frame_Throws: C
+//
+bool Do_Frame_Throws(REBVAL *out, REBVAL *frame) {
+    if (IS_FRAME_PHASED(frame))  // see REDO for tail-call recursion
+        fail ("Use REDO to restart a running FRAME! (not DO)");
+
+    REBCTX *c = VAL_CONTEXT(frame);  // checks for INACCESSIBLE
+
+    REBARR *varlist = CTX_VARLIST(c);
+    if (GET_SUBCLASS_FLAG(VARLIST, varlist, FRAME_HAS_BEEN_INVOKED))
+        fail (Error_Stale_Frame_Raw());
+
+    REBFLGS flags = EVAL_MASK_DEFAULT
+        | EVAL_FLAG_FULLY_SPECIALIZED
+        | FLAG_STATE_BYTE(ST_ACTION_TYPECHECKING);
+
+    DECLARE_END_FRAME (f, flags);
+    Push_Frame(out, f);
+
+    f->varlist = varlist;
+    f->rootvar = CTX_ROOTVAR(c);
+    INIT_LINK_KEYSOURCE(varlist, f);
+
+    assert(FRM_PHASE(f) == CTX_FRAME_ACTION(c));
+    INIT_FRM_BINDING(f, VAL_FRAME_BINDING(frame));
+
+    Begin_Prefix_Action(f, VAL_FRAME_LABEL(frame));
+
+    bool threw = Process_Action_Throws(f);
+    assert(threw or IS_END(f->feed->value));  // we started at END_FLAG
+
+    Drop_Frame(f);
+    return threw;
+}
+
+
+//
 //  do: native [
 //
 //  {Evaluates a block of source code (directly or fetched according to type)}
@@ -431,37 +468,7 @@ REBNATIVE(do)
         return D_OUT; }
 
       case REB_FRAME: {
-        if (IS_FRAME_PHASED(source))  // see REDO for tail-call recursion
-            fail ("Use REDO to restart a running FRAME! (not DO)");
-
-        REBCTX *c = VAL_CONTEXT(source); // checks for INACCESSIBLE
-
-        REBARR *varlist = CTX_VARLIST(c);
-        if (GET_SUBCLASS_FLAG(VARLIST, varlist, FRAME_HAS_BEEN_INVOKED))
-            fail (Error_Stale_Frame_Raw());
-
-        REBFLGS flags = EVAL_MASK_DEFAULT
-            | EVAL_FLAG_FULLY_SPECIALIZED
-            | FLAG_STATE_BYTE(ST_ACTION_TYPECHECKING);
-
-        DECLARE_END_FRAME (f, flags);
-        Push_Frame(D_OUT, f);
-
-        f->varlist = varlist;
-        f->rootvar = CTX_ROOTVAR(c);
-        INIT_LINK_KEYSOURCE(varlist, f);
-
-        assert(FRM_PHASE(f) == CTX_FRAME_ACTION(c));
-        INIT_FRM_BINDING(f, VAL_FRAME_BINDING(source));
-
-        Begin_Prefix_Action(f, VAL_FRAME_LABEL(source));
-
-        bool threw = Process_Action_Throws(f);
-        assert(threw or IS_END(f->feed->value));  // we started at END_FLAG
-
-        Drop_Frame(f);
-
-        if (threw)
+        if (Do_Frame_Throws(D_OUT, source))
             return R_THROWN; // prohibits recovery from exits
 
         return D_OUT; }

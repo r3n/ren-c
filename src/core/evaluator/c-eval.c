@@ -1084,125 +1084,190 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     //
     //     [result var]: updating-function arg1 arg2
     //
-    // !!! This is a very slow-running prototype of the desired behavior.  It
-    // is a mock up intended to find any flaws in the concept before writing
-    // faster native code that would require rewiring the evaluator somewhat.
+    // It supports `_` in slots whose results you don't want to ask for, `#`
+    // in slots you want to ask for (but don't want to name), will evaluate
+    // GROUP!s, and also allows sym-word to `@circle` which result you want
+    // to be the overall result of the expression (defaults to the normal
+    // main return value).
 
       case REB_SET_BLOCK: {
         assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));
 
+        // We pre-process the SET-BLOCK! first, because we are going to
+        // advance the feed in order to build a frame for the following code.
+        // It makes more sense for any GROUP!s to be evaluated on the left
+        // before on the right, so push the results to the stack.
+        //
+        // !!! Should the block be locked while the advancement happens?  It
+        // wouldn't need to be since everything is on the stack before code
+        // is run on the right...but it might reduce confusion.
+
         if (VAL_LEN_AT(v) == 0)
             fail ("SET-BLOCK! must not be empty for now.");
 
+      blockscope {
+        bool circled = false;  // a return is SYM-XXX to be main return
         const RELVAL *tail;
         const RELVAL *check = VAL_ARRAY_AT(&tail, v);
+        REBSPC *derived = Derive_Specifier(v_specifier, v);
         for (; tail != check; ++check) {
-            if (IS_BLANK(check) or IS_WORD(check) or IS_PATH(check))
+            //
+            // SYM-WORD! or SYM-PATH! are used to mark which result should be
+            // the overall return of the expression.  But a GROUP! can't
+            // resolve to that and make the decision, so handle it up front.
+            //
+            if (ANY_SYM_KIND(VAL_TYPE(check))) {
+                if (circled)
+                    fail ("Can't circle more than one multi-return result");
+                circled = true;
+            }
+            if (
+                IS_SYM_WORD(check)
+                or IS_SYM_PATH(check)
+                or IS_SYM_TUPLE(check)
+            ){
+                Derelativize(DS_PUSH(), check, v_specifier);
+                Plainify(DS_TOP);
+                SET_CELL_FLAG(DS_TOP, STACK_NOTE_CIRCLED);
                 continue;
-            if (Is_Blackhole(check))
-                continue;
-            fail ("SET-BLOCK! elements must be WORD/PATH/BLANK/ISSUE for now");
+            }
+            const RELVAL *item;
+            REBSPC *specifier;
+            if (IS_GROUP(check) or IS_SYM_GROUP(check)) {
+                if (Do_Any_Array_At_Throws(f_spare, check, derived)) {
+                    Move_Cell(f->out, f_spare);
+                    DS_DROP_TO(f->dsp_orig);
+                    goto return_thrown;
+                }
+                item = f_spare;
+                specifier = SPECIFIED;
+            }
+            else {
+                item = check;
+                specifier = v_specifier;
+            }
+            if (IS_BLANK(item)) {
+                if (DSP == f->dsp_orig)
+                    fail ("Cannot opt out of main return with BLANK!");
+                Init_Blank(DS_PUSH());
+            }
+            else if (Is_Blackhole(item)) {
+                //
+                // !!! If someone writes `[... @(#) ...]: ...`, then there is
+                // a problem if it's not the first slot; as the function needs
+                // a variable location to write the result to.  For now, just
+                // fabricate a LET variable.
+                //
+                if (DSP == f->dsp_orig or not IS_SYM_GROUP(check))
+                    Init_Blackhole(DS_PUSH());
+                else {
+                    REBVAL *let = rebValue("let temp");
+                    assert(IS_WORD(let));
+                    Move_Cell(DS_PUSH(), let);
+                    rebRelease(let);
+                }
+            }
+            else if (IS_WORD(item) or IS_PATH(item) or IS_TUPLE(item)) {
+                Derelativize(DS_PUSH(), item, specifier);
+            }
+            else
+                fail ("SET-BLOCK! elements are WORD/PATH/TUPLE/BLANK/ISSUE");
+
+            if (IS_SYM_GROUP(check))
+                SET_CELL_FLAG(DS_TOP, STACK_NOTE_CIRCLED);
         }
 
-        if (not (IS_WORD(f_next) or IS_PATH(f_next) or IS_ACTION(f_next)))
-            fail ("SET_BLOCK! must be followed by WORD/PATH/ACTION for now.");
-
-        // Turn SET-BLOCK! into a BLOCK! in `f->out` for easier processing.
+        // By default, the first return result will be returned.
         //
-        Derelativize(f->out, v, v_specifier);
-        mutable_KIND3Q_BYTE(f->out) = REB_BLOCK;
-        mutable_HEART_BYTE(f->out) = REB_BLOCK;
+        if (not circled)
+            SET_CELL_FLAG(DS_AT(f->dsp_orig + 1), STACK_NOTE_CIRCLED);
+     }
 
-        // Get the next argument as an ACTION!, specialized if necessary, into
-        // the `spare`.  We'll specialize it further to set any output
-        // arguments to words from the left hand side.
+        // Build a frame for the function call by fulfilling its arguments.
+        // The function will be in a state that it can be called, but not
+        // invoked yet.
         //
-        if (Get_If_Word_Or_Path_Throws(
-            f_spare,
-            f_next,
-            FEED_SPECIFIER(f->feed),
-            false
-        )){
+        // !!! This function can currently return a QUOTED! of the next value
+        // if it's not an ACTION!; consider that an error for multi-return.
+        //
+        if (Make_Frame_From_Feed_Throws(f_spare, f->feed)) {
+            Move_Cell(f->out, f_spare);
+            DS_DROP_TO(f->dsp_orig);
             goto return_thrown;
         }
-
-        if (not IS_ACTION(f_spare))
+        if (not IS_FRAME(f_spare))  // can return QUOTED! if not action atm
             fail ("SET-BLOCK! is only allowed to have ACTION! on right ATM.");
 
-        REBDSP dsp_outputs = DSP;
+        // Now we want to enumerate through the outputs, and fill them with
+        // words/paths/_/# from the data stack.  Note the first slot is set
+        // from the "primary" output so it doesn't go in a slot.
+        //
+        REBDSP dsp_output = f->dsp_orig + 2;
 
       blockscope {
+        REBCTX *c = VAL_CONTEXT(f_spare);
         const REBKEY *key_tail;
-        const REBKEY *key = ACT_KEYS(&key_tail, VAL_ACTION(f_spare));
-        const REBPAR *param = ACT_PARAMS_HEAD(VAL_ACTION(f_spare));
-        for (; key != key_tail; ++key, ++param) {
+        const REBKEY *key = CTX_KEYS(&key_tail, c);
+        REBVAR *var = CTX_VARS_HEAD(c);
+        const REBPAR *param = ACT_PARAMS_HEAD(CTX_FRAME_ACTION(c));
+        for (; key != key_tail; ++key, ++var, ++param) {
+            if (dsp_output == DSP + 1)
+                break;  // no more outputs requested
             if (Is_Param_Hidden(param))
                 continue;
             if (VAL_PARAM_CLASS(param) != REB_P_OUTPUT)
                 continue;
-            Init_Word(DS_PUSH(), KEY_SYMBOL(key));
+            if (not IS_BLANK(DS_AT(dsp_output))) {
+                Copy_Cell(var, DS_AT(dsp_output));
+                Set_Var_May_Fail(
+                    var, SPECIFIED,
+                    UNSET_VALUE, SPECIFIED,
+                    false  // hard
+                );
+            }
+            ++dsp_output;
         }
       }
 
-        DECLARE_LOCAL(outputs);
-        Init_Block(outputs, Pop_Stack_Values(dsp_outputs));
-        PUSH_GC_GUARD(outputs);
-
-        // Now create a function to splice in to the execution stream that
-        // specializes what we are calling so the output parameters have
-        // been preloaded with the words or paths from the left block.
+        // Now run the frame...
         //
-        REBVAL *specialized = rebValue(
-            //
-            // !!! Unfortunately we need an alias for the outputs to fetch
-            // via WORD!, because there's no way to do something like a
-            // FOR-EACH over the outputs without having that put in the
-            // bindings.  So if the outputs contain F for instance, they'd
-            // get overwritten by the F argument to the function because the
-            // array is in place.
-            //
-            "let outputs:", outputs,
+        if (Do_Frame_Throws(f->out, f_spare)) {
+            DS_DROP_TO(f->dsp_orig);
+            goto return_thrown;
+        }
 
-            "specialize enclose", rebQ(f_spare), "func [frame] [",
-                "for-each o outputs [",
-                    "if frame/(o) [",  // void in case func doesn't (null?)
-                        "set frame/(o) '~unset~",
-                    "]",
-                "]",
-                "either first", f->out, "@[",
-                    "set first", f->out, "do frame",
-                "] @[do frame]",
-            "] collect [ use [block] [",
-                "block: next", f->out,
-                "for-each o outputs [",
-                    "if tail? block [break]",  // no more outputs wanted
-                    "if block/1 [",  // interested in this result
-                        "keep setify o",
-                        "keep quote compose block/1",  // pre-compose, safety
-                    "]",
-                    "block: next block",
-                "]",
-                "if not tail? block [fail {Too many multi-returns}]",
-            "] ]"
+        // Take care of the SET for the main result.
+        //
+        // !!! Move the main result set part off the stack and into the spare
+        // in case there are GROUP! evaluations in the assignment; though that
+        // needs more thinking (e.g. what if they throw?)
+        //
+        Copy_Cell(f_spare, DS_AT(f->dsp_orig + 1));
+        Set_Var_May_Fail(
+            f_spare, SPECIFIED,
+            f->out, SPECIFIED,
+            false  // "hard"
         );
 
-        DROP_GC_GUARD(outputs);
-
-        Copy_Cell(f_spare, specialized);
-        rebRelease(specialized);
-
-        // Toss away the pending WORD!/PATH!/ACTION! that was in the execution
-        // stream previously.
+        // Now take care of the assignment of the original result; we can tell
+        // by which result is circled...
         //
-        Fetch_Next_Forget_Lookback(f);
+        if (NOT_CELL_FLAG(DS_AT(f->dsp_orig + 1), STACK_NOTE_CIRCLED)) {
+            REBDSP dsp_circled = f->dsp_orig + 2;
+            while (NOT_CELL_FLAG(DS_AT(dsp_circled), STACK_NOTE_CIRCLED))
+                ++dsp_circled;
+            Move_Cell(f_spare, DS_AT(dsp_circled));  // see note on GROUP! eval
+            Get_Var_May_Fail(
+                f->out,
+                f_spare,
+                SPECIFIED,
+                true,  // any
+                false  // hard
+            );
+        }
 
-        // Interject the function with our multiple return arguments and
-        // return value assignment step.
-        //
-        gotten = f_spare;
-        v = f_spare;
-
-        goto evaluate; }
+        DS_DROP_TO(f->dsp_orig);
+        break; }
 
 
     //=////////////////////////////////////////////////////////////////////=//

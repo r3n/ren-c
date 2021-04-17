@@ -175,7 +175,7 @@
 // !!! This concept is somewhat dodgy and experimental, but it shows promise
 // in addressing problems like being able to give errors if a user writes
 // something like `if [x > 2] [print "true"]` vs. `if x > 2 [print "true"]`,
-// while still tolerating `item: [a b c] | if item [print "it's an item"]`. 
+// while still tolerating `item: [a b c] | if item [print "it's an item"]`.
 // That has a lot of impact for the new user experience.
 //
 #define CELL_FLAG_UNEVALUATED \
@@ -206,6 +206,11 @@
 //   the more ephemeral "note" is used on the stack element and then changed
 //   to the sticky flag on the paramlist when popping.
 //
+// * STACK_NOTE_CIRCLED - When doing multi-returns, this marks which stack
+//   element representing a return slot should act as the main return value.
+//   (It could be done with a DSP position, but this thinks ahead to stackless,
+//   so storing in the data stack makes it survive the evaluation.)
+//
 
 #define CELL_FLAG_NOTE \
     FLAG_LEFT_BIT(28)
@@ -214,6 +219,7 @@
 #define CELL_FLAG_NOTE_REMOVE CELL_FLAG_NOTE
 #define CELL_FLAG_BIND_NOTE_REUSE CELL_FLAG_NOTE
 #define CELL_FLAG_STACK_NOTE_LOCAL CELL_FLAG_NOTE
+#define CELL_FLAG_STACK_NOTE_CIRCLED CELL_FLAG_NOTE
 
 
 //=//// CELL_FLAG_NEWLINE_BEFORE //////////////////////////////////////////=//
@@ -341,7 +347,7 @@ struct Reb_Datatype_Extra  // see %sys-datatype.h
 
 struct Reb_Date_Extra  // see %sys-time.h
 {
-    REBYMD ymdz;  // month/day/year/zone (time payload *may* hold nanoseconds) 
+    REBYMD ymdz;  // month/day/year/zone (time payload *may* hold nanoseconds)
 };
 
 struct Reb_Typeset_Extra  // see %sys-typeset.h
@@ -499,7 +505,7 @@ union Reb_Value_Payload { //=/////////////// ACTUAL PAYLOAD DEFINITION ////=//
     //
     // ACTION!  // see %sys-action.h
     //     REBARR *paramlist;  // has MISC.meta, LINK.underlying
-    //     REBARR *details;  // has MISC.dispatcher, LINK.specialty 
+    //     REBARR *details;  // has MISC.dispatcher, LINK.specialty
     //
     // VARARGS!  // see %sys-varargs.h
     //     REBINT signed_param_index;  // if negative, consider arg enfixed

@@ -122,6 +122,9 @@ inline static bool Is_Void_With_Sym(const RELVAL *v, SYMID sym) {
 #endif
 
 
+#define UNSET_VALUE \
+    c_cast(const REBVAL*, &PG_Unset_Value)
+
 // Moving a cell invalidates the old location.  This idea is a potential
 // prelude to being able to do some sort of reference counting on series based
 // on the cells that refer to them tracking when they are overwritten.  In
