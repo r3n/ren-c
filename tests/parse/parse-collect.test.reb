@@ -98,7 +98,7 @@
     [# pos]: parse [1 2 3] [
         x: collect [
             keep integer!
-            keep only @(second [A [<pick> <me>] B])
+            keep only (second [A [<pick> <me>] B])
             keep integer!
         ]
     ]
@@ -106,7 +106,7 @@
     x = [1 [<pick> <me>] 2]
 ])
 (did all [
-    parse [1 2 3] [x: collect [keep only @([a b c]) to end]
+    parse [1 2 3] [x: collect [keep only ([a b c]) to end]]
     x = [[a b c]]
 ])
 

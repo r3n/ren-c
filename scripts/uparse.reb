@@ -592,6 +592,7 @@ default-combinators: make map! reduce [
         return: "The kept value (same as input)"
             [<opt> any-value!]
         parser [action!]
+        /only "Keep blocks as BLOCK!"
         <local> result
     ][
         if not state.collecting [
@@ -602,7 +603,7 @@ default-combinators: make map! reduce [
             return null
         ]
 
-        append state.collecting :result
+        append/(if only ['only]) state.collecting :result
         return :result
     ]
 
@@ -1289,6 +1290,11 @@ combinatorize: func [
 
                 f.(unquote param): :r
             ]
+            refinement? param [
+                ; Leave refinements alone, e.g. /only ... a general strategy
+                ; would be needed for these if the refinements add parameters
+                ; as to how they work.
+            ]
             true [  ; another parser to combine with
                 ;
                 ; !!! At the moment we disallow SET with GROUP!.
@@ -1363,7 +1369,17 @@ parsify: func [
         ]
 
         path? :r [
-            r: get r
+            let word: ensure word! first r
+            if let c: select state.combinators word [
+                let [f 'rules]: combinatorize rules state :c
+                for-each refinement next as block! r [
+                    f/(refinement): #
+                ]
+
+                set advanced rules  ; !!! Should `[:advanced]: ...` be ok?
+                return make action! f
+            ]
+            fail ["Unknown combinator:" word]
         ]
 
         ; !!! Here is where we would let GET-PATH! and GET-WORD! be used to

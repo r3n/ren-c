@@ -241,7 +241,15 @@
     ;
     (["a" "a" "a"] = uparse "aaa" [return collect [some keep "a"]])
     (["a"] = uparse "aaa" [return collect [keep some "a"]])
-]
+
+    ; There is a KEEP/ONLY feature which is part of a half-baked attempt at
+    ; generic combinator refinements.
+(
+    result: uparse "abbbbabbab" [return collect [
+        some [keep "a", keep/only collect [some keep "b" keep (<hi>)]]
+    ]]
+    result = ["a" ["b" "b" "b" "b" <hi>] "a" ["b" "b" <hi>] "a" ["b" <hi>]]
+)]
 
 
 ; EMIT is a new idea to try and make it easier to use PARSE rules to bubble
