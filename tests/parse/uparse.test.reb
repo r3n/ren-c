@@ -6,6 +6,34 @@
 ; using a different set of combinators.  Those combinators can be chosen for
 ; new features, or just to get compatibility with Rebol2/R3-Alpha/Red parse.
 
+
+; Unless they are "invisible" (like ELIDE), rules return values.  If the
+; rule's purpose is not explicitly to generate new series content (like a
+; COLLECT) then it tries to return something very cheap...e.g. a value it
+; has on hand, like the rule or the match.  This can actually be useful.
+[
+    (
+        x: null
+        did all [
+            "a" = uparse "a" [x: "a"]
+            "a" = x
+        ]
+    )(
+        x: null
+        did all [
+            "aaa" = uparse "aaa" [x: some "a"]
+            "a" = x  ; SOME doesn't want to be "expensive" on average
+        ]
+    )(
+        x: null
+        did all [
+            "aaa" = uparse "aaa" [x: [some "a" | some "b"]]
+            "a" = x  ; demonstrates use of the result (which alternate taken)
+        ]
+    )
+]
+
+
 ; GROUP! are value-bearing rules that do not advance the input and get their
 ; argument literally from a DO evaluation.  They always succeed.
 [(
@@ -76,6 +104,7 @@
     (null = uparse ["aaaa"] [into text! some 3 "a"])
 ]
 
+
 ; BETWEEN is a new combinator that lets you capture between rules.
 [(
     did all [
@@ -92,6 +121,7 @@
         x = [{Thing!}]
     ]
 )]
+
 
 ; SET-WORD! rules that do not match should not disrupt the variable, but if
 ; OPT is used with it then that indicates it should be set to NULL.
@@ -113,6 +143,7 @@
     ]
 )]
 
+
 ; If a DATATYPE! is used in a text or binary rule, that is interpreted as a
 ; desire to TRANSCODE the input.
 ;
@@ -127,6 +158,7 @@
         i = 1020
     ]
 )
+
 
 ; ACROSS is UPARSE's version of historical PARSE COPY.  But it is available as
 ; a SYM-BLOCK! as well for a shorthand.
@@ -143,6 +175,7 @@
         y = "bbb"
     ])
 ]
+
 
 ; HERE follows Topaz precedent as the new means of capturing positions
 ; (e.g. POS: HERE).  But it is useful for other purposes, when a rule is
@@ -162,6 +195,7 @@
          x = "stuff"
      ]
 )]
+
 
 ; COLLECT is currently implemented to conspire with the BLOCK! combinator to
 ; do rollback between its alternates.  But since anyone can write combinators
@@ -200,7 +234,15 @@
         ]]]
         x = [#a <kept> #a <kept> #a <kept>]
     ]
-)]
+)
+
+    ; Note potential confusion that SOME KEEP and KEEP SOME are not the same.
+    ;
+    ;
+    (["a" "a" "a"] = uparse "aaa" [return collect [some keep "a"]])
+    (["a"] = uparse "aaa" [return collect [keep some "a"]])
+]
+
 
 ; EMIT is a new idea to try and make it easier to use PARSE rules to bubble
 ; up objects.  It works with a GATHER and SET-WORD!
@@ -232,6 +274,7 @@
     ]
 )]
 
+
 ; If you EMIT with no GATHER, the current behavior is to make the UPARSE
 ; itself emit variable definitions, much like LET.  Having this be a feature
 ; of EMIT instead of a new keyword might not be the best idea, but it's
@@ -254,7 +297,7 @@
        let filename: "demo.txt"
        uparse filename [
             emit base: between here "."
-            emit extension: thru end
+            emit extension: @[thru end]
         ] else [
             fail "Not a file with an extension"
         ]
@@ -266,6 +309,7 @@
         extension = #extension
     ]
 )]
+
 
 ; UPARSE INTO is arity-2, permitting use of a value-bearing rule to produce
 ; the thing to recurse the parser into...which can generate a new series, as
@@ -297,6 +341,7 @@
     ]
 )]
 
+
 ; CHANGE is rethought in UPARSE to work with value-bearing rules.  The rule
 ; gets the same input that the first argument did.
 ;
@@ -321,6 +366,7 @@
         str = "(AA)"
     ]
 )]
+
 
 ; Mixing SET-WORD! with block returns the last value-bearing rule in the PARSE
 ; (Note: more on this later in this file; review when breaking out separate
@@ -364,6 +410,7 @@
     ]
 )]
 
+
 ; !!! There was an idea that SOME could be called on generators, when the
 ; SYM-GROUP! was used as plain GROUP! is but would fail on NULL, and would
 ; be combined with OPT if you wanted it to succeed.  This was changed, so
@@ -380,6 +427,7 @@
 ;        data = [1 2 3]
 ;    ]
 ;)]
+
 
 ; RETURN was removed from Ren-C PARSE but is being re-added to UPARSE, as
 ; it seems useful enough to outweigh the interface complexity.
@@ -400,6 +448,7 @@
     ]
 )]
 
+
 ; NOT NOT should be equivalent to AHEAD
 ; Red at time of writing has trouble with this
 ; As does Haskell Parsec, e.g. (notFollowedBy . notFollowedBy != lookAhead)
@@ -407,6 +456,7 @@
 [
     ("a" = uparse "a" [[not not "a"] "a"])
 ]
+
 
 [(
     x: uparse "baaabccc" [into [between "b" "b"] [some "a" end] to end]
@@ -427,6 +477,7 @@
     x: uparse "aaabccc" [into @[to "b"] [some "a"] to end]
     x = "aaabccc"
 )]
+
 
 ; INTO can be mixed with HERE to parse into the same series
 [(
@@ -455,21 +506,23 @@
     ]
 )]
 
-; TO and THRU are now value bearing, e.g. `x: thru "a"` acts as what would
-; have historicaly been `copy x thru "a"`.
+
+; TO and THRU would be too costly to be implicitly value bearing by making
+; copies; you need to use ACROSS.
 [(
-    "aaab" = uparse "aaabbb" [return thru "b"]
+    "b" = uparse "aaabbb" [return thru "b"]
 )(
-    "aaa" = uparse "aaabbb" [return to "b"]
+    "b" = uparse "aaabbb" [return to "b"]
 )]
+
 
 ; GET-GROUP!s will splice rules, null means no rule but succeeds...FALSE is
 ; useful for failing, and TRUE is a synonym for NULL in this context.
-
 [
     ("aaa" = uparse "aaa" [:(if false ["bbb"]) "aaa"])
     ("bbbaaa" = uparse "bbbaaa" [:(if true ["bbb"]) "aaa"])
 ]
+
 
 ; a BLOCK! rule combined with SET-WORD! will evaluate to the last value-bearing
 ; result in the rule.  This provides compatibility with the historical idea
@@ -482,6 +535,7 @@
     (2 = uparse [1 2] [return [integer! integer!]])
     ("a" = uparse ["a"] [return [integer! | text!]])
 ]
+
 
 ; A BLOCK! rule is allowed to return NULL, but this is a bit confusing since
 ; invisible rules return NULL too...so initializing to null may not be the
@@ -506,6 +560,7 @@
     )
 ]
 
+
 ; TALLY is a new rule for making counting easier
 [
     (3 = uparse "aaa" [return tally "a"])
@@ -513,10 +568,10 @@
 
     (did all [
          uparse "<<<stuff>>>" [
-             left: tally "<"
-             x: between here n ">"
+             n: tally "<"
+             inner: between here n ">"
          ]
-         x = "stuff"
+         inner = "stuff"
     ])
 ]
 
@@ -565,6 +620,7 @@
     ([_ 8000 _ 2] = argtest ["8000" "-v"])
     ([_ 8000 %foo/bar 2] = argtest ["8000" "-v" "foo/bar"])
 ]
+
 
 ; SYM-WORD!, SYM-GROUP!, and SYM-PATH! are all used for literal matching.
 ; This means to match against the input but don't treat what's given as a rule.

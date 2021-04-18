@@ -91,12 +91,13 @@ combinator: func [
             ; we just use it to notice the furthest parse point reached.
             ;
             let state: f.state
+            let remainder: f.remainder
             let result: do f
             elide all [
                 state.furthest
-                result
-                (index? result) > (index? get state.furthest)
-                set state.furthest result
+                (index? remainder: get remainder) > (index? get state.furthest)
+                set state.furthest remainder
+                :result
             ]
         ]
     )
@@ -105,16 +106,17 @@ combinator: func [
         ; Get the text description if given
         ((if text? spec.1 [spec.1, elide spec: my next]))
 
-        return: [<opt> any-series!]
-
-        ; Get the RESULT: definition if there is one
+        ; Get the RETURN: definition if there is one
         ;
         ((if set-word? spec.1 [
-            assert [spec.1 = 'result:]
-            assert [block? spec.2]
-            reduce [spec.1 spec.2]
-            elide spec: my skip 2
+            assert [spec.1 = 'return:]
+            assert [text? spec.2]
+            assert [block? spec.3]
+            reduce [spec.1 spec.2 spec.3]
+            elide spec: my skip 3
         ]))
+
+        remainder: [<opt> any-series!]
 
         state [frame!]
         input [any-series!]
@@ -143,54 +145,58 @@ default-combinators: make map! reduce [
 
     'opt combinator [
         {If the parser given as a parameter fails, return input undisturbed}
-        result: [<opt> any-value!]
+        return: "PARSER's result if it succeeds, otherwise NULL"
+            [<opt> any-value!]
         parser [action!]
+        <local> result
     ][
-        ; If the argument given as a rule has a result, then OPT will also.
-        ;
-        let f: make frame! :parser
-        f.input: input
-        if result [
-            either find f 'result [
-                f.result: result
-            ][
-                fail "Result requested from OPT but rule used has no result"
-            ]
+        if [result @(remainder)]: parser input [
+            return :result  ; on parser's success, return what it returned
         ]
-
-        return any [
-            do f  ; success means nested parser should have set result
-            elide if result [set result null]  ; on failure OPT nulls result
-            input
-        ]
+        set remainder input  ; on parser's failure, make OPT remainder input
+        return null  ; OPT succeeds on parser failure, but has a null result
     ]
 
     'end combinator [
         {Only match if the input is at the end}
-        ; Note: no arguments besides the input (neither parsers nor literals)
+        return: "END position if matched (similar to HERE)"
+            [<opt> any-series!]
     ][
-        if tail? input [return input]
+        if tail? input [
+            set remainder input
+            return input  ; actually returns the end position
+        ]
+        set remainder null
         return null
     ]
 
     'not combinator [
         {Fail if the parser rule given succeeds, else continue}
+        return: "~not~ if the rule fails, NULL if it succeeds"
+            [<opt> void!]
         parser [action!]
     ][
-        if parser input [
+        if [# @(remainder)]: parser input [  ; don't care about result
+            set remainder null  ; parser succeeded, so NOT reports failure
             return null
         ]
-        return input
+        set remainder input  ; parser failed, so NOT reports success
+        return '~not~  ; clearer than returning NULL
     ]
 
     'ahead combinator [
         {Leave the parse position at the same location, but fail if no match}
+        return: "parser result if success, NULL if failure"
+            [<opt> any-value!]
         parser [action!]
+        <local> result
     ][
-        if not parser input [
-            return null
+        if [result @(remainder)]: parser input [
+            set remainder input  ; succeed, but don't advance the input
+            return :result
         ]
-        return input
+        set remainder null
+        return null
     ]
 
     === LOOPING CONSTRUCT KEYWORDS ===
@@ -208,67 +214,63 @@ default-combinators: make map! reduce [
 
     'while combinator [
         {Any number of matches (including 0)}
-        result: [<opt> any-value!]
+        return: "Result of last successful match"
+            [<opt> any-value!]
         parser [action!]
+        <local> last-result result pos
     ][
-        let f: make frame! :parser
-        if result [
-            if in f 'result [
-                f.result: result
-            ]
-            else [
-                fail "Can't get result from WHILE with non-value-bearing rule"
-            ]
-            set result null
-        ]
+        last-result: null
         cycle [
-            f/input: input
-            input: any [do copy f, stop]
+            if not [result @pos]: parser input [
+                set remainder input  ; overall WHILE never fails (but REJECT?)
+                return last-result
+            ]
+            last-result: result
+            input: pos
         ]
-        return input
     ]
 
     'some combinator [
         {Must run at least one match}
-        result: [<opt> any-value!]
+        return: "Result of last successful match"
+            [<opt> any-value!]
         parser [action!]
+        <local> last-result result pos
     ][
-        let f: make frame! :parser
-        if result [
-            if in f 'result [
-                f.result: result
-            ]
-            else [
-                fail "Can't get result from SOME with non-value-bearing rule"
-            ]
-        ]
-        f/input: input
-        if not input: do copy f [
+        if not [last-result @input]: parser input [
+            set remainder null  ; if first try fails, the SOME failed
             return null
         ]
-        cycle [
-            f/input: input
-            input: any [do copy f, stop]
+        cycle [  ; if first try succeeds, flip to same code as WHILE
+            if not [result @pos]: parser input [
+                set remainder input
+                return :last-result
+            ]
+            last-result: result
+            input: pos
         ]
-        return input
     ]
 
     'tally combinator [
-        {Count the number of matches (including 0)}
-        result: [integer!]
+        {Iterate a rule and count the number of times it matches}
+        return: "Number of matches (can be 0)"
+            [integer!]
         parser [action!]
+        <local> count pos
     ][
-        let f: make frame! :parser
-        let count: 0
+        count: 0
         cycle [
-            f/input: input
-            input: any [do copy f, stop]
+            ; !!! We discard the result, but should it be available, e.g.
+            ; via a multi-return?  Can PARSE rules have multi-returns?  If
+            ; so, then advanced would likely have to be done another way.  :-/
+            ;
+            if not [# @pos]: parser input [
+                set remainder input
+                return count
+            ]
             count: count + 1
+            input: pos
         ]
-        if result [  ; interesting degree of freedom to not require result?
-            set result count
-        ]
-        return input
     ]
 
     === MUTATING KEYWORDS ===
@@ -286,26 +288,31 @@ default-combinators: make map! reduce [
 
     'change combinator [
         {Substitute a match with new data}
+        return: "!!! TBD !!!"
+            [void!]
         parser [action!]
         replacer [action!]  ; !!! How to say result is used here?
+        <local> replacement
     ][
-        if not find (parameters of :replacer) '/result [
-            fail "CHANGE needs result-bearing combinator as second argument"
-        ]
-
-        if not let limit: parser input [  ; first look for end position
+        if not [# @(remainder)]: parser input [  ; first look for end position
             return null
         ]
 
-        if not let ['# replacement]: replacer input [  ; then get replacement
+        if not [replacement @(#)]: replacer input [  ; then get replacement
+            set remainder null
             return null
         ]
 
-        return change/part input replacement limit  ; CHANGE returns tail
+        ; CHANGE returns tail, use as new remainder
+        ;
+        set remainder change/part input replacement get remainder
+        return '~changed~
     ]
 
     'remove combinator [
         {Remove data that matches a parse rule}
+        return: "!!!TBD"
+            [void!]
         parser [action!]
     ][
         if not let limit: parser input [
@@ -316,6 +323,8 @@ default-combinators: make map! reduce [
 
     'insert combinator [
         {Unconditionally insert literal data into the input series}
+        return: "!!! TBD"
+            [void!]
         'data [any-value!]
     ][
         return insert input data
@@ -325,18 +334,18 @@ default-combinators: make map! reduce [
 
     'to combinator [
         {Match up TO a certain rule (result position before succeeding rule)}
-        result: [any-series!]
+        return: "The rule's product"
+            [<opt> any-value!]
         parser [action!]
+        <local> result
     ][
-        let start: input
         cycle [
-            if parser input [  ; could be `to end`, check TAIL? *after*
-                if result [
-                    set result copy/part start input
-                ]
-                return input
+            if [result @(#)]: parser input [
+                set remainder input  ; TO means do not include match range
+                return :result
             ]
-            if tail? input [
+            if tail? input [  ; could be `to end`, so check tail *after*
+                set remainder null
                 return null
             ]
             input: next input
@@ -345,66 +354,66 @@ default-combinators: make map! reduce [
 
     'thru combinator [
         {Match up THRU a certain rule (result position after succeeding rule)}
-        result: [any-series!]
+        return: "The rule's product"
+            [<opt> any-value!]
         parser [action!]
+        <local> result pos
     ][
-        let start: input
-        let pos
         cycle [
-            if pos: parser input [  ; could be `thru end`, check TAIL? *after*
-                if result [
-                    set result copy/part start pos
-                ]
-                return pos
+            if [result @pos]: parser input [
+                set remainder pos
+                return :result
             ]
-            if tail? input [
+            if tail? input [  ; could be `thru end`, check TAIL? *after*
                 return null
             ]
             input: next input
         ]
-        return null
     ]
 
     'here combinator [
-         result: [any-series!]
+        {Get the current parse input position, without advancing input}
+        return: "parse position"
+            [any-series!]
     ][
-        if result [  ; don't assume SET-WORD! on left (for generality)
-            set result input
-        ]
+        set remainder input
         return input
     ]
 
     'seek combinator [
-         'var [word! path! integer!]
+        return: "seeked position"
+            [any-series!]
+        'var [word! path! integer!]
     ][
         if integer? var [
-            return at head input var
+            return set remainder at head input var
         ]
         if not same? head input head get var [
             fail "SEEK in UPARSE must be in the same series"
         ]
-        return get var
+        return set remainder get var
     ]
 
     'between combinator [
-        result: [any-series!]
+        return: "Copy of content between the left and right parsers"
+            [<opt> any-series!]
         parser-left [action!]
         parser-right [action!]
+        <local> start
     ][
-        if not let start: parser-left input [return null]
+        if not [# start]: parser-left input [return null]
 
         let limit: start
         cycle [
-            if input: parser-right limit [  ; found it
-                if result [
-                    set result copy/part start limit
-                ]
-                return input
+            if [# @(remainder)]: parser-right limit [  ; found it
+                return copy/part start limit
             ]
-            if tail? limit [return null]
+            if tail? limit [  ; remainder is null
+                return null
+            ]
             limit: next limit
         ]
-        return null
+        ; ~unreachable~
     ]
 
     === VALUE-BEARING KEYWORDS ===
@@ -421,13 +430,15 @@ default-combinators: make map! reduce [
 
     'skip combinator [
         {Match one series item in input, succeeding so long as it's not at END}
-        result: [any-value!]
+        return: "One atom of series input"
+            [<opt> any-value!]
     ][
-        if tail? input [return null]
-        if result [
-            set result input.1
+        if tail? input [
+            set remainder null
+            return null
         ]
-        return next input
+        set remainder next input
+        return input.1
     ]
 
     ; Historically Rebol used COPY to mean "match across a span of rules and
@@ -442,16 +453,12 @@ default-combinators: make map! reduce [
 
     'across combinator [
         {Copy from the current parse position through a rule}
-        result: [any-series!]
+        return: "Copied series"
+            [<opt> any-series!]
         parser [action!]
     ][
-        if let pos: parser input [
-            if result [
-                set result copy/part input pos
-            ] else [  ; !!! is it necessary to fail here?
-                fail "ACROSS must be used with a SET-WORD! in UPARSE"
-            ]
-            return pos
+        if [# @(remainder)]: parser input [
+            return copy/part input get remainder
         ]
         return null
     ]
@@ -466,12 +473,12 @@ default-combinators: make map! reduce [
 
     'return combinator [
         {Return a value explicitly from the parse}
+        return: "Never actually returns"
+            [void!]
         parser [action!]
+        <local> result
     ][
-        if not find (parameters of :parser) '/result [
-            fail "RETURN needs result-bearing combinator"
-        ]
-        if not let ['input value]: parser input [
+        if not [result @(remainder)]: parser input [
             return null
         ]
 
@@ -479,7 +486,7 @@ default-combinators: make map! reduce [
         ; we UNWIND then we bypass any of its handling code, so it won't set
         ; the /PROGRESS etc.  Review.
         ;
-        unwind state value
+        unwind state :result
     ]
 
     === INTO KEYWORD ===
@@ -514,14 +521,13 @@ default-combinators: make map! reduce [
 
     'into combinator [
         {Perform a recursion into another datatype with a rule}
-        result: [<opt> any-value!]
+        return: "Result of the subparser"
+            [<opt> any-value!]
         parser [action!]  ; !!! Easier expression of value-bearing parser?
         subparser [action!]
+        <local> subseries result
     ][
-        if not find (parameters of :parser) '/result [
-            fail "INTO needs result-bearing combinator as first argument"
-        ]
-        if not let ['input subseries]: parser input [
+        if not [subseries @(remainder)]: parser input [
             ;
             ; If the parser in the first argument can't get a value to subparse
             ; then we don't process it.
@@ -539,15 +545,10 @@ default-combinators: make map! reduce [
         ; If the entirety of the item at the input array is matched by the
         ; supplied parser rule, then we advance past the item.
         ;
-        let f: make frame! :subparser
-        f/input: subseries
-        if result [
-            f/result: result
+        if tail? try [result @(#)]: subparser subseries [
+            return :result
         ]
-        let pos: do f
-        if pos = tail subseries [
-            return input
-        ]
+        set remainder null
         return null
     ]
 
@@ -564,7 +565,8 @@ default-combinators: make map! reduce [
     ; that want "rollback" is desired.
 
     'collect combinator [
-        result: [any-series!]
+        return: "Block of collected values"
+            [<opt> block!]
         parser [action!]
     ][
         if not state.collecting [
@@ -572,7 +574,7 @@ default-combinators: make map! reduce [
         ]
 
         let collect-base: tail state.collecting
-        if not input: parser input [
+        if not [# @(remainder)]: parser input [
             ;
             ; Although the block rules roll back, COLLECT might be used with
             ; other combinators that run more than one rule...and one rule
@@ -583,32 +585,25 @@ default-combinators: make map! reduce [
             clear collect-base
             return null
         ]
-        if result [
-            set result copy collect-base
-        ]
-        clear collect-base
-        return input
+        return (copy collect-base, elide clear collect-base)
     ]
 
     'keep combinator [
+        return: "The kept value (same as input)"
+            [<opt> any-value!]
         parser [action!]
+        <local> result
     ][
-        assert [state.collecting]
-
-        let f: make frame! :parser
-        if not in f 'result [
-            fail "Can't use KEEP with PARSER that doesn't have a RESULT:"
+        if not state.collecting [
+            fail "UPARSE cannot KEEP with no COLLECT rule in effect"
         ]
-        let temp
-        f.result: 'temp
-        f.input: input
-        if not let limit: do f [
+
+        if not [result @(remainder)]: parser input [
             return null
         ]
 
-        append state.collecting temp
-
-        return limit
+        append state.collecting :result
+        return :result
     ]
 
     === GATHER AND EMIT ===
@@ -616,17 +611,31 @@ default-combinators: make map! reduce [
     ; With gather, the idea is to do more of a "bubble-up" type of strategy
     ; for creating objects with labeled fields.  Also, the idea that PARSE
     ; itself would switch modes.
+    ;
+    ; !!! A particularly interesting concept that has come up is being able
+    ; to "USE" or "IMPORT" an OBJECT! so its fields are local (like a WITH).
+    ; This could combine with gather, e.g.
+    ;
+    ;     import parse [1 "hi"] [
+    ;         return gather [emit x: integer!, emit y: text!]
+    ;     ]
+    ;     print [x "is one and" y "is {hi}"]
+    ;
+    ; The idea is interesting enough that it suggests being able to EMIT with
+    ; no GATHER in effect, and then have the RETURN GATHER semantic.
 
     'gather combinator [
-        result: [any-series!]
+        return: "The gathered object"
+            [<opt> object!]
         parser [action!]
+        <local> obj
     ][
         let made-state: did if not state.gathering [
             state.gathering: make block! 10
         ]
 
         let gather-base: tail state.gathering
-        if not input: parser input [
+        if not [# @(remainder)]: parser input [
             ;
             ; Although the block rules roll back, GATHER might be used with
             ; other combinators that run more than one rule...and one rule
@@ -640,20 +649,21 @@ default-combinators: make map! reduce [
             ]
             return null
         ]
-        if result [
-            set result make object! gather-base
-        ]
+        obj: make object! gather-base
         either made-state [
             state.gathering: null  ; eliminate entirely
         ][
             clear gather-base  ; clear only from the marked position
         ]
-        return input
+        return obj
     ]
 
     'emit combinator [
+        return: "The emitted value"
+            [<opt> any-value!]
         'target [set-word!]
         parser [action!]
+        <local> result
     ][
         ; !!! Experiment to allow a top-level accrual, to make EMIT more
         ; efficient by becoming the result of the PARSE.
@@ -662,44 +672,37 @@ default-combinators: make map! reduce [
             state.gathering: make block! 10
         ]
 
-        let f: make frame! :parser
-        if not in f 'result [
-            fail "Can't use EMIT with PARSER that doesn't have a RESULT:"
-        ]
-        let temp
-        f.result: 'temp
-        f.input: input
-        if not let limit: do f [
+        if not [result @(remainder)]: parser input [
             return null
         ]
         append state.gathering target
-        append state.gathering quote temp
-        return limit
+        append state.gathering quote :result
+        return :result
     ]
 
     === SET-WORD! COMBINATOR ===
 
-    ; The concept behind Ren-C's SET-WORD! in PARSE is that some parse
-    ; combinators are able to yield a result in addition to updating the
-    ; position of the parse input.  If these appear to the right of a
-    ; set-word, then the set word will be assigned on a match.
+    ; The concept behind Ren-C's SET-WORD! in PARSE is that parse combinators
+    ; don't just update the remainder of the parse input, but they also return
+    ; values.  If these appear to the right of a set-word, then the set word
+    ; will be assigned on a match.
 
     set-word! combinator [
+        return: "The set value"
+            [<opt> any-value!]
         value [set-word!]
         parser [action!]
+        <local> result
     ][
-        if not find (parameters of :parser) '/result [
-            fail "SET-WORD! in UPARSE needs result-bearing combinator"
-        ]
-        if not let ['input temp]: parser input [
+        if not [result @(remainder)]: parser input [
             ;
             ; A failed rule leaves the set target word at whatever value it
             ; was before the set.
             ;
-            return null
+            return null  ; remainder is already null
         ]
-        set value temp  ; success means change variable
-        return input
+        set value :result  ; value is the SET-WORD!
+        return :result
     ]
 
     === TEXT! COMBINATOR ===
@@ -713,18 +716,18 @@ default-combinators: make map! reduce [
     ; data in the block case.
 
     text! combinator [
-        result: [text!]
+        return: "The rule series matched against (not input value)"
+            [<opt> text!]
         value [text!]
     ][
         case [
             any-array? input [
                 if input.1 <> value [
+                    set remainder null
                     return null
                 ]
-                if result [  ; in this case, we want the array's value
-                    set result input.1
-                ]
-                return next input
+                set remainder next input
+                return input.1
             ]
 
             ; for both of these cases, we have to use the rule, since there's
@@ -732,21 +735,21 @@ default-combinators: make map! reduce [
 
             any-string? input [
                 if not input: find/match/(if state.case 'case) input value [
+                    set remainder null
                     return null
                 ]
             ]
             true [
                 assert [binary? input]
                 if not input: find/match input as binary! value [
+                    set remainder null
                     return null
                 ]
             ]
         ]
 
-        if result [
-            set result value
-        ]
-        return input
+        set remainder input
+        return value
     ]
 
     === TOKEN! COMBINATOR (currently ISSUE! and CHAR!) ===
@@ -757,19 +760,31 @@ default-combinators: make map! reduce [
     ; strings.  It matches case-sensitively.
 
     issue! combinator [
+        return: "The token matched against (not input value)"
+            [<opt> issue!]
         value [issue!]
     ][
         case [
             any-array? input [
-                if input.1 = value [return next input]
+                if input.1 = value [
+                    set remainder next input
+                    return input.1
+                ]
+                set remainder null
                 return null
             ]
             any-string? input [
-                return find/match input value
+                if set remainder find/match input value [
+                    return value
+                ]
+                return null
             ]
             true [
                 assert [binary? input]
-                return find/match input as binary! value
+                if set remainder find/match input as binary! value [
+                    return value
+                ]
+                return null
             ]
         ]
     ]
@@ -782,11 +797,17 @@ default-combinators: make map! reduce [
     ; then not be able to set a string position.  So we don't do that.
 
     binary! combinator [
-        value [issue!]
+        return: "The binary matched against (not input value)"
+            [<opt> binary!]
+        value [binary!]
     ][
         case [
             any-array? input [
-                if input.1 = value [return next input]
+                if input.1 = value [
+                    set remainder next input
+                    return input.1
+                ]
+                set remainder null
                 return null
             ]
             any-string? input [
@@ -794,7 +815,10 @@ default-combinators: make map! reduce [
             ]
             true [
                 assert [binary? input]
-                return find/match input value
+                if set remainder find/match input value [
+                    return value
+                ]
+                return null
             ]
         ]
     ]
@@ -806,20 +830,17 @@ default-combinators: make map! reduce [
     ; this would be disruptive in terms of a value-bearing BLOCK! rule.
 
     group! combinator [
-        result: [<opt> any-value!]
+        return: "Result of evaluating the group"
+            [<opt> any-value!]
         value [group!]
     ][
-        if result [
-            set result do value
-        ]
-        else [
-            do value
-        ]
-        return input  ; just give back same input passed in
+        set remainder input
+        return do value
     ]
 
     get-block! combinator [
-        result: [<opt> any-value!]
+        return: "Undefined at this time"
+            [<opt> any-value!]
         value [get-block!]
     ][
         fail "No current meaning for GET-BLOCK! combinator"
@@ -833,6 +854,8 @@ default-combinators: make map! reduce [
     ; viewed, e.g. being able to do INTO BINARY! on a TEXT! (?)
 
     bitset! combinator [
+        return: "The matched input value"
+            [<opt> char!]
         value [bitset!]
     ][
         case [
@@ -862,15 +885,15 @@ default-combinators: make map! reduce [
     ; ANY-ARRAY! type, just to see if type checking can work.
 
     quoted! combinator [
-        result: [any-value!]
+        return: "The matched value"
+            [<opt> any-value!]
         value [quoted!]
     ][
         if :input.1 = unquote value [
-            if result [
-                set result input.1
-            ]
-            return next input
+            set remainder next input
+            return unquote value
         ]
+        set remainder null
         return null
     ]
 
@@ -882,11 +905,15 @@ default-combinators: make map! reduce [
     ; need for the IF construct.
 
     logic! combinator [
-         value [logic!]
+        return: "True if success, null if failure"
+            [<opt> logic!]
+        value [logic!]
     ][
         if value [
-            return input
+            set remainder input
+            return true
         ]
+        set remainder null
         return null
     ]
 
@@ -897,15 +924,20 @@ default-combinators: make map! reduce [
     ; parameters.  For now we just go for a plain repeat count.
 
     integer! combinator [
-         value [integer!]
-         parser [action!]
+        return: "Last parser result"
+            [<opt> any-value!]
+        value [integer!]
+        parser [action!]
+        <local> result
     ][
         loop value [
-            if not input: parser input [
+            if not [result @input]: parser input [
+                set remainder null
                 return null
             ]
         ]
-        return input
+        set remainder input
+        return :result
     ]
 
     === DATATYPE! COMBINATOR ===
@@ -929,56 +961,48 @@ default-combinators: make map! reduce [
     ; then you can filter the result of that.
 
     datatype! combinator [
-         result: [any-value!]
-         value [datatype!]
+        return: "Matched or synthesized value"
+            [<opt> any-value!]
+        value [datatype!]
+        <local> item error
     ][
         either any-array? input [
             if value <> type of input.1 [
+                set remainder null
                 return null
             ]
-            if result [
-                set result input.1
-            ]
-            return next input
+            set remainder next input
+            return input.1
         ][
-            let [item 'input error]: transcode input
-            if error [
+            [item @(remainder) error]: transcode input
+            any [error, value != type of :item] then [
+                set remainder null
                 return null
             ]
-            if value != type of item [
-                return null
-            ]
-            if result [
-                set result item
-            ]
-            return input
+            return :item
         ]
     ]
 
     typeset! combinator [
-         result: [any-value!]
-         value [typeset!]
+        return: "Matched or synthesized value"
+            [any-value!]
+        value [typeset!]
+        <local> item error
     ][
         either any-array? input [
             if not find value (type of input.1) [
+                set remainder null
                 return null
             ]
-            if result [
-                set result input.1
-            ]
-            return next input
+            set remainder next input
+            return input.1
         ][
-            let [item 'input error]: transcode input
-            if error [
+            [item @(remainder) error]: transcode input
+            any [error, not find value (type of :item)] then [
+                set remainder null
                 return null
             ]
-            if not find value (type of item) [
-                return null
-            ]
-            if result [
-                set result item
-            ]
-            return input
+            return :item
         ]
     ]
 
@@ -997,57 +1021,57 @@ default-combinators: make map! reduce [
     ; !!! What should be done in the case of NULL?
 
     sym-word! combinator [
-        result: [any-value!]
+        return: "Exact match"
+            [<opt> any-value!]
         value [sym-word!]
     ][
         if :input.1 = get value [
-            if result [
-                set result input.1
-            ]
-            return next input
+            set remainder next input
+            return :input.1
         ]
+        set remainder null
         return null
     ]
 
     sym-tuple! combinator [
-        result: [any-value!]
+        return: "Exact match"
+            [<opt> any-value!]
         value [sym-tuple!]
     ][
         if :input.1 = get value [
-            if result [
-                set result input.1
-            ]
-            return next input
+            set remainder next input
+            return :input.1
         ]
+        set remainder null
         return null
     ]
 
     sym-group! combinator [
-        result: [any-value!]
+        return: "Exact match"
+            [<opt> any-value!]
         value [sym-group!]
     ][
         if :input.1 = do value [
-            if result [
-                set result input.1
-            ]
-            return next input
+            set remainder next input
+            return :input.1
         ]
+        set remainder null
         return null
     ]
 
     sym-block! combinator [
         {Make a BLOCK! rule value-bearing as if it were an ACROSS rule}
-        result: [any-value!]
+        return: "Exact match"
+            [<opt> any-value!]
         value [sym-block!]
+        <local> result parser
     ][
-        if not result [
-            fail "SYM-XXX rules can only be used in value-bearing contexts"
-        ]
         ; Run the combinator for BLOCK!, and then we will see how far it got.
         ;
-        if let pos: (state.combinators)/(block!) state input (as block! value) [
-            set result copy/part input pos
-            return pos
+        value: as block! value
+        parser: :(state.combinators)/(block!)
+        if [result @(remainder)]: parser state input value [
+            return copy/part input get remainder
         ]
         return null
     ]
@@ -1064,16 +1088,21 @@ default-combinators: make map! reduce [
 
     'elide combinator [
         {Transform a result-bearing combinator into one that has no result}
+        return: "Should be invisible (handling TBD)"
+            [<invisible>]
         parser [action!]
     ][
-        return parser input
+        [# @(remainder)]: parser input
+        return @()
     ]
 
     'comment combinator [
         {Comment out an arbitrary amount of PARSE material}
+        return: "Should be invisible (handling TBD)"
+            [<invisible>]
         'ignored [block! text! tag! issue!]
     ][
-        return input
+        return @()
     ]
 
     === BLOCK! COMBINATOR ===
@@ -1093,8 +1122,10 @@ default-combinators: make map! reduce [
     ; step that could short circuit before the others were needed.)
 
     block! combinator [
-        result: [<opt> any-value!]
+        return: "Last result value"
+            [<opt> any-value!]
         value [block!]
+        <local> result
     ][
         let rules: value
         let pos: input
@@ -1109,9 +1140,7 @@ default-combinators: make map! reduce [
         ; say  `x: [to "a"]` and don't get an ornery result or an error.  We
         ; may need to track an independent "no result" state (?)
         ;
-        if result [
-            set result null
-        ]
+        result: null
         while [not tail? rules] [
             if state.verbose [
                 print ["RULE:" mold/limit rules 60]
@@ -1130,7 +1159,10 @@ default-combinators: make map! reduce [
                 ; with input "cde" then [| "ab"] will consider itself to be a
                 ; match before any input is consumed, e.g. before the "c".
                 ;
-                return pos
+                ; !!! Would BREAK be better to match code with reaching end?
+                ;
+                set remainder pos
+                return :result
             ]
 
             ; Do one "Parse Step".  This involves turning whatever is at the
@@ -1138,15 +1170,14 @@ default-combinators: make map! reduce [
             ;
             let [action 'rules]: parsify state rules
             let f: make frame! :action
-            if in f 'result [  ; non-result bearing cases ignored
-                f.result: result
-            ]
             f.input: pos
+            f.remainder: 'pos
 
-            if not pos: do f [
-                if result [  ; forget last result; go back to no-result state
-                    set result null
-                ]
+            result: do f
+
+            if not pos [
+                result: null  ; forget last result; go back to no-result state
+
                 if state.collecting [  ; toss collected values from this pass
                     if collect-baseline [  ; we marked how far along we were
                         clear collect-baseline
@@ -1175,6 +1206,7 @@ default-combinators: make map! reduce [
                         if r = '| [throw input]  ; reset POS
                     ]
                 ] else [
+                    set remainder null
                     return null
                 ]
             ]
@@ -1183,7 +1215,8 @@ default-combinators: make map! reduce [
         ; Deliver errors on block combinator returning no results, e.g.
         ; x: [to "a"] ?
         ;
-        return pos
+        set remainder pos
+        return :result
     ]
 ]
 
@@ -1240,8 +1273,9 @@ combinatorize: func [
                 ; All combinators should have an input.  But the
                 ; idea is that we leave this unspecialized.
             ]
-            param = '/result [
-                ; Actually a return value.  These are still being figured out.
+            param = '/remainder [
+                ; The remainder is a return; responsibility of the caller, also
+                ; left unspecialized.
             ]
             param = 'value [
                 f.value: value
@@ -1274,8 +1308,11 @@ combinatorize: func [
 
 identity-combinator: combinator [
     {Combinator used by NULL, e.g. with :(if false [...]) rule patterns}
+    return: "Returns NULL (is this right?)"
+        [<opt>]
 ][
-    return input
+    set remainder input
+    return null
 ]
 
 
@@ -1393,7 +1430,9 @@ uparse: func [
     f.state: state
     f.input: series
     f.value: rules
-    let pos: do f
+    f.remainder: let pos
+
+    do f  ; the result is ignored by PARSE (should it be another return value?)
 
     ; If there were EMIT things gathered, but no actual GATHER then just
     ; assume those should become locals in the stream of execution as LET
@@ -1442,7 +1481,9 @@ append redbol-combinators reduce [
     ; These compatibility versions are not value-bearing.
 
     'any combinator [
-        {Any number of matches (including 0)}
+        {(REDBOL) Any number of matches (including 0), stop if no progress}
+        return: "Redbol rules don't return results"
+            [void!]
         parser [action!]
     ][
         let pos
@@ -1458,7 +1499,9 @@ append redbol-combinators reduce [
     ]
 
     'some combinator [
-        {Must run at least one match}
+        {(REDBOL) Must run at least one match, stop if no progress}
+        return: "Redbol rules don't return results"
+            [void!]
         parser [action!]
     ][
         let pos
@@ -1497,7 +1540,9 @@ append redbol-combinators reduce [
     ; rethought.
 
     'copy combinator [
-        {(Old style) Copy input series elements into a SET-WORD! or WORD!}
+        {(REDBOL) Copy input series elements into a SET-WORD! or WORD!}
+        return: "Redbol rules don't return results"
+            [void!]
         'target [word! set-word!]
         parser [action!]
     ][
@@ -1509,7 +1554,9 @@ append redbol-combinators reduce [
     ]
 
     'set combinator [
-        {(Old style) Take single input element into a SET-WORD! or WORD!}
+        {(REDBOL) Take single input element into a SET-WORD! or WORD!}
+        return: "Redbol rules don't return results"
+            [void!]
         'target [word! set-word!]
         parser [action!]
     ][
@@ -1535,6 +1582,8 @@ append redbol-combinators reduce [
     ; into the variable or restoring it.
 
     set-word! combinator [
+        return: "Redbol rules don't return results"
+            [void!]
         value [set-word!]
     ][
         set value input
@@ -1542,6 +1591,8 @@ append redbol-combinators reduce [
     ]
 
     get-word! combinator [
+        return: "Redbol rules don't return results"
+            [void!]
         value [get-word!]
     ][
         ; Restriction: seeks must be within the same series.
@@ -1554,9 +1605,16 @@ append redbol-combinators reduce [
 
     === OLD-STYLE INTO BEHAVIOR ===
 
+    ; New INTO is arity-2
+    ;
+    ; https://forum.rebol.info/t/new-more-powerful-arity-2-into-in-uparse/1555
+
     'into combinator [
-        {Perform a recursion with a rule}
+        {(REDBOL) Arity-1 Form of Recursion with a rule}
+        return: "Redbol rules don't return results"
+            [void!]
         subparser [action!]
+        <local> pos result
     ][
         if tail? input [
             fail "At END cannot use INTO"
@@ -1568,10 +1626,12 @@ append redbol-combinators reduce [
         ; If the entirety of the item at the input array is matched by the
         ; supplied parser rule, then we advance past the item.
         ;
-        let pos: subparser subseries
-        if pos = tail subseries [
-            return next input
+
+        if tail? [result @pos]: subparser subseries [
+            set remainder next input
+            return :result
         ]
+        set remainder null
         return null
     ]
 
@@ -1579,6 +1639,8 @@ append redbol-combinators reduce [
 
     'break combinator [
         {Stop an iterating rule but succeed}
+        return: "Redbol rules don't return results"
+            [void!]
     ][
         fail "BREAK"
     ]
@@ -1602,6 +1664,9 @@ append redbol-combinators reduce [
     ; whether parsing continues or not.
 
     'fail combinator [
+        {(REDBOL) Interrupt matching with failure}
+        return: "Redbol rules don't return results"
+            [void!]
     ][
         return null
     ]
