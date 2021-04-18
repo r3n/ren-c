@@ -179,8 +179,8 @@ void Value_To_Int64(REBVAL *out, const REBVAL *value, bool no_sign)
             return;
         }
         REBVAL *sign = (*bp >= 0x80)
-            ? rebValue("''+/-")
-            : rebValue("''+");
+            ? rebValue("'+/-")
+            : rebValue("'+");
 
         REBVAL *result = rebValue("debin [be", rebR(sign), "]", value);
 

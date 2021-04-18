@@ -427,7 +427,7 @@
 ; word! vs. get-word! symmetry
 (equal? equal? 'a first [:a] equal? first [:a] 'a)
 ; {word! vs. lit-word!
-(equal? 'a first ['a])
+(equal? just 'a first ['a])
 ; word! vs. lit-word! symmetry
 (equal? equal? 'a first ['a] equal? first ['a] 'a)
 ; word! vs. refinement! (changed in Ren-C)
@@ -442,7 +442,7 @@
 ; get-word! reflexivity
 (equal? first [:a] first [:a])
 ; get-word! vs. lit-word!
-(equal? first [:a] first ['a])
+(not equal? first [:a] first ['a])
 ; get-word! vs. lit-word! symmetry
 (equal? equal? first [:a] first ['a] equal? first ['a] first [:a])
 ; get-word! vs. refinement!
@@ -460,7 +460,7 @@
 ; lit-word! vs. refinement! symmetry
 (equal? equal? first ['a] /a equal? /a first ['a])
 ; lit-word! vs. set-word!
-(equal? first ['a] first [a:])
+(not equal? first ['a] first [a:])
 ; lit-word! vs. set-word! symmetry
 (equal? equal? first ['a] first [a:] equal? first [a:] first ['a])
 ; refinement! reflexivity

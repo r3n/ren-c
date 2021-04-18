@@ -1194,6 +1194,22 @@ bind?: emulate [denuller specialize :of [property: 'binding]]
 bound?: emulate [denuller specialize :of [property: 'binding]]
 
 
+; Non-strict equality does not consider quoting in historical Redbol.  This
+; is changed in Ren-C:
+;
+; https://forum.rebol.info/t/1133/7
+
+dequoter: helper [
+    func [f] [adapt :f [value1: my dequote, value2: my dequote]]
+]
+
+equal?: emulate [dequoter :equal?]
+not-equal?: emulate [dequoter :not-equal?]
+=: emulate [enfixed dequoter :=]
+<>: emulate [enfixed dequoter :<>]
+!=: emulate [enfixed dequoter :!=]
+
+
 ; https://forum.rebol.info/t/justifiable-asymmetry-to-on-block/751
 ;
 oldsplicer: helper [
