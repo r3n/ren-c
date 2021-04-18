@@ -1670,9 +1670,9 @@ REBNATIVE(subparse)
 
                 rule = Get_Parse_Value(P_SAVE, P_RULE, P_RULE_SPECIFIER);
 
-                if (IS_SYM_GROUP(rule)) {
+                if (IS_GROUP(rule)) {
                     //
-                    // !!! SYM-GROUP! means ordinary evaluation of material
+                    // !!! GROUP! means ordinary evaluation of material
                     // that is not matched as a PARSE rule; this is an idea
                     // which is generalized in UPARSE
                     //

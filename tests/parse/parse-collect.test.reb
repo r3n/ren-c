@@ -87,7 +87,7 @@
     [# pos]: parse [1 2 3] [
         x: collect [
             keep integer!
-            keep @(second [A [<pick> <me>] B])
+            keep (second [A [<pick> <me>] B])
             keep integer!
         ]
     ]
