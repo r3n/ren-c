@@ -403,15 +403,29 @@ default-combinators: make map! reduce [
     'seek combinator [
         return: "seeked position"
             [any-series!]
-        'var [word! path! integer!]
+        parser [action!]
+        <local> where
     ][
-        if integer? var [
-            return quote set remainder at head input var  ; "core" return
+        if not [where (remainder)]: parser input [
+            return null
         ]
-        if not same? head input head get var [
-            fail "SEEK in UPARSE must be in the same series"
+        if where = [] [
+            fail "Cannot SEEK to invisible parse rule result"
         ]
-        return quote set remainder get var  ; "core" return protocol
+        where: my unquote
+        case [
+            integer? where [
+                set remainder at head input where
+            ]
+            any-series? :where [
+                if not same? head input head where [
+                    fail "Series SEEK in UPARSE must be in the same series"
+                ]
+                set remainder where
+            ]
+            fail "SEEK requires INTEGER! or series position"
+        ]
+        return quote get remainder  ; "core" return protocol
     ]
 
     'between combinator [
