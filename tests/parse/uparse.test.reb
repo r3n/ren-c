@@ -186,14 +186,14 @@
         pos = "bbb"
     ]
 )(
-     did all [
-         uparse "<<<stuff>>>" [
-             left: across some "<"
-             (n: length of left)
-             x: between here n ">"
-         ]
-         x = "stuff"
-     ]
+    did all [
+        uparse "<<<stuff>>>" [
+            left: across some "<"
+            (n: length of left)
+            x: between here n ">"
+        ]
+        x = "stuff"
+    ]
 )]
 
 
@@ -352,7 +352,6 @@
 
 ; CHANGE is rethought in UPARSE to work with value-bearing rules.  The rule
 ; gets the same input that the first argument did.
-;
 [(
     str: "aaa"
     did all [
@@ -545,11 +544,7 @@
 ]
 
 
-; A BLOCK! rule is allowed to return NULL, but this is a bit confusing since
-; invisible rules return NULL too...so initializing to null may not be the
-; best.  Reconsider void! behaviors, e.g. should `x: []` give back a void...
-; or maybe even error forcing you to say `x.: []` or some other override if
-; you really meant to take the void?
+; A BLOCK! rule is allowed to return NULL, distinct from failure
 [
     (
         x: <before>
@@ -562,7 +557,7 @@
     (
         x: <before>
         did all [
-            uparse [1] [integer! x: [elide end]]
+            uparse [1] [integer! x: [(null)]]
             x = null
         ]
     )
@@ -643,3 +638,50 @@
     obj: make object! [x: [some rule]]
     data = uparse data [some @obj.x]
 )]
+
+
+; Invisibles are another aspect of UPARSE...where you can have a rule match
+; but not contribute its synthesized value to the result.
+[
+    ("a" = uparse "aaab" [return [some "a" elide "b"]])
+
+    (
+        j: null
+        did all [
+            1020 = uparse "b" [return [(1000 + 20) elide (j: 304)]]
+            j = 304
+        ]
+    )
+
+    ("a" = uparse "a" ["a" (comment "GROUP! content can vaporize too!")])
+
+    ; ELIDE doesn't elide failure...just the result on success.
+    ;
+    (null = uparse "a" [elide "b"])
+]
+
+
+; UPARSE2 should have a more comprehensive test as part of Redbol, but until
+; that is done here are just a few basics to mae sure it's working at all.
+[
+    ("aaa" = uparse2 "aaa" [some "a"])
+    ("aaa" = uparse2 "aaa" [any "a"])
+    (["aaa"] = uparse2 ["aaa"] [into any "a"])
+    ("aaabbb" = uparse2 "aaabbb" [
+        pos: some "a" some "b" :pos some "a" some "b"
+    ])
+    (
+        x: null
+        did all [
+            uparse2 "aaabbbccc" [to "b" copy x to "c" some "c"]
+            x = "bbb"
+        ]
+    )
+    (
+        x: null
+        did all [
+            uparse2 "aaabbbccc" [to "b" set x some "b" thru end]
+            x = #"b"
+        ]
+    )
+]
