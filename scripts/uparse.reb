@@ -895,7 +895,7 @@ default-combinators: make map! reduce [
         if same? unique-identity result: (unique-identity, do value) [
             return []
         ]
-        return quote :result
+        return quote get/any 'result
     ]
 
     get-block! combinator [
@@ -991,6 +991,7 @@ default-combinators: make map! reduce [
         parser [action!]
         <local> result
     ][
+        result: quote null  ; !!! should `0 skip` resolve to ' like this?
         loop value [
             if not [result input]: parser input [
                 return null

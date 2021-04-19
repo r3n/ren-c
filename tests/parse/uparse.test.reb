@@ -514,6 +514,17 @@
 )]
 
 
+; INTEGER! has some open questions regarding how it is not very visible when
+; used as a rule...that maybe it should need a keyword.  Ranges are not worked
+; out in terms of how to make [2 4 rule] range between 2 and 4 occurrences,
+; as that breaks the combinator pattern at this time.
+[
+    ("" = uparse "" [0 skip])
+    ("a" = uparse "a" [1 "a"])
+    ("aa" = uparse "aa" [2 "a"])
+]
+
+
 ; TO and THRU would be too costly to be implicitly value bearing by making
 ; copies; you need to use ACROSS.
 [(
