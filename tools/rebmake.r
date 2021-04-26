@@ -1575,6 +1575,11 @@ Execution: make generator-class [
                             replace cmd "gcc -c " "gcc -c `mysql_config --cflags` "
                             replace cmd "objs/main.o" "objs/main.o `mysql_config --libs` "
                         ]
+                        ; viewgtk3 modification
+                        if not null? find cmd "viewgtk3" [;print ["Command viewgtk3 gevonden:" cmd]
+                            replace cmd "gcc -c " "gcc -c `pkg-config --cflags gtk+-3.0` "
+                            replace cmd "objs/main.o" "objs/main.o `pkg-config --libs gtk+-3.0` "
+                        ]
                         cmd: reify cmd
                         print ["Running:" cmd]
                         call/shell cmd
