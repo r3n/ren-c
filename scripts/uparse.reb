@@ -1780,3 +1780,11 @@ redbol-combinators.('keep): null
 uparse2: specialize :uparse [
     combinators: redbol-combinators
 ]
+
+
+; !!! This operation will likely take over the name USE.  It is put here since
+; the UPARSE tests involve it.
+;
+using: func [obj [<blank> object!]] [
+    add-use-object (binding of 'return) obj
+]

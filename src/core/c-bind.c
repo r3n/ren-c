@@ -527,7 +527,7 @@ REBNATIVE(let)
 REBNATIVE(add_let_binding) {
     INCLUDE_PARAMS_OF_ADD_LET_BINDING;
 
-    REBFRM *f = CTX_FRAME_IF_ON_STACK(VAL_CONTEXT(ARG(frame)));
+    REBFRM *f = CTX_FRAME_MAY_FAIL(VAL_CONTEXT(ARG(frame)));
 
     if (f_specifier)
         SET_SERIES_FLAG(f_specifier, MANAGED);
@@ -542,6 +542,38 @@ REBNATIVE(add_let_binding) {
     INIT_VAL_WORD_PRIMARY_INDEX(D_OUT, 1);
 
     return D_OUT;
+}
+
+
+//
+//  add-use-object: native [
+//
+//  {Experimental function for adding an object's worth of binding to a frame}
+//
+//      return: [void!]
+//      frame [frame!]
+//      object [object!]
+//  ]
+//
+REBNATIVE(add_use_object) {
+    INCLUDE_PARAMS_OF_ADD_USE_OBJECT;
+
+    REBFRM *f = CTX_FRAME_MAY_FAIL(VAL_CONTEXT(ARG(frame)));
+
+    REBCTX *ctx = VAL_CONTEXT(ARG(object));
+
+    if (f_specifier)
+        SET_SERIES_FLAG(f_specifier, MANAGED);
+    REBSPC *patch = Make_Or_Reuse_Patch(  // optimizes out CTX_LEN() == 0
+        ctx,
+        CTX_LEN(ctx),
+        f_specifier,
+        REB_WORD
+    );
+
+    mutable_BINDING(FEED_SINGLE(f->feed)) = patch;
+
+    return Init_Void(D_OUT, REB_VOID);
 }
 
 
