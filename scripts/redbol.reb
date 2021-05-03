@@ -699,7 +699,7 @@ parse: emulate [
             blank! [split input charset reduce [tab space CR LF]]
             text! [split input to-bitset rules]
         ] else [
-            did uparse2/(case_PARSE) input rules
+            uparse2/(case_PARSE) input rules
         ]
     ]
 ]

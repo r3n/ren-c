@@ -92,7 +92,7 @@ combinator: func [
             ;
             let state: f.state
             let remainder: f.remainder
-            do f
+            do f else [return null]
             elide all [
                 state.furthest
                 (index? remainder: get remainder) > (index? get state.furthest)
@@ -224,7 +224,7 @@ default-combinators: make map! reduce [
         parser [action!]
         <local> last-result result pos
     ][
-        last-result: null
+        last-result: just '  ; "core return protocol", null is not failing
         cycle [
             if not [result pos]: parser input [
                 set remainder input  ; overall WHILE never fails (but REJECT?)
@@ -496,36 +496,6 @@ default-combinators: make map! reduce [
             return quote copy/part input get remainder  ; "core" protocol
         ]
         return null
-    ]
-
-    === RETURN KEYWORD ===
-
-    ; RETURN was removed for a time in Ren-C due to concerns about how it
-    ; "contaminated" the interface...when the goal was to make PARSE return
-    ; progress in a series.  But it is reintroduced here:
-    ;
-    ;https://forum.rebol.info/t/1561
-
-    'return combinator [
-        {Return a value explicitly from the parse}
-        return: "Never actually returns"
-            [<opt> void!]
-        parser [action!]
-        <local> result
-    ][
-        if not [result (remainder)]: parser input [
-            return null
-        ]
-
-        if result = [] [
-            fail "Cannot return invisible synthesized result"
-        ]
-
-        ; !!! STATE is filled in as the frame of the top-level UPARSE call.  If
-        ; we UNWIND then we bypass any of its handling code, so it won't set
-        ; the /PROGRESS etc.  Review.
-        ;
-        unwind state unquote result
     ]
 
     === INTO KEYWORD ===
@@ -1478,18 +1448,36 @@ parsify: func [
 ]
 
 
-uparse: func [
-    return: "Input or explicit RETURN if parse succeeded, NULL otherwise"
+=== ENTRY POINTS: UPARSE*, UPARSE, MATCH-UPARSE, and UPARSE? ===
+
+; The historical Redbol PARSE was focused on returning a LOGIC! so that you
+; could write `if parse data rules [...]` and easily react to finding out if
+; the rules matched the input to completion.
+;
+; While this bias stuck with UPARSE in the beginning, the deeper power of
+; returning the evaluated result made it hugely desirable as the main form
+; that owns the word "PARSE".  A version that does not check to completion
+; is fundamentally the most powerful, since it can just make HERE the last
+; result...and then check that the result is at the tail.  Other variables
+; can be set as well.
+;
+; So this formulates everything on top of a UPARSE* that returns the sythesized
+; result
+
+uparse*: func [
+    {Process as much of the input as parse rules consume (see also UPARSE)}
+
+    return: "Synthesized value from last match rule, or NULL if rules failed"
         [<opt> any-value!]
-    progress: "Partial progress if requested"
-        [<opt> any-series!]
     furthest: "Furthest input point reached by the parse"
         [any-series!]
 
     series "Input series"
         [any-series!]
-    rules "Block of parse rules"
+    @rules "Block of parse rules"
         [block!]
+    /verbatim "If last match rule synthesizes NULL, don't return NULL-2"
+
     /combinators "List of keyword and datatype handlers used for this parse"
         [map!]
     /case "Do case-sensitive matching"
@@ -1521,33 +1509,71 @@ uparse: func [
     f.value: rules
     f.remainder: let pos
 
-    do f  ; the result is ignored by PARSE (should it be another return value?)
-
-    ; If there were EMIT things gathered, but no actual GATHER then just
-    ; assume those should become locals in the stream of execution as LET
-    ; bindings.  Because we want you to be able to emit NULL, the values
-    ; are actually quoted...so we unquote them here.
-    ;
-    all [pos, gathering] then [
-        for-each [name q-value] gathering [
-            add-let-binding (binding of 'return) name (unquote q-value)
-        ]
+    let synthesized: do f
+    if synthesized = [] [  ; !!! Should UPARSE support invisible return?
+        synthesized: just '  ; treat it like a match
     ]
-
-    ; If /PROGRESS was requested as an output, then they don't care whether
-    ; the tail was reached or not.  Main return is the input unless there
-    ; was an actual failure.
-    ;
-    if progress [
-        set progress pos
-        return if pos [series]
-    ]
-
-    ; Note: SERIES may change during the process of the PARSE.  This means
-    ; we don't want to precalculate TAIL SERIES, since the tail may change.
-    ;
-    return if pos = tail series [series]
+    return/(if not verbatim 'vanishable) unquote/isotope synthesized
 ]
+
+uparse: comment [redescribe [  ; redescribe not working at te moment (?)
+    {Process input in the parse dialect, must match to end (see also UPARSE*)}
+] ] (
+    enclose augment :uparse* [
+        /no-auto-gather "Don't implicitly GATHER any un-GATHERed EMITs"
+    ] func [f [frame!]] [
+        ; Leveraging the core capabilities of UPARSE*, we capture the product
+        ; of the passed-in rules, while making the ultimate product of the
+        ; compound rule how far the parse managed to get if it succeeds.
+        ;
+        let gathered: null
+        let synthesized
+        f.rules: compose [
+            ((if not f.no-auto-gather '[
+                gathered: gather synthesized:
+            ])) (f.rules)
+            ((if not f.no-auto-gather '(:synthesized)))
+            elide end  ; we want the rule product
+        ]
+
+        let verbatim: f.verbatim  ; can't access after `do f`
+
+        if not let result: quote/isotope do f [
+            return null  ; if f.rules failed to match, or end not reached
+        ]
+
+        ; !!! This is an experimental feature UPARSE adds on top of UPARSE*
+        ; where if there were EMIT-ed things with no gather that we notice,
+        ; they are returned as an object, making it possible to USE them
+        ; more easily (currently USING).  The macro mechanism (core return)
+        ; which would let us inject the [using obj, synthesized] in the
+        ; code stream isn't ready, and it inhibits abstraction...but we
+        ; might still think it's worth it for UPARSE and people could use
+        ; UPARSE* if they had trouble with it.
+        ;
+        for-each key try gathered [
+            return gathered  ; return the object if not empty
+        ]
+        return @(unquote/isotope result)  ; verbatim was decided by UPARSE*
+    ]
+)
+
+match-uparse: comment [redescribe [  ; redescribe not working at te moment (?)
+    {Process input in the parse dialect, input if match (see also UPARSE*)}
+] ] (
+    enclose :uparse* func [f [frame!]] [
+        ;
+        ; Synthesized result will be NULL if no match, or series end if match
+        ;
+        f.rules: compose [(f.rules) end]
+
+        let input: f.series  ; DO FRAME! invalidates args; cache for returning
+
+        return do f then [input]
+    ]
+)
+
+uparse?: chain [:match-uparse | :did]
 
 
 === REBOL2/R3-ALPHA/RED COMPATIBILITY ===
@@ -1777,7 +1803,7 @@ redbol-combinators.('emit): null
 redbol-combinators.('collect): null
 redbol-combinators.('keep): null
 
-uparse2: specialize :uparse [
+uparse2: specialize :uparse? [
     combinators: redbol-combinators
 ]
 

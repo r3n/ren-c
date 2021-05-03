@@ -4,13 +4,13 @@
     (did breaker: func [text] [
         let capturing
         let inner
-        return uparse text [return collect [any [
+        return uparse text [collect [while [
             not end
             (capturing: false)
             keep opt between here ["$(" (capturing: true) | end]
             :(if capturing '[
                 inner: between here ")"
-                keep @(as word! inner)
+                keep (as word! inner)
             ])
         ]]]
     ])
