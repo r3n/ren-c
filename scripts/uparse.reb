@@ -1221,10 +1221,40 @@ default-combinators: make map! reduce [
                 ; with input "cde" then [| "ab"] will consider itself to be a
                 ; match before any input is consumed, e.g. before the "c".
                 ;
-                ; !!! Would BREAK be better to match code with reaching end?
+                ; But UPARSE has an extra trick up its sleeve with `||`, so
+                ; you can have a sequence of alternates within the same block.
+                ; scan ahead to see if that's the case.
+                ;
+                ; !!! This carries a performance penalty, as successful matches
+                ; must scan ahead through the whole rule of blocks just as a
+                ; failing match would when searching alternates.  Caching
+                ; "are there alternates beyond this point" or "are there
+                ; sequences beyond this point" could speed that up as flags on
+                ; cells if they were available to the internal implementation.
+                ;
+                catch [  ; use CATCH to continue outer loop
+                    let r
+                    while [r: rules.1] [
+                        rules: my next
+                        if r = '|| [throw <inline-sequence-operator>]
+                    ]
+                ] then [
+                    continue
+                ]
+
+                ; If we didn't find an inline sequencing operator, then the
+                ; successful alternate means the whole block is done.
                 ;
                 set remainder pos
                 return :result
+            ]
+
+            ; If you hit an inline sequencing operator here then it's the last
+            ; alternate in a list.  Just skip over it.
+            ;
+            if rules.1 = '|| [
+                rules: my next
+                continue
             ]
 
             ; Do one "Parse Step".  This involves turning whatever is at the
@@ -1268,6 +1298,13 @@ default-combinators: make map! reduce [
                     while [r: rules.1] [
                         rules: my next
                         if r = '| [throw input]  ; reset POS
+
+                        ; If we see a sequencing operator after a failed
+                        ; alternate, it means we can't consider the alternates
+                        ; across that sequencing operator as candidates.  So
+                        ; return null just like we would if reaching the end.
+                        ;
+                        if r = '|| [break]
                     ]
                 ] else [
                     set remainder null
@@ -1593,7 +1630,7 @@ match-uparse: comment [redescribe [  ; redescribe not working at te moment (?)
     ]
 )
 
-uparse?: chain [:match-uparse | :did]
+uparse?: chain [:uparse* | :then?]
 
 
 === REBOL2/R3-ALPHA/RED COMPATIBILITY ===

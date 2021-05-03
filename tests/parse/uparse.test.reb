@@ -696,6 +696,17 @@
 ]
 
 
+; INLINE SEQUENCING is the idea of using || to treat everyting on the left
+; as if it's in a block.
+;
+;    ["a" | "b" || "c"] <=> [["a" | "b"] "c"]
+[
+    ("c" = uparse "ac" ["a" | "b" || "c"])
+    ("c" = uparse "bc" ["a" | "b" || "c"])
+    (null = uparse "xc" ["a" | "b" || "c"])
+]
+
+
 ; UPARSE2 should have a more comprehensive test as part of Redbol, but until
 ; that is done here are just a few basics to mae sure it's working at all.
 [
