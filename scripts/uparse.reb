@@ -204,6 +204,26 @@ default-combinators: make map! reduce [
         return null
     ]
 
+    'further combinator [
+        {Pass through the result only if the input was advanced by the rule}
+        return: "parser result if it succeeded and advanced input, else NULL"
+            [<opt> any-value!]
+        parser [action!]
+        <local> result pos
+    ][
+        if not [result pos]: parser input [
+            return null  ; the parse rule did not match
+        ]
+        if (index? pos) <= (index? input) [
+            return null  ; the rule matched, but did not advance the input
+        ]
+        if result = [] [  ; don't allow all-invisible
+            fail "Rule passed to FURTHER must synthesize a product"
+        ]
+        set remainder pos
+        return result
+    ]
+
     === LOOPING CONSTRUCT KEYWORDS ===
 
     ; ANY and WHILE were slight variations on a theme, with `any [...]` being
@@ -1532,7 +1552,7 @@ uparse: comment [redescribe [  ; redescribe not working at te moment (?)
             ((if not f.no-auto-gather '[
                 gathered: gather synthesized:
             ])) (f.rules)
-            ((if not f.no-auto-gather '(:synthesized)))
+            ((if not f.no-auto-gather '(get/any 'synthesized)))
             elide end  ; we want the rule product
         ]
 
