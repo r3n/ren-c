@@ -704,6 +704,10 @@
     ("c" = uparse "ac" ["a" | "b" || "c"])
     ("c" = uparse "bc" ["a" | "b" || "c"])
     (null = uparse "xc" ["a" | "b" || "c"])
+
+    ("c" = uparse "ac" ["a" || "b" | "c"])
+    ("b" = uparse "ab" ["a" || "b" | "c"])
+    (null = uparse "ax" ["a" || "b" | "c"])
 ]
 
 

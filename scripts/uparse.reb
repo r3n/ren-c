@@ -1236,7 +1236,10 @@ default-combinators: make map! reduce [
                     let r
                     while [r: rules.1] [
                         rules: my next
-                        if r = '|| [throw <inline-sequence-operator>]
+                        if r = '|| [
+                            input: pos  ; don't roll back past current pos
+                            throw <inline-sequence-operator>
+                        ]
                     ]
                 ] then [
                     continue
@@ -1250,9 +1253,10 @@ default-combinators: make map! reduce [
             ]
 
             ; If you hit an inline sequencing operator here then it's the last
-            ; alternate in a list.  Just skip over it.
+            ; alternate in a list.
             ;
             if rules.1 = '|| [
+                input: pos  ; don't roll back past current pos
                 rules: my next
                 continue
             ]
