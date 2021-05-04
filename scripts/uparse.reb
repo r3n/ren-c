@@ -167,12 +167,12 @@ default-combinators: make map! reduce [
 
     'end combinator [
         {Only match if the input is at the end}
-        return: "Invisible to facilitate terminating with END retaining result"
-            [<invisible>]
+        return: "End position of the parse input"
+            [<opt> any-series!]
     ][
         if tail? input [
             set remainder input
-            return []  ; !!! is invisible a good answer?
+            return quote input  ; core return protocol
         ]
         set remainder null
         return null

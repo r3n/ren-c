@@ -104,7 +104,7 @@
 ; it delegates the recognition to the parse engine, meaning that rules do not
 ; have to be put into blocks as often.
 [
-    (["aaaa"] = uparse ["aaaa"] [into text! some 2 "a"])
+    ("a" = uparse ["aaaa"] [into text! some 2 "a"])
     (null = uparse ["aaaa"] [into text! some 3 "a"])
 ]
 
@@ -481,6 +481,8 @@
     ("at least 1" = uparse "a" [further [opt "a" opt "b"] ("at least 1")])
     ("at least 1" = uparse "a" [further [opt "a" opt "b"] ("at least 1")])
     ("at least 1" = uparse "ab" [further [opt "a" opt "b"] ("at least 1")])
+
+    (uparse? "" [while further [to end]])
 ]
 
 
