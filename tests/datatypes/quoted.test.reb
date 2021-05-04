@@ -139,7 +139,7 @@
 
 ('''a/b/c/d/e/f = requote join just '''a/b/c 'd/e/f)
 
-((just '[1]) = (requote parse just '[1] [some integer!]))
+((just '[1]) = (requote match-parse just '[1] [some integer!]))
 
 
 ; COPY should be implemented for all types, QUOTED! included.

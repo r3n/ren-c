@@ -37,7 +37,7 @@
     did all [
         r: make-rule
         "a" = do first first first r  ; sanity check with plain DO
-        parse "a" r  ; this was where the problem was
+        parse? "a" r  ; this was where the problem was
     ]
 )
 

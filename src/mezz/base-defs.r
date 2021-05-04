@@ -347,7 +347,19 @@ reframer: enclose :reframer* func* [f] [
 
 reorder: enclose :reorder* func* [f] [
     let action: get 'f/action
-    inherit-meta do f 'action  
+    inherit-meta do f 'action
+]
+
+; !!! The native R3-Alpha parse functionality doesn't have parity with UPARSE's
+; ability to synthesize results, but it will once it is re-engineered to match
+; UPARSE's design when it hardens.  For now these routines provide some amount
+; of interface parity with UPARSE.
+;
+parse: :parse*/fully
+parse?: chain [:parse | :then?]
+match-parse: enclose :parse func* [f] [
+    let input: f.input
+    do f then [input]
 ]
 
 ; The lower-level pointfree function separates out the action it takes, but

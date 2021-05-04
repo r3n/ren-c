@@ -246,9 +246,9 @@ make-emitter: function [
         parse stem ["tmp-" to end]
     ]
 
-    is-c: did parse stem [thru [".c" | ".h" | ".inc"] end]
+    is-c: parse? stem [thru [".c" | ".h" | ".inc"] end]
 
-    is-js: did parse stem [thru ".js" end]
+    is-js: parse? stem [thru ".js" end]
 
     e: make object! compose [
         ;

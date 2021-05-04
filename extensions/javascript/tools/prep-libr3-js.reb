@@ -365,7 +365,7 @@ map-each-api [
     ]
 
     no-reb-name: _
-    if not parse name ["reb" copy no-reb-name to end] [
+    if not parse? name ["reb" copy no-reb-name to end] [
         fail ["API name must start with `reb`" name]
     ]
 

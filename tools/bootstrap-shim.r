@@ -125,6 +125,16 @@ non: func [type [<opt> datatype!] value [<opt> any-value!]] [
     return :value
 ]
 
+; PARSE is being changed to a more powerful interface that returns synthesized
+; parse products.  So just testing for matching or not is done with PARSE?,
+; to avoid conflating successful-but-null-bearing-parses with failure.
+;
+parse?: chain [:lib/parse | :did]
+parse: chain [
+    :lib/parse
+    |
+    func [x [<opt> any-series! bar!]] [if :x ['~use-parse?-for-logic~]]
+]
 
 ; Enfixedness was conceived as not a property of an action itself, but of a
 ; particular relationship between a word and an action.  While this had some

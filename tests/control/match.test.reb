@@ -114,15 +114,7 @@
     ]
     true)
 
-    ; PARSE was a favored example because getting the PARSE input was useful.
-    ; But now that's the default operation of PARSE.  Simulate a LOGIC!
-    ; returning PARSE to show the benefit.
-    ;
-    (
-        parse?: chain [:parse | :did]
-        true
-    )
-    ("aaa" = match+ parse? "aaa" [some "a"])
+    ("aaa" = match+ match-parse "aaa" [some "a"])
     (null = match+ parse "aaa" [some "b"])
 ]
 

@@ -1,14 +1,14 @@
 ; Is PARSE working at all?
 
-(did parse "abc" ["abc"])
-(did [# pos]: parse "abc" ["abc" end])
+(parse? "abc" ["abc"])
+(parse? "abc" ["abc" end])
 
 ; Edge case of matching END with TO or THRU
 ;
-("" = parse "" [to ["a" | end]])
-("" = parse "" [thru ["a" | end]])
-([] = parse [] [to ["a" | end]])
-([] = parse [] [thru ["a" | end]])
+(parse? "" [to ["a" | end]])
+(parse? "" [thru ["a" | end]])
+(parse? [] [to ["a" | end]])
+(parse? [] [thru ["a" | end]])
 
 
 [#206 (
@@ -16,7 +16,7 @@
     repeat n 512 [
         if n = 1 [continue]
 
-        if not parse (append copy "" make char! n - 1) [set c any-char end] [
+        if not parse? (append copy "" make char! n - 1) [set c any-char end] [
             fail "Parse didn't work"
         ]
         if c != make char! n - 1 [fail "Char didn't match"]
@@ -48,84 +48,84 @@
     e/id = 'need-non-void
 )(
     foo: quote '~void~
-    did parse [~void~] [foo end]
+    parse? [~void~] [foo end]
 )
 
 ; Empty block case handling
 
-(did parse [] [])
-(did parse [] [[[]]])
-(not parse [x] [])
-(not parse [x] [[[]]])
-(did parse [x] [[] 'x []])
+(parse? [] [])
+(parse? [] [[[]]])
+(not parse? [x] [])
+(not parse? [x] [[[]]])
+(parse? [x] [[] 'x []])
 
 ; Literal blank vs. fetched blank/null handling.
 ; Literal blank means "skip" at source level, but if retrieved from a variable
 ; it means the same as null.
 ; https://forum.rebol.info/t/1348
 [
-    (did parse [x] ['x null])
-    (did [# pos]: parse [x] [blank 'x end])
+    (parse? [x] ['x null])
+    (parse? [x] [blank 'x end])
 
-    (did parse [] [blank blank blank])
-    (not parse [] [_ _ _])
-    (did parse [x <y> "z"] [_ _ _])
+    (parse? [] [blank blank blank])
+    (not parse? [] [_ _ _])
+    (parse? [x <y> "z"] [_ _ _])
 
-    (not parse [x <y> "z"] ['_ '_ '_])
-    (did parse [_ _ _] ['_ '_ '_])
+    (not parse? [x <y> "z"] ['_ '_ '_])
+    (parse? [_ _ _] ['_ '_ '_])
     (
         q-blank: quote _
-        did parse [_ _ _] [q-blank q-blank q-blank]
+        parse? [_ _ _] [q-blank q-blank q-blank]
     )
 
-    (not parse [] [[[_ _ _]]])
-    (did parse [] [[[blank blank blank]]])
-    (did parse [] [[[null null null]]])
+    (not parse? [] [[[_ _ _]]])
+    (parse? [] [[[blank blank blank]]])
+    (parse? [] [[[null null null]]])
 ]
 
 ; SET-WORD! (store current input position)
 
 (
-    res: did parse ser: [x y] [pos: here, skip, skip]
+    res: parse? ser: [x y] [pos: here, skip, skip]
     all [res, pos = ser]
 )
 (
-    res: did parse ser: [x y] [skip, pos: here, skip]
+    res: parse? ser: [x y] [skip, pos: here, skip]
     all [res, pos = next ser]
 )
 (
-    res: did parse ser: [x y] [skip, skip, pos: here]
+    res: parse? ser: [x y] [skip, skip, pos: here]
     all [res, pos = tail of ser]
 )
 [#2130 (
-    res: did parse ser: [x] [pos: here, set val word!]
+    res: parse? ser: [x] [pos: here, set val word!]
     all [res, val = 'x, pos = ser]
 )]
 [#2130 (
-    res: did parse ser: [x] [pos: here, set val: word!]
+    res: parse? ser: [x] [pos: here, set val: word!]
     all [res, val = 'x, pos = ser]
 )]
 [#2130 (
-    res: did parse ser: "foo" [pos: here, copy val skip]
+    res: parse? ser: "foo" [pos: here, copy val skip]
     all [not res, val = "f", pos = ser]
 )]
 [#2130 (
-    res: did parse ser: "foo" [pos: here, copy val: skip]
+    res: parse? ser: "foo" [pos: here, copy val: skip]
     all [not res, val = "f", pos = ser]
 )]
 
 ; SEEK INTEGER! (replaces TO/THRU integer!
 
-(did parse "abcd" [seek 3 "cd"])
-(did parse "abcd" [seek 5])
-(did parse "abcd" [seek 128])
+(parse? "abcd" [seek 3 "cd"])
+(parse? "abcd" [seek 5])
+(parse? "abcd" [seek 128])
 
 [#1965
-    (did parse "abcd" [seek 3 skip "d"])
-    (did parse "abcd" [seek 4 skip])
-    (did parse "abcd" [seek 128])
-    (did parse "abcd" ["ab" seek 1 "abcd"])
-    (did parse "abcd" ["ab" seek 1 skip "bcd"])
+    (parse? "abcd" [seek 3 skip "d"])
+    (parse? "abcd" [seek 4 skip])
+    (parse? "abcd" [seek 128])
+    (parse? "abcd" ["ab" seek 1 "abcd"])
+    (parse? "abcd" ["ab" seek 1 skip "bcd"])
 ]
 
 ; parse THRU tag!
@@ -148,20 +148,20 @@
 )
 
 [#1959
-    (did parse "abcd" [thru "d"])
+    (parse? "abcd" [thru "d"])
 ]
 [#1959
-    (did parse "abcd" [to "d" skip])
+    (parse? "abcd" [to "d" skip])
 ]
 
 [#1959
-    (did parse "<abcd>" [thru <abcd>])
+    (parse? "<abcd>" [thru <abcd>])
 ]
 [#1959
-    (did parse [a b c d] [thru 'd])
+    (parse? [a b c d] [thru 'd])
 ]
 [#1959
-    (did parse [a b c d] [to 'd skip])
+    (parse? [a b c d] [to 'd skip])
 ]
 
 ; self-invoking rule
@@ -192,51 +192,51 @@
 ; NOT rule
 
 [#1246
-    (did parse "1" [not not "1" "1"])
+    (parse? "1" [not not "1" "1"])
 ]
 [#1246
-    (did parse "1" [not [not "1"] "1"])
+    (parse? "1" [not [not "1"] "1"])
 ]
 [#1246
-    (not parse "" [not 0 "a"])
+    (not parse? "" [not 0 "a"])
 ]
 [#1246
-    (not parse "" [not [0 "a"]])
+    (not parse? "" [not [0 "a"]])
 ]
 [#1240
-    (did parse "" [not "a"])
+    (parse? "" [not "a"])
 ]
 [#1240
-    (did parse "" [not skip])
+    (parse? "" [not skip])
 ]
 [#1240
-    (did parse "" [not fail])
+    (parse? "" [not fail])
 ]
 
 
 ; TO/THRU + bitset!/charset!
 
 [#1457
-    (did parse "a" compose [thru (charset "a")])
+    (parse? "a" compose [thru (charset "a")])
 ]
 [#1457
-    (not parse "a" compose [thru (charset "a") skip])
+    (not parse? "a" compose [thru (charset "a") skip])
 ]
 [#1457
-    (did parse "ba" compose [to (charset "a") skip])
+    (parse? "ba" compose [to (charset "a") skip])
 ]
 [#1457
-    (not parse "ba" compose [to (charset "a") "ba"])
+    (not parse? "ba" compose [to (charset "a") "ba"])
 ]
 [#2141 (
     xset: charset "x"
-    did parse "x" [thru [xset]]
+    parse? "x" [thru [xset]]
 )]
 
 ; self-modifying rule, not legal in Ren-C if it's during the parse
 
 (error? trap [
-    not parse "abcd" rule: ["ab" (remove back tail of rule) "cd"]
+    not parse? "abcd" rule: ["ab" (remove back tail of rule) "cd"]
 ])
 
 [https://github.com/metaeducation/ren-c/issues/377 (
@@ -247,8 +247,8 @@
 
 ; AHEAD and AND are synonyms
 ;
-(did parse ["aa"] [ahead text! into ["a" "a"]])
-(did parse ["aa"] [and text! into ["a" "a"]])
+(parse? ["aa"] [ahead text! into ["a" "a"]])
+(parse? ["aa"] [and text! into ["a" "a"]])
 
 ; INTO is not legal if a string parse is already running
 ;
@@ -280,14 +280,14 @@
 ; These evaluate and inject their material into the PARSE, if it is not null.
 ; They act like a COMPOSE/ONLY that runs each time the GET-GROUP! is passed.
 
-(did parse "aaabbb" [:([some "a"]) :([some "b"])])
-(did parse "aaabbb" [:([some "a"]) :(if false [some "c"]) :([some "b"])])
-(did parse "aaa" [:('some) "a"])
-(not parse "aaa" [:(1 + 1) "a"])
-(did parse "aaa" [:(1 + 2) "a"])
+(parse? "aaabbb" [:([some "a"]) :([some "b"])])
+(parse? "aaabbb" [:([some "a"]) :(if false [some "c"]) :([some "b"])])
+(parse? "aaa" [:('some) "a"])
+(not parse? "aaa" [:(1 + 1) "a"])
+(parse? "aaa" [:(1 + 2) "a"])
 (
     count: 0
-    did parse ["a" "aa" "aaa"] [some [into [:(count: count + 1) "a"]]]
+    parse? ["a" "aa" "aaa"] [some [into [:(count: count + 1) "a"]]]
 )
 
 ; SET-GROUP!
@@ -298,7 +298,7 @@
     m: null
     word: 'm
     did all [
-        parse [1020] [(word): integer!]
+        parse? [1020] [(word): integer!]
         word = 'm
         m = 1020
     ]
@@ -307,10 +307,10 @@
 ; LOGIC! BEHAVIOR
 ; A logic true acts as a no-op, while a logic false causes matches to fail
 
-(did parse "ab" ["a" true "b"])
-(not parse "ab" ["a" false "b"])
-(did parse "ab" ["a" :(1 = 1) "b"])
-(not parse "ab" ["a" :(1 = 2) "b"])
+(parse? "ab" ["a" true "b"])
+(not parse? "ab" ["a" false "b"])
+(parse? "ab" ["a" :(1 = 1) "b"])
+(not parse? "ab" ["a" :(1 = 2) "b"])
 
 
 ; QUOTED! BEHAVIOR
@@ -318,17 +318,17 @@
 
 (
     did all [
-        [# pos]: parse [... [a b]] [to '[a b]]
+        pos: parse* [... [a b]] [to '[a b], here]
         pos = [[a b]]
     ]
 )
-(did parse [... [a b]] [thru '[a b]])
-(did parse [1 1 1] [some '1])
+(parse? [... [a b]] [thru '[a b]])
+(parse? [1 1 1] [some '1])
 
 ; Quote level is not retained by captured content
 ;
 (did all [
-    [# pos]: parse [''[1 + 2]] [into [copy x to end]]
+    pos: parse* [''[1 + 2]] [into [copy x to end], here]
     [] == pos
     x == [1 + 2]
 ])
@@ -343,7 +343,7 @@
 ; Unlike R3-Alpha, changing the series being parsed is not allowed.
 (
     did all [
-        parse "aabbcc" [
+        parse? "aabbcc" [
             some "a", x: here, some "b", y: here
             seek x, copy z to end
         ]
@@ -364,17 +364,17 @@
 ; are better than nothing...
 (
     catchar: #"🐱"
-    did parse #{F09F90B1} [catchar]
+    parse? #{F09F90B1} [catchar]
 )(
     cattext: "🐱"
-    did parse #{F09F90B1} [cattext]
+    parse? #{F09F90B1} [cattext]
 )(
     catbin: #{F09F90B1}
-    e: trap [did parse "🐱" [catbin]]
+    e: trap [parse? "🐱" [catbin]]
     'find-string-binary = e/id
 )(
     catchar: #"🐱"
-    did parse "🐱" [catchar]
+    parse? "🐱" [catchar]
 )
 
 [
@@ -383,17 +383,17 @@
         bincat = #{43F09F98BA54}
     )
 
-    (did parse bincat [{C😺T}])
+    (parse? bincat [{C😺T}])
 
-    (did parse bincat [{c😺t}])
+    (parse? bincat [{c😺t}])
 
-    (not parse/case bincat [{c😺t} end])
+    (not parse?/case bincat [{c😺t} end])
 ]
 
 (
     test: to-binary {The C😺T Test}
     did all [
-        parse test [to {c😺t} copy x to space to end]
+        parse? test [to {c😺t} copy x to space to end]
         x = #{43F09F98BA54}
         "C😺T" = to-text x
     ]
@@ -401,14 +401,14 @@
 
 
 (did all [
-    parse text: "a ^/ " [
+    parse? text: "a ^/ " [
         any [newline remove [to end] | "a" [remove [to newline]] | skip]
     ]
     text = "a^/"
 ])
 
 
-(did parse "a" [some [to end] end])
+(parse? "a" [some [to end] end])
 
 [https://github.com/metaeducation/ren-c/issues/1032 (
     s: {abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ}
@@ -459,9 +459,9 @@
 
 [
     https://github.com/rebol/rebol-issues/issues/2393
-    (not parse "aa" [some [#"a"] reject])
-    (not parse "aabb" [some [#"a"] reject some [#"b"]])
-    (not parse "aabb" [some [#"a" reject] to end])
+    (not parse? "aa" [some [#"a"] reject])
+    (not parse? "aabb" [some [#"a"] reject some [#"b"]])
+    (not parse? "aabb" [some [#"a" reject] to end])
 ]
 
 ; !!! R3-Alpha introduced a controversial "must make progress" rule, where
@@ -470,12 +470,12 @@
 ; these tests pass.  Ren-C is questioning the progress rule, believing the
 ; benefit of infinite-loop-avoidance is not worth the sacrifice of logic.
 [
-    (not parse "ab" [to [""] "ab"])
-    (did parse "ab" [to ["a"] "ab"])
-    (did parse "ab" [to ["ab"] "ab"])
-    (not parse "ab" [thru [""] "ab"])
-    (did parse "ab" [thru ["a"] "b"])
-    (not parse "ab" [thru ["ab"] ""])
+    (not parse? "ab" [to [""] "ab"])
+    (parse? "ab" [to ["a"] "ab"])
+    (parse? "ab" [to ["ab"] "ab"])
+    (not parse? "ab" [thru [""] "ab"])
+    (parse? "ab" [thru ["a"] "b"])
+    (not parse? "ab" [thru ["ab"] ""])
 ]
 
 ; Ren-C made it possible to use quoted WORD!s in place of CHAR! or TEXT! to
@@ -483,40 +483,40 @@
 ; tick marks from everything like ["ab"] to become just ['ab]
 ;
 (did all [
-    [# pos]: parse "abbbbbc" ['a some ['b]]
+    pos: parse* "abbbbbc" ['a some ['b], here]
     "c" = pos
 ])
 (did all [
-    [# pos]: parse "abbbbc" ['ab some ['bc | 'b]]
+    pos: parse* "abbbbc" ['ab, some ['bc | 'b], here]
     "" = pos
 ])
 (did all [
-    [# pos]: parse "abc10def" ['abc '10]
+    pos: parse* "abc10def" ['abc '10, here]
     "def" = pos
 ])
 
 (
     byteset: make bitset! [0 16 32]
-    did parse #{001020} [some byteset]
+    parse? #{001020} [some byteset]
 )
 
 ; A SET of zero elements gives NULL, a SET of > 1 elements is an error
 [(
     x: <before>
     did all [
-        [1] = parse [1] [set x opt text! integer!]
+        parse? [1] [set x opt text! integer!]
         x = null
     ]
 )(
     x: <before>
     did all [
-        ["a" 1] = parse ["a" 1] [set x some text! integer!]
+        parse? ["a" 1] [set x some text! integer!]
         x = "a"
     ]
 )(
     x: <before>
     e: trap [
-        ["a" "b" 1] = parse ["a" "b" 1] [set x some text! integer!]
+        parse? ["a" "b" 1] [set x some text! integer!]
     ]
     did all [
         e/id = 'parse-multiple-set

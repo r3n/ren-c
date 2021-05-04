@@ -510,7 +510,7 @@ main-startup: func [
 
     while [not tail? argv] [
 
-        let is-option: did parse/case argv/1 [
+        let is-option: parse?/case argv/1 [
 
             ["--" end] (
                 ; Double-dash means end of command line arguments, and the

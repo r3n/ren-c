@@ -624,7 +624,7 @@
                 | dir: skip, (to-file dir)
             ]
             |
-            ["-h" | "-help" | "--help" (-help, quit)]
+            ["-h" | "-help" | "--help" || (-help, quit)]
             |
             verbose: [
                 "-q" (0)

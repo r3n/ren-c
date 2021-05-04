@@ -721,12 +721,12 @@ static REB_R Parse_One_Rule(
         // We try to allow some conveniences when parsing strings based on
         // how items render, e.g.:
         //
-        //     >> did parse "ab<c>10" ['ab <c> '10]
+        //     >> parse? "ab<c>10" ['ab <c> '10]
         //     == #[true]
         //
         // It can be less visually noisy than:
         //
-        //     >> did parse "ab<c>10" ["ab" {<c>} "10"]
+        //     >> parse? "ab<c>10" ["ab" {<c>} "10"]
         //     == #[true]
         //
         // !!! The concept is based somewhat on what was legal in FIND for
@@ -1837,7 +1837,19 @@ REBNATIVE(subparse)
                 goto pre_rule;
 
               case SYM_RETURN:
-                fail ("RETURN removed from PARSE, use (THROW ...)");
+                fail ("RETURN removed from PARSE, see UPARSE return value");
+
+              // !!! HERE looks like a no-op, but if it's to the right of a
+              // SET-WORD! then it will be assigned to that variable by the
+              // set word code.  So this case is hit only when it's not to
+              // the right of a set-word.  That's a no-op until native PARSE
+              // has synthesized rule results.  But for the moment, a special
+              // case is noticed at the top level PARSE* to return the current
+              // position for how far a parse gets.
+              //
+              case SYM_HERE:
+                FETCH_NEXT_RULE(f);  // skip the HERE word
+                goto pre_rule;
 
               case SYM_SEEK: {
                 FETCH_NEXT_RULE(f);  // skip the SEEK word
@@ -2652,14 +2664,12 @@ REBNATIVE(subparse)
 
 
 //
-//  parse: native [
+//  parse*: native [
 //
-//  "Parse series according to grammar rules, return last match position"
+//  "Parse series according to grammar rules"
 //
-//      return: "null if rules failed, else terminal position of match"
-//          [<opt> any-series!]
-//      progress: "<output> Allow partial matches; returns progress position"
-//          [<opt> any-series!]
+//      return: "TBD: parse product, currently either VOID! or NULL"
+//          [<opt> void! any-series!]
 //
 //      input "Input series to parse"
 //          [<blank> any-series!]
@@ -2668,15 +2678,41 @@ REBNATIVE(subparse)
 //      /case "Uses case-sensitive comparison"
 //      /inside "Context to add to rules (and subrules)"
 //          [any-context!]
+//      /fully "Require parse to reach end, see PARSE specialization"
 //  ]
 //
-REBNATIVE(parse)
+REBNATIVE(parse_p)
 //
 // https://forum.rebol.info/t/1084
 {
-    INCLUDE_PARAMS_OF_PARSE;
+    INCLUDE_PARAMS_OF_PARSE_P;
 
     REBVAL *input = ARG(input);
+    REBVAL *rules = ARG(rules);
+
+    const RELVAL *rules_tail;
+    const RELVAL *rules_at = VAL_ARRAY_AT(&rules_tail, rules);
+
+    // !!! Look for the special pattern `parse ... [collect [x]]` and delegate
+    // to a fabricated `parse [temp: collect [x]]` so we can return temp.
+    // This hack is just to give a sense of the coming benefit of synthesized
+    // parse rules, to help realize why PARSE? vs PARSE vs PARSE* exist.
+    if (
+        rules_at != rules_tail
+        and rules_at + 1 != rules_tail
+        and rules_at + 2 == rules_tail
+        and IS_WORD(rules_at) and VAL_WORD_ID(rules_at) == SYM_COLLECT
+        and IS_BLOCK(rules_at + 1)
+    ){
+        REBCTX *frame_ctx = Context_For_Frame_May_Manage(frame_);
+        return rebValue(
+            "let temp",
+            "let f: copy", CTX_ARCHETYPE(frame_ctx),
+            "f.rules: [temp: collect", rules_at + 1, "]",
+            "do f",
+            "temp"
+        );
+    }
 
     if (not ANY_SERIES_KIND(CELL_KIND(VAL_UNESCAPED(input))))
         fail ("PARSE input must be an ANY-SERIES! (use AS BLOCK! for PATH!)");
@@ -2686,9 +2722,9 @@ REBNATIVE(parse)
     // explicitly add the rule on when it follows such links.
     //
     if (REF(inside))
-        Virtual_Bind_Patchify(ARG(rules), VAL_CONTEXT(ARG(inside)), REB_WORD);
+        Virtual_Bind_Patchify(rules, VAL_CONTEXT(ARG(inside)), REB_WORD);
 
-    DECLARE_FRAME_AT (subframe, ARG(rules), EVAL_MASK_DEFAULT);
+    DECLARE_FRAME_AT (subframe, rules, EVAL_MASK_DEFAULT);
 
     bool interrupted;
     if (Subparse_Throws(
@@ -2710,52 +2746,39 @@ REBNATIVE(parse)
         return R_THROWN;
     }
 
-    REBVAL *progress = ARG(progress);
+    if (IS_NULLED(D_OUT))
+        return nullptr;  // the match failed
 
-    if (IS_NULLED(D_OUT)) {
-        if (IS_TRUTHY(progress)) {
-            //
-            // While returning NULL in this case might be nice for letting the
-            // caller test only the progress to know about the success of a
-            // partial match, setting it to VOID! helps pave the way for a
-            // future in which a failed partial match could tell you how far
-            // it got in the input before failing.
-            //
-            Init_Void(D_SPARE, SYM_VOID);
-            rebElideQ("set", progress, D_SPARE);
-        }
-        return nullptr;
-    }
-
-    REBLEN index = VAL_UINT32(D_OUT);  // index reached by subparse
+    REBLEN index = VAL_UINT32(D_OUT);
     assert(index <= VAL_LEN_HEAD(input));
 
-    if (not IS_TRUTHY(progress)) {
-        //
-        // Not asking for how far a parse got implies that the parse must
-        // reach the complete end of input in order to have succeeded.
-        //
-        if (index == VAL_LEN_HEAD(input))
-            RETURN (input);
-
-        return nullptr;
+    if (REF(fully)) {  // match succeeded, but we also want to reach the tail
+        if (index != VAL_LEN_HEAD(input))
+            return nullptr;  // index did not reach tail
     }
 
-    // !!! Current policy is to try to return the same number of quotes as
-    // the input.  VAL_INDEX() allows reading indices out of REBCEL which
-    // are guaranteed unescaped (hence you won't be falsely reading out of
-    // the data of a REB_QUOTED container).  But REBCEL is read only, so
-    // the writes must be done to a RELVAL.  We must dequote/requote to
-    // make sure we don't write to a REB_QUOTED or shared contained cell.
+    // !!! R3-Alpha parse design had no means to bubble up a "synthesized"
+    // rule product.  But that's important in the new design.  Hack in support
+    // for the single case of when the last rule in the block was HERE and
+    // returning the parse position.
     //
-    Copy_Cell(D_SPARE, ARG(input));
-    REBLEN num_quotes = Dequotify(D_SPARE);  // take quotes out
-    VAL_INDEX_UNBOUNDED(D_SPARE) = index;  // cell guaranteed not REB_QUOTED
-    Quotify(D_SPARE, num_quotes);  // put quotes back
+    if (
+        rules_at != rules_tail  // position on input wasn't []
+        and IS_WORD(rules_tail - 1)  // last element processed was a WORD!
+        and VAL_WORD_ID(rules_tail - 1) == SYM_HERE  // the word was HERE
+    ){
+        Copy_Cell(D_OUT, ARG(input));
+        REBLEN num_quotes = Dequotify(D_OUT);  // take quotes out
+        VAL_INDEX_UNBOUNDED(D_OUT) = index;  // cell guaranteed not REB_QUOTED
+        return Quotify(D_OUT, num_quotes);  // put quotes back
+    }
 
-    rebElideQ("set", progress, D_SPARE);
-
-    RETURN (ARG(input));  // main return value is input at original position
+    // !!! Give back a value that triggers a THEN clause and won't trigger an
+    // ELSE clause.  See UPARSE for the redesign that will be applied to more
+    // native code in the future.  But this is just to get people out of the
+    // habit of writing `IF PARSE ...`
+    //
+    return rebValue("'~use-PARSE?-for-logic~");
 }
 
 

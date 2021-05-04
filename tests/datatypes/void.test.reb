@@ -94,8 +94,8 @@
 ; there needs to be a mechanism to indicate that it's okay for a rule to
 ; literally match ~unset~ vs. be a typo.
 ;
-(did parse [~foo~ ~foo~] [some '~foo~])  ; acceptable
-(did parse [~foo~ ~foo~] [some ~foo~])  ; !!! shady, rethink
+(parse? [~foo~ ~foo~] [some '~foo~])  ; acceptable
+(parse? [~foo~ ~foo~] [some ~foo~])  ; !!! shady, rethink
 (
     foo: '~foo~
     e: trap [

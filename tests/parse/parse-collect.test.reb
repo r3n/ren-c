@@ -8,32 +8,33 @@
 ; (like a SET or COPY) instead of affecting the return result.
 
 (did all [
-    parse [1 2 3] [x: collect [keep [some integer!]]]
+    parse? [1 2 3] [x: collect [keep [some integer!]]]
     x = [1 2 3]
 ])
 (did all [
-    parse [1 2 3] [x: collect [some [keep integer!]]]
+    parse? [1 2 3] [x: collect [some [keep integer!]]]
     x = [1 2 3]
 ])
 (did all [
-    parse [1 2 3] [x: collect [keep only [some integer!]]]
+    parse? [1 2 3] [x: collect [keep only [some integer!]]]
     x = [[1 2 3]]
 ])
 (did all [
-    parse [1 2 3] [x: collect [some [keep only integer!]]]
+    parse? [1 2 3] [x: collect [some [keep only integer!]]]
     x = [[1] [2] [3]]
 ])
 
 ; Collecting non-array series fragments
 
 (did all [
-    [# pos]: parse "aaabbb" [x: collect [keep [some "a"]]]
+    pos: parse* "aaabbb" [x: collect [keep [some "a"]] here]
     "bbb" = pos
     x = ["aaa"]
 ])
 (did all [
-    [# pos]: parse "aaabbbccc" [
+    pos: parse* "aaabbbccc" [
         x: collect [keep [some "a"] some "b" keep [some "c"]]
+        here
     ]
     "" = pos
     x = ["aaa" "ccc"]
@@ -42,12 +43,13 @@
 ; Backtracking (more tests needed!)
 
 (did all [
-    [# pos]: parse [1 2 3] [
+    pos: parse* [1 2 3] [
         x: collect [
             keep integer! keep integer! keep text!
             |
             keep integer! keep [some integer!]
         ]
+        here
     ]
     [] = pos
     x = [1 2 3]
@@ -65,7 +67,7 @@
 ; Nested collect
 
 (did all [
-    did parse [1 2 3 4] [
+    parse? [1 2 3 4] [
         a: collect [
             keep integer!
             b: collect [keep [2 integer!]]
@@ -84,29 +86,31 @@
 ; !!! This is extended in UPARSE to the other SYM-XXX! types.
 ;
 (did all [
-    [# pos]: parse [1 2 3] [
+    pos: parse* [1 2 3] [
         x: collect [
             keep integer!
             keep (second [A [<pick> <me>] B])
             keep integer!
         ]
+        here
     ]
     [3] = pos
     x = [1 <pick> <me> 2]
 ])
 (did all [
-    [# pos]: parse [1 2 3] [
+    pos: parse* [1 2 3] [
         x: collect [
             keep integer!
             keep only (second [A [<pick> <me>] B])
             keep integer!
         ]
+        here
     ]
     [3] = pos
     x = [1 [<pick> <me>] 2]
 ])
 (did all [
-    parse [1 2 3] [x: collect [keep only ([a b c]) to end]]
+    parse? [1 2 3] [x: collect [keep only ([a b c]) to end]]
     x = [[a b c]]
 ])
 
@@ -115,17 +119,17 @@
     https://github.com/metaeducation/ren-c/issues/935
 
     (did all [
-        did parse "aaabbb" [x: collect [keep some "a" keep some "b"]]
+        parse? "aaabbb" [x: collect [keep some "a" keep some "b"]]
         x = ["aaa" "bbb"]
     ])
 
     (did all [
-        parse "aaabbb" [x: collect [keep to "b"] to end]
+        parse? "aaabbb" [x: collect [keep to "b"] to end]
         x = ["aaa"]
     ])
 
     (did all [
-        parse "aaabbb" [
+        parse? "aaabbb" [
             outer: collect [
                 some [inner: collect keep some "a" | keep some "b"]
             ]
@@ -141,8 +145,14 @@
     x: <x>
     y: <y>
     did all [
-        parse "aaa" [let x: collect [some [keep "a"]], (y: x)]
+        parse? "aaa" [let x: collect [some [keep "a"]], (y: x)]
         x = <x>
         y = ["a" "a" "a"]
     ]
+)
+
+; Special tweak to make COLLECT work as a synthesized result value, just to
+; give a hint at what's coming as UPARSE features go mainline.
+(
+    ["a" "a" "a"] = parse "aaa" [collect [some [keep "a"]]]
 )
