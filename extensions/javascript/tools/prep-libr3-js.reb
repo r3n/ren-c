@@ -287,7 +287,7 @@ to-js-type: func [
         ; The differences between undefined and null are subtle and easy to
         ; get wrong, but a void-returning function should map to undefined.
         ;
-        parse s ["void" any space] ["undefined"]
+        parse s ["void" while space] ["undefined"]
     ]
 ]
 

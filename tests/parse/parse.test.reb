@@ -141,8 +141,7 @@
 (
     i: 0
     parse "a." [
-        any [thru "a" (i: i + 1 j: to-value if i > 1 [[end skip]]) j]
-        end
+        while [thru "a" (i: i + 1 j: to-value if i > 1 [end skip]) j]
     ]
     i == 1
 )
@@ -180,7 +179,7 @@
 [#1268 (
     i: 0
     <infinite?> = catch [
-        parse "a" [any [(i: i + 1) (if i > 100 [throw <infinite?>])]]
+        parse "a" [while [(i: i + 1) (if i > 100 [throw <infinite?>])]]
     ]
 )]
 [#1268 (
@@ -271,7 +270,7 @@
 ; This test works in Rebol2 even if it starts `i: 0`, presumably a bug.
 (
     i: 1
-    parse "a" [any [(i: i + 1 j: if i = 2 [[end skip]]) j]]
+    parse "a" [while [(i: i + 1 j: if i = 2 [[end skip]]) j]]
     i == 2
 )
 
@@ -402,7 +401,7 @@
 
 (did all [
     parse? text: "a ^/ " [
-        any [newline remove [to end] | "a" [remove [to newline]] | skip]
+        while [newline remove [to end] | "a" [remove [to newline]] | skip]
     ]
     text = "a^/"
 ])
@@ -424,7 +423,7 @@
     t: {----------------------------------------------------}
     for n 2 50 1 [
         sub: copy/part s n
-        parse sub [any [
+        parse sub [while [
             remove skip
             insert "-"
         ]]
@@ -446,7 +445,7 @@
             keep/only 'fail
         ]
         parse data (compose/deep [
-            any [((rules))]
+            while [((rules))]
             end
         ]) then [
             collect [

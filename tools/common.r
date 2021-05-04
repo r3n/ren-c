@@ -428,7 +428,7 @@ stripload: function [
         while [  ; https://github.com/rebol/rebol-issues/issues/1401
             newline [while [comment-or-space-rule remove newline]]
             |
-            [ahead [any space ";"]] comment-or-space-rule
+            [ahead [while space ";"]] comment-or-space-rule
             |
             "^^{"  ; (actually `^{`) escaped brace, never count
             |

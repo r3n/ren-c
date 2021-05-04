@@ -1496,21 +1496,21 @@ REBNATIVE(subparse)
                 P_FLAGS |= PF_LOOPING;
                 goto pre_rule;
 
-              case SYM_ANY:
+              case SYM_SOME:
                 assert(mincount == 1 and maxcount == 1);  // true on entry
-                mincount = 0;
-                goto sym_some;
-
-              case SYM_FURTHER:  // require advancement
-                P_FLAGS |= PF_FURTHER;
+                P_FLAGS |= PF_LOOPING;
+                maxcount = INT32_MAX;
                 FETCH_NEXT_RULE(f);
                 goto pre_rule;
 
-              case SYM_SOME:
-                assert(mincount == 1 and maxcount == 1);  // true on entry
-              sym_some:
-                P_FLAGS |= PF_LOOPING;
-                maxcount = INT32_MAX;
+              case SYM_ANY:
+                fail (
+                    "Please replace PARSE ANY with WHILE or WHILE FURTHER: "
+                    "https://forum.rebol.info/t/1540/12"
+                );
+
+              case SYM_FURTHER:  // require advancement
+                P_FLAGS |= PF_FURTHER;
                 FETCH_NEXT_RULE(f);
                 goto pre_rule;
 

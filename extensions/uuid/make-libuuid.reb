@@ -57,7 +57,7 @@ fix-randutils.c: func [
         add-config.h
         insert {^/#include <errno.h>^/}
 
-        any [
+        while [
             comment-out-includes
 
             ; randutils.c:137:12: error:
@@ -99,7 +99,7 @@ fix-gen_uuid.c: function [
     parse text [
         add-config.h
 
-        any [
+        while [
             ;comment out unneeded headers
             comment-out-includes
 

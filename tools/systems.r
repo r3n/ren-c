@@ -327,7 +327,7 @@ system-definitions: make object! [
     ;LL?: _                       ; might have LL consts, reb-config.h checks
 
     ; See C_STACK_OVERFLOWING for an explanation of the dodgy technique used
-    ; to try and preempt a C stackoverflow crash with a trappable error. 
+    ; to try and preempt a C stackoverflow crash with a trappable error.
     ;
     SGD: "OS_STACK_GROWS_DOWN"    ; most widespread choice in C compilers
     ;SGU: "OS_STACK_GROWS_UP"     ; rarer (Debian HPPA, some emscripten/wasm)
@@ -421,9 +421,9 @@ system-libraries: make object! [
 
     DL: "dl" ; dynamic lib
     LOG: "log" ; Link with liblog.so on Android
-    
+
     W32: ["wsock32" "comdlg32" "user32" "shell32" "advapi32"]
-    
+
     NWK: "network" ; Needed by HaikuOS
 ]
 
@@ -455,7 +455,7 @@ for-each-system: func [
             platform-name: to-word platform-name
         )
         set platform-number integer!
-        any [
+        while [
             set id tuple!
             [blank! (
                 os: _

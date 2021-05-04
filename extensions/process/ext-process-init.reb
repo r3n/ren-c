@@ -64,19 +64,21 @@ parse-command-to-argv*: func [
     command [text!]
 ][
     let quoted-shell-item-rule: [  ; Note: ANY because "" is legal as an arg
-        any [{\"} | not {"} skip]  ; escaped quotes and nonquotes
+        while [{\"} | not {"} skip]  ; escaped quotes and nonquotes
     ]
     let unquoted-shell-item-rule: [some [not space skip]]
 
-    let result
-    parse command [
-        result: collect [any [
-            any space [
-                {"} keep quoted-shell-item-rule {"}
-                | keep unquoted-shell-item-rule
+    let result: parse command [
+        collect [
+            while [
+                while space
+                [
+                    {"} keep quoted-shell-item-rule {"}
+                    | keep unquoted-shell-item-rule
+                ]
             ]
+            while space
         ]
-        any space end]
     ] else [
         fail [
             "Could not parse command line into argv[] block." LF

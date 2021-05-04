@@ -54,7 +54,7 @@ emit-proto: func [
     header: proto-parser/data
 
     all [
-        block? header 
+        block? header
         2 <= length of header
         set-word? header/1
     ] else [
@@ -246,7 +246,7 @@ sys-globals-parser: context [
     grammar: context bind [
 
         rule: [
-            any [
+            while [
                 parse-position: here
                 segment
             ]
@@ -255,7 +255,7 @@ sys-globals-parser: context [
         segment: [
             (id: _)
             span-comment
-            | line-comment any [newline line-comment] newline
+            | line-comment while [newline line-comment] newline
             | opt wsp directive
             | declaration
             | other-segment
@@ -277,7 +277,7 @@ sys-globals-parser: context [
         directive: [
             copy data [
                 ["#ifndef" | "#ifdef" | "#if" | "#else" | "#elif" | "#endif"]
-                any [not newline c-pp-token]
+                while [not newline c-pp-token]
             ] eol
             (
                 ; Here is where it would call processing of conditional data

@@ -343,7 +343,7 @@ rebsource: context [
                     seek :bol  ; !!! GET-WORD! for bootstrap (SEEK is no-op)
                 ]
 
-                any [
+                while [
                     to stop-char
                     position: here
                     [
@@ -440,7 +440,7 @@ rebsource: context [
 
         lbrace: [and punctuator "{"]
         rbrace: [and punctuator "}"]
-        braced: [lbrace any [braced | not rbrace skip] rbrace]
+        braced: [lbrace while [braced | not rbrace skip] rbrace]
 
         function-spacing-rule: (
             bind/copy standard/function-spacing c-lexical/grammar
@@ -450,7 +450,7 @@ rebsource: context [
 
         append grammar/format-func-section [
             last-func-end:
-            any [nl | eol | wsp]
+            while [nl | eol | wsp]
         ]
 
         append/only grammar/other-segment just (

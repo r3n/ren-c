@@ -226,20 +226,17 @@ default-combinators: make map! reduce [
 
     === LOOPING CONSTRUCT KEYWORDS ===
 
-    ; ANY and WHILE were slight variations on a theme, with `any [...]` being
-    ; the same as `while [not end, ...]`.  Because historical Redbol PARSE-ANY
-    ; contrasts semantically with with DO-ANY (pick from alternates), we
-    ; choose to make the primitive operation WHILE.
+    ; UPARSE uses WHILE and SOME as its two looping operators, and finesses the
+    ; question of how to enforce advancement of input using a new generalized
+    ; combinator called FURTHER.
     ;
-    ; https://forum.rebol.info/t/any-vs-while-and-not-end/1572
-    ; https://forum.rebol.info/t/any-vs-many-in-parse-eof-tag-combinators/1540/
+    ; https://forum.rebol.info/t/1540/12
     ;
-    ; For the moment, ANY is assigned as an alias for WHILE, but with no
-    ; difference in shade of meaning.
+    ; What was ANY is now WHILE FURTHER.  Hence ANY is reserved for future use.
 
     'while combinator [
         {Any number of matches (including 0)}
-        return: "Result of last successful match"
+        return: "Result of last successful match, or NULL if no matches"
             [<opt> any-value!]
         parser [action!]
         <local> last-result result pos

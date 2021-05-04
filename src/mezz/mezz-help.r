@@ -322,9 +322,8 @@ help: function [
     refinements: _  ; refinements and refinement arguments
 
     parse parameters of :value [
-        copy args any [word! | get-word! | lit-word! | issue!]
-        copy refinements any path!  ; !!! Refinements may become intermixed!
-        end
+        copy args while [word! | get-word! | lit-word! | issue!]
+        copy refinements while path!  ; !!! Refinements may become intermixed!
     ]
 
     ; Output exemplar calling string, e.g. LEFT + RIGHT or FOO A B C

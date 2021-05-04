@@ -121,7 +121,7 @@ make-port*: function [
 
             ; optional host [:port]
             opt [
-                copy s1 any host-char
+                copy s1 while host-char
                 opt [
                     ":" copy s2 digits (
                         append out compose [

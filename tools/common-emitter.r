@@ -52,7 +52,7 @@ cscape: function [
     num-text: to text! num  ; CHANGE won't take GROUP! to evaluate, #1279
 
     list: collect* [
-        parse string [(col: 0) start: here any [
+        parse string [(col: 0) start: here while [  ; <- No COMMA! in bootstrap
             [
                 (prefix: _ suffix: _) finish: here
 

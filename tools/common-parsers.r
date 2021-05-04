@@ -28,27 +28,28 @@ decode-key-value-text: function [
     {Decode key value formatted text.}
     text [text!]
 ][
-    
     data-fields: [
-        any [
-            position:
+        while [
+            position: here
             data-field
             | newline
         ]
-        end
     ]
 
     data-field: [
-        data-field-name eof: [
-            #" " to newline any [
+        data-field-name eof: here [
+            #" " to newline while [
                 newline not data-field-name not newline to newline
             ]
-            | any [1 2 newline 2 20 #" " to newline]
+            | while [1 2 newline 2 20 #" " to newline]
         ] eol: (emit-meta) newline
     ]
 
     data-field-char: charset [#"A" - #"Z" #"a" - #"z"]
-    data-field-name: [some data-field-char any [#" " some data-field-char] #":"]
+    data-field-name: [
+        some data-field-char
+        while [#" " some data-field-char] #":"
+    ]
 
     emit-meta: func [<local> key] [
         key: replace/all copy/part position eof #" " #"-"
@@ -128,7 +129,7 @@ proto-parser: context [
 
         rule: [
             parse-position: here opt fileheader
-            any [parse-position: here segment]
+            while [parse-position: here segment]
         ]
 
         fileheader: [
@@ -145,7 +146,7 @@ proto-parser: context [
             (proto-id: proto-arg-1: _)
             format-func-section
             | span-comment
-            | line-comment any [newline line-comment] newline
+            | line-comment while [newline line-comment] newline
             | opt wsp directive
             | other-segment
         ]
@@ -153,7 +154,7 @@ proto-parser: context [
         directive: [
             copy data [
                 ["#ifndef" | "#ifdef" | "#if" | "#else" | "#elif" | "#endif"]
-                any [not newline c-pp-token]
+                while [not newline c-pp-token]
             ] eol
             (
                 emit-directive data
@@ -197,7 +198,7 @@ proto-parser: context [
                 ; can also examine state variables of the parser to extract
                 ; other properties--such as the processed intro block.
                 ;
-                emit-proto proto 
+                emit-proto proto
             )
         ]
 
@@ -275,7 +276,7 @@ proto-parser: context [
                     not ")"
                     copy proto-arg-1 identifier
                 ]
-                any [typemacro-parentheses | not ")" [white-space | skip]]
+                while [typemacro-parentheses | not ")" [white-space | skip]]
                 ")"
             ]
         ]

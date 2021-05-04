@@ -435,10 +435,10 @@ do-needs: function [
     mods: make block! length of needs
     name: vers: hash: _
     parse ensure block! needs [
-        here:
+        problem-pos: here
         opt [opt 'core set vers tuple! (do-needs vers)]
-        any [
-            here:
+        while [
+            problem-pos: here
             set name [word! | file! | url! | tag!]
             set vers opt tuple!
             set hash opt binary!
@@ -446,7 +446,7 @@ do-needs: function [
         ]
         end
     ] else [
-        cause-error 'script 'invalid-arg here
+        cause-error 'script 'invalid-arg problem-pos
     ]
 
     ; Temporary object to collect exports of "mixins" (private modules).
@@ -609,7 +609,7 @@ load-module: func [
 
             let tmp
             parse source [
-                any [
+                while [
                     tmp:
                     set name opt set-word!
                     set mod [

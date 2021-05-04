@@ -126,7 +126,7 @@ c-lexical: context [
 
         pp-number: [
             [digit | #"." digit]
-            any [
+            while [
                 digit
                 | id-nondigit
                 | #"."

@@ -319,7 +319,7 @@ reword: function [
 
     rule: [
         a: here  ; Begin marking text to copy verbatim to output
-        any [
+        while [
             to prefix  ; seek to prefix (may be blank!, this could be a no-op)
             b: here  ; End marking text to copy verbatim to output
             prefix  ; consume prefix (if no-op, may not be at start of match)
@@ -629,7 +629,7 @@ split: function [
                     copy series to end (keep/only series)
                 ]
             ] else [
-                [any [copy series 1 size skip (keep/only series)]]
+                [while [copy series 1 size skip (keep/only series)]]
             ]
         ]
         block? dlm [

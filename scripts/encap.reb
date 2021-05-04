@@ -602,17 +602,17 @@ pe-format: context [
         let group-rule: [
             set word set-word!
             (find-a-word word)
-            | and block! into block-rule ;recursively look into the array
+            | ahead block! into block-rule ;recursively look into the array
             | skip
         ]
         block-rule: [
-            and group! into [any group-rule]
-            | and block! into [any block-rule]
+            ahead group! into [while group-rule]
+            | ahead block! into [while block-rule]
             | ['copy | 'set] set word word! (find-a-word word)
             | skip
         ]
 
-        parse rule [any block-rule end]
+        parse rule [while block-rule end]
 
         ;dump def
         set name make object! append def _

@@ -134,7 +134,7 @@ func: func* [
     loc: _
     with-return: _
 
-    parse spec [any [
+    parse spec [while [
         <void> (append new-spec <void>)
     |
         <elide> (append new-spec <elide>)
@@ -197,7 +197,7 @@ func: func* [
         false  ; failing here means rolling over to next rule
     |
         <local>
-        any [set var: word! set other: opt group! (
+        while [set var: word! set other: opt group! (
             append new-spec to tuple! var
             append exclusions var
             if other [
@@ -214,7 +214,7 @@ func: func* [
                 copy/deep body
             ]
         )
-        any [
+        while [
             set other: [object! | word! | path!] (
                 if not object? other [other: ensure any-context! get other]
                 bind new-body other
@@ -224,7 +224,7 @@ func: func* [
             )
         ]
     |
-        <with> any [
+        <with> while [
             set other: [word! | path!] (
                 append exclusions other
 
@@ -243,7 +243,7 @@ func: func* [
                 copy/deep body
             ]
         )
-        any [
+        while [
             set var: word! (other: _) opt set other: group! (
                 append exclusions var
                 append statics compose [
@@ -380,7 +380,7 @@ redescribe: func [
     let note: _
     parse spec [
         opt [
-            copy description any text! (
+            copy description while text! (
                 description: spaced description
                 all [
                     description = {}
@@ -397,7 +397,7 @@ redescribe: func [
                 ]
             )
         ]
-        any [
+        while [
             set param: [
                 word! | get-word! | lit-word! | set-word!
                 | ahead path! into [word! blank!]
@@ -1153,7 +1153,7 @@ read-lines: func [
         [ [to (delimiter) remove (delimiter) pos: here] ]
     ][
         [
-            to crlf any [
+            to crlf while [
                 ["^M" and not "^/"]
                 to crlf
             ] (if not keep ['remove]) ["^/" | "^M^/"] pos: here

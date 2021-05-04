@@ -28,7 +28,7 @@ decode-lines: func [
         seek :rest  ; GET-WORD! for bootstrap (SEEK is no-op)
         thru newline
     ]
-    parse text [any line-rule end] else [
+    parse text [while line-rule end] else [
         fail [
             {Expected line} (try text-line-of text pos)
             {to begin with} (mold line-prefix)
@@ -52,7 +52,7 @@ encode-lines: func [
     let bol: join line-prefix indent
     let pos
     parse text [
-        any [
+        while [
             thru newline pos: here
             [
                 newline (pos: insert pos line-prefix)
@@ -120,7 +120,7 @@ lines-exceeding: func [  ; !!! Doesn't appear used, except in tests (?)
 
     let [eol bol]
     parse text [
-        any [bol: here to newline eol: here skip count-line-rule]
+        while [bol: here to newline eol: here skip count-line-rule]
         bol: here skip to end eol: here count-line
         end
     ]
@@ -143,7 +143,7 @@ text-line-of: func [
     let advance-rule: [skip (line: line + 1)]
 
     parse text [
-        any [
+        while [
             to newline cursor: here
 
             ; IF deprecated in Ren-C, but :(...) with logic not available
@@ -154,7 +154,6 @@ text-line-of: func [
             advance-rule
         ]
         advance-rule
-        end
     ]
 
     if zero? line [return null]
@@ -176,7 +175,7 @@ text-location-of: func [
     advance-rule: [eol: here skip (line: line + 1)]
 
     parse text [
-        any [
+        while [
             to newline cursor: here
 
             ; !!! IF is deprecated in PARSE, but this code is expected to work
