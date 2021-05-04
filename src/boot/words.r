@@ -190,7 +190,8 @@ across
 collect  ; Variant in Red, but Ren-C's acts SET-like, suggested by @rgchris
 keep
 some
-any
+any  ; no longer a parse keyword, use WHILE FURTHER
+further  ; https://forum.rebol.info/t/1593
 opt
 not  ; turned to _not_ for SYM__NOT_, see TO-C-NAME for why this is weird
 and  ; turned to _and_ for SYM__AND_, see TO-C-NAME for why this is weird

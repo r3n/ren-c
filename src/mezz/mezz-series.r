@@ -638,21 +638,21 @@ split: function [
             ;
 
             [
-                any [mk1: here, while [mk2: here, [dlm | end] break | skip] (
+                while [not end [
+                    mk1: here, while [mk2: here, [dlm | end] break | skip] (
                     keep/only copy/part mk1 mk2
-                )]
+                )]]
                 end
             ]
         ]
     ] else [
         ensure [bitset! text! char! word! tag!] dlm
         [
-            some [
+            some [not end [
                 copy mk1: [to dlm | to end]
                 (keep/only mk1)
                 opt thru dlm
-            ]
-            end
+            ]]
         ]
     ]]
 

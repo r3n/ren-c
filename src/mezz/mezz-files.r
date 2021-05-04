@@ -70,7 +70,7 @@ clean-path: func [
     let count: 0
     let part
     parse reverse target [
-        some [
+        while [not end [
             "../"
             (count: me + 1)
             |
@@ -95,8 +95,7 @@ clean-path: func [
                     ]
                 ]
             )
-        ]
-        end
+        ]]
     ]
 
     if all [
@@ -111,7 +110,7 @@ clean-path: func [
     if not scheme [
         return path
     ]
-    
+
     return to url! head insert path unspaced [
         form scheme/scheme "://"
         if scheme/user [

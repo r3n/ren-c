@@ -407,8 +407,17 @@
     text = "a^/"
 ])
 
+; FURTHER can be used to detect when parse has stopped advancing the input and
+; then not count the rule as a match.
+;
+[
+    (parse? "" [while further [to end]])
 
-(parse? "a" [some [to end] end])
+    (not parse? "" [further [opt "a" opt "b"] ("at least one")])
+    (parse? "a" [further [opt "a" opt "b"] ("at least 1")])
+    (parse? "a" [further [opt "a" opt "b"] ("at least 1")])
+    (parse? "ab" [further [opt "a" opt "b"] ("at least 1")])
+]
 
 [https://github.com/metaeducation/ren-c/issues/1032 (
     s: {abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ}

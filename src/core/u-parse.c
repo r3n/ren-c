@@ -249,9 +249,10 @@ enum parse_flags {
     PF_REMOVE = 1 << 9,
     PF_INSERT = 1 << 10,
     PF_CHANGE = 1 << 11,
-    PF_ANY_OR_SOME = 1 << 12,
+    PF_LOOPING = 1 << 12,
+    PF_FURTHER = 1 << 13,  // must advance parse input to count as a match
 
-    PF_ONE_RULE = 1 << 13,  // signal to only run one step of the parse
+    PF_ONE_RULE = 1 << 14,  // signal to only run one step of the parse
 
     PF_MAX = PF_ONE_RULE
 };
@@ -1487,10 +1488,12 @@ REBNATIVE(subparse)
 
             switch (cmd) {
               case SYM_WHILE:
+                P_FLAGS |= PF_LOOPING;
                 assert(mincount == 1 and maxcount == 1);  // true on entry
                 mincount = 0;
                 maxcount = INT32_MAX;
                 FETCH_NEXT_RULE(f);
+                P_FLAGS |= PF_LOOPING;
                 goto pre_rule;
 
               case SYM_ANY:
@@ -1498,10 +1501,15 @@ REBNATIVE(subparse)
                 mincount = 0;
                 goto sym_some;
 
+              case SYM_FURTHER:  // require advancement
+                P_FLAGS |= PF_FURTHER;
+                FETCH_NEXT_RULE(f);
+                goto pre_rule;
+
               case SYM_SOME:
                 assert(mincount == 1 and maxcount == 1);  // true on entry
               sym_some:
-                P_FLAGS |= PF_ANY_OR_SOME;
+                P_FLAGS |= PF_LOOPING;
                 maxcount = INT32_MAX;
                 FETCH_NEXT_RULE(f);
                 goto pre_rule;
@@ -2315,18 +2323,16 @@ REBNATIVE(subparse)
         if (count < 0)
             count = INT32_MAX;  // the forever case
 
-        P_POS = cast(REBLEN, i);
-
-        if (i == P_INPUT_LEN and (P_FLAGS & PF_ANY_OR_SOME)) {
-            //
-            // ANY and SOME auto terminate on e.g. `some [... | end]`.
-            // But WHILE is conceptually a synonym for a self-recursive
-            // rule and does not consider it a termination.  See:
-            //
-            // https://github.com/rebol/rebol-issues/issues/1268
-            //
+        // If FURTHER was used then the parse must advance the input; it can't
+        // be at the saem position.
+        //
+        if (P_POS == cast(REBINT, i) and (P_FLAGS & PF_FURTHER)) {
+            if (not (P_FLAGS & PF_LOOPING))
+                Init_Nulled(ARG(position));  // need to fail rule, not loop
             break;
         }
+
+        P_POS = cast(REBLEN, i);
     }
 
     // !!! This out of bounds check is necessary because GROUP!s execute

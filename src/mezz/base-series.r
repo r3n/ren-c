@@ -264,15 +264,13 @@ trim: function [
     ;
     indent: _
     if auto [
-        parse series [
+        parse* series [
             ; Don't count empty lines, (e.g. trim/auto {^/^/^/    asdf})
             remove [any LF]
 
             (indent: 0)
             s: here, some rule, e: here
             (indent: (index of e) - (index of s))
-
-            end
         ]
     ]
 
@@ -282,17 +280,13 @@ trim: function [
 
     parse series [
         line-start-rule
-        any [
-            while [
-                ahead [any rule [newline | end]]
-                remove [any rule]
-                [newline line-start-rule]
-                    |
-                skip
-            ]
-        ]
-
-        end
+        while [not end [
+            ahead [any rule [newline | end]]
+            remove [any rule]
+            newline line-start-rule
+                |
+            skip
+        ]]
     ]
 
     ; While trimming with /TAIL takes out any number of newlines, plain TRIM
@@ -301,7 +295,6 @@ trim: function [
     parse series [
         remove [any newline]
         while [newline remove [some newline end] | skip]
-        end
     ]
 
     return series
