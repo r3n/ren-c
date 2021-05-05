@@ -1380,6 +1380,21 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         break;
 
 
+    //=//// LIT! ///////////////////////////////////////////////////////////=//
+    //
+    // Like QUOTE, with the added feature that it will preserve the NULL-2
+    // status of the argument.  (QUOTE does not take its a `@literal` argument
+    // so it cannot detect this.)
+
+      case REB_LIT:
+        if (Rightward_Evaluate_Nonvoid_Into_Out_Throws(f, v))  // see notes
+            goto return_thrown;
+
+        if (not Is_Light_Nulled(f->out))
+            Quotify(f->out, 1);
+        break;
+
+
     //=////////////////////////////////////////////////////////////////////=//
     //
     // Treat all the other Is_Bindable() types as inert

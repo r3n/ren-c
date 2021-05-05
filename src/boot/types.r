@@ -71,7 +71,7 @@ void        "value that triggers errors if accessed via WORD!/PATH!/TUPLE!"
             void        -       +       +       []
 
 blank       "placeholder unit type which acts as conditionally false"
-            blank       +       -       +       [branch]
+            blank       +       -       +       [unit branch]
 
 ; <ANY-SCALAR>
 
@@ -298,11 +298,18 @@ sym-word    "symbolic form of word! that does not evaluate"
 ; <ANY-SYM> (order matters, see UNSETIFY_ANY_XXX_KIND())
 
 
+; LIT! is just the lone @ symbol, which acts like QUOTE, but with the ability
+; to pick up on the NULL-2 and invisible distinctions.
+
+lit         "quoting operator which can distinguish NULL and NULL-2"
+            lit         -       -       +       [unit]
+
+
 ; COMMA! has a high number with bindable types it's evaluative, and the
 ; desire is to make the ANY_INERT() test fast with a single comparison.
 
 comma       "separator between full evaluations (that is otherwise invisible)"
-            comma       -       -       +       []
+            comma       -       -       +       [unit]
 
 
 ; ACTION! is the "OneFunction" type in Ren-C https://forum.rebol.info/t/596

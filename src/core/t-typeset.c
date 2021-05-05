@@ -193,12 +193,6 @@ bool Add_Typeset_Bits_Core(
             else if (0 == CT_String(item, Root_Const_Tag, strict)) {
                 TYPE_SET(typeset, REB_TS_CONST);
             }
-            else if (0 == CT_String(item, Root_In_Out_Tag, strict)) {
-                if (VAL_PARAM_CLASS(typeset) != REB_P_OUTPUT)
-                    fail ("Only output parameters can be marked <in-out>");
-
-                TYPE_SET(typeset, REB_TS_IN_OUT);
-            }
             else if (0 == CT_String(item, Root_Literal_Tag, strict)) {
                 //
                 // !!! <literal> is not the general way to make literal args

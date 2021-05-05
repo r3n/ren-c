@@ -225,7 +225,6 @@ static void Init_Action_Spec_Tags(void)
     Root_Local_Tag = Make_Locked_Tag("local");
     Root_Skip_Tag = Make_Locked_Tag("skip");
     Root_Const_Tag = Make_Locked_Tag("const");
-    Root_In_Out_Tag = Make_Locked_Tag("in-out");
     Root_Invisible_Tag = Make_Locked_Tag("invisible");
     Root_Elide_Tag = Make_Locked_Tag("elide");
 
@@ -245,7 +244,6 @@ static void Shutdown_Action_Spec_Tags(void)
     rebRelease(Root_Local_Tag);
     rebRelease(Root_Skip_Tag);
     rebRelease(Root_Const_Tag);
-    rebRelease(Root_In_Out_Tag);
     rebRelease(Root_Invisible_Tag);
     rebRelease(Root_Elide_Tag);
 
