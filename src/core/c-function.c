@@ -58,12 +58,8 @@ static bool Params_Of_Hook(
           case REB_P_NORMAL:
             break;
 
-          case REB_P_MODAL:
-            if (flags & PHF_DEMODALIZED) {
-                // associated refinement specialized out
-            }
-            else
-                Symify(DS_TOP);
+          case REB_P_LITERAL:
+            Symify(DS_TOP);
             break;
 
           case REB_P_SOFT:
@@ -379,7 +375,7 @@ void Push_Paramlist_Triads_May_Fail(
                 }
                 else if (kind == REB_SYM_WORD) {
                     if (not quoted)
-                        pclass = REB_P_MODAL;
+                        pclass = REB_P_LITERAL;
                 }
             }
         }
@@ -952,9 +948,9 @@ REBACT *Make_Action(
           case REB_P_RETURN:
           case REB_P_OUTPUT:
           case REB_P_NORMAL:
+          case REB_P_LITERAL:
             break;
 
-          case REB_P_MODAL:
           case REB_P_SOFT:
           case REB_P_MEDIUM:
           case REB_P_HARD:

@@ -407,7 +407,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         const REBPAR *first = First_Unspecialized_Param(nullptr, enfixed);
         if (
             VAL_PARAM_CLASS(first) == REB_P_SOFT
-            or VAL_PARAM_CLASS(first) == REB_P_MODAL
+            or VAL_PARAM_CLASS(first) == REB_P_LITERAL
         ){
             goto give_up_backward_quote_priority;  // yield as an exemption
         }

@@ -109,72 +109,6 @@ bool Lookahead_To_Sync_Enfix_Defer_Flag(struct Reb_Feed *feed) {
 }
 
 
-// The code for modal parameter handling has to be used for both enfix and
-// normal parameters.  It's enough code to be worth factoring out vs. repeat.
-//
-static bool Handle_Modal_In_Out_Throws(REBFRM *f) {
-    switch (VAL_TYPE(f->out)) {
-      case REB_SYM_WORD:  // run @APPEND
-      case REB_SYM_PATH:  // run @APPEND/ONLY
-      case REB_SYM_GROUP:  // run @(GR O UP)
-      case REB_SYM_BLOCK:  // pass @[BL O CK] as-is
-        Plainify(f->out);
-        goto enable_modal;
-
-      default:
-        goto skip_enable_modal;
-    }
-
-  enable_modal: {
-    //
-    // !!! We could (should?) pre-check the paramlists to
-    // make sure users don't try and make a modal argument
-    // not followed by a refinement.  That would cost
-    // extra, but avoid the test on every call.
-    //
-    if (f->key + 1 == f->key_tail)
-        fail ("Modal parameter can't be at end of parameter list");
-
-    const REBPAR *enable = f->param + 1;
-
-    if (Is_Param_Hidden(enable)) {
-        if (not (IS_NULLED(enable) or Is_Blackhole(enable)))
-            fail ("Specialized refinement following modal can't take args");
-    }
-    else {
-        if (not (
-            TYPE_CHECK(enable, REB_TS_REFINEMENT)
-            and Is_Typeset_Empty(enable)
-        )){
-            fail ("Refinement must follow modal parameter");
-        }
-    }
-
-    // Signal refinement as being in use.
-    //
-    Init_Word(DS_PUSH(), KEY_SYMBOL(f->key + 1));
-  }
-
-  skip_enable_modal:
-    //
-    // Because the possibility of needing to see the uneval'd
-    // value existed, the parameter had to act quoted.  Eval.
-    //
-    if (Eval_Value_Maybe_End_Throws(f->arg, f->out, SPECIFIED)) {
-        Copy_Cell(f->out, f->arg);
-        return true;
-    }
-
-    // The modal parameter can test to see if an expression vaporized, e.g.
-    // `@(comment "hi")` or `@()`, and handle that case.
-    //
-    if (IS_END(f->arg))
-        Init_Endish_Nulled(f->arg);
-
-    return false;
-}
-
-
 //
 //  Process_Action_Maybe_Stale_Throws: C
 //
@@ -383,8 +317,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             else switch (pclass) {
               case REB_P_NORMAL:
               case REB_P_OUTPUT:
-                enfix_normal_handling:
-
+              case REB_P_LITERAL:
                 Copy_Cell(f->arg, f->out);
                 if (GET_CELL_FLAG(f->out, UNEVALUATED))
                     SET_CELL_FLAG(f->arg, UNEVALUATED);
@@ -407,15 +340,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 Copy_Cell(f->arg, f->out);
                 SET_CELL_FLAG(f->arg, UNEVALUATED);
                 break;
-
-              case REB_P_MODAL: {
-                if (NOT_CELL_FLAG(f->out, UNEVALUATED))
-                    goto enfix_normal_handling;
-
-                if (Handle_Modal_In_Out_Throws(f))
-                    goto abort_action;
-
-                break; }
 
               case REB_P_SOFT:
                 //
@@ -553,9 +477,12 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
           case REB_P_NORMAL:
           case REB_P_OUTPUT:
-          normal_handling: {
+          case REB_P_LITERAL: {
             if (GET_FEED_FLAG(f->feed, BARRIER_HIT)) {
-                Init_Endish_Nulled(f->arg);
+                if (pclass == REB_P_LITERAL)
+                    Init_Void(f->arg, SYM_INVISIBLE);  // !!! ...good answer?
+                else
+                    Init_Endish_Nulled(f->arg);
                 goto continue_fulfilling;
             }
 
@@ -570,8 +497,18 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 goto abort_action;
             }
 
-            if (IS_END(f->arg))
-                Init_Endish_Nulled(f->arg);
+            if (IS_END(f->arg)) {
+                if (pclass == REB_P_LITERAL)
+                    Init_Void(f->arg, SYM_INVISIBLE);  // !!! ...good answer?
+                else
+                    Init_Endish_Nulled(f->arg);
+            }
+            else if (pclass == REB_P_LITERAL) {
+                if (Is_Light_Nulled(f->arg))
+                    Init_Nulled(f->arg);
+                else
+                    Quotify(f->arg, 1);
+            }
             break; }
 
   //=//// HARD QUOTED ARG-OR-REFINEMENT-ARG ///////////////////////////////=//
@@ -596,24 +533,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             Lookahead_To_Sync_Enfix_Defer_Flag(f->feed);
 
             goto continue_fulfilling;
-
-  //=//// MODAL ARG  //////////////////////////////////////////////////////=//
-
-          case REB_P_MODAL: {
-            if (GET_FEED_FLAG(f->feed, BARRIER_HIT)) {
-                Init_Endish_Nulled(f->arg);
-                goto continue_fulfilling;
-            }
-
-            if (not ANY_SYM_KIND(VAL_TYPE(f_next)))  // not an @xxx
-                goto normal_handling;  // acquire as a regular argument
-
-            Literal_Next_In_Frame(f->out, f);  // f->value is read-only...
-            if (Handle_Modal_In_Out_Throws(f))  // ...out so we can Unsymify()
-                goto abort_action;
-
-            Lookahead_To_Sync_Enfix_Defer_Flag(f->feed);
-            break; }
 
   //=//// SOFT QUOTED ARG-OR-REFINEMENT-ARG  //////////////////////////////=//
 

@@ -231,7 +231,7 @@ static void Init_Action_Spec_Tags(void)
 
     // !!! Needed for bootstrap, as `@arg` won't LOAD in old r3
     //
-    Root_Modal_Tag = Make_Locked_Tag("modal");
+    Root_Literal_Tag = Make_Locked_Tag("literal");
 }
 
 static void Shutdown_Action_Spec_Tags(void)
@@ -249,7 +249,7 @@ static void Shutdown_Action_Spec_Tags(void)
     rebRelease(Root_Invisible_Tag);
     rebRelease(Root_Elide_Tag);
 
-    rebRelease(Root_Modal_Tag);  // !!! only needed for bootstrap with old r3
+    rebRelease(Root_Literal_Tag);  // !!! only needed for bootstrap with old r3
 }
 
 

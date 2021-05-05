@@ -199,13 +199,13 @@ bool Add_Typeset_Bits_Core(
 
                 TYPE_SET(typeset, REB_TS_IN_OUT);
             }
-            else if (0 == CT_String(item, Root_Modal_Tag, strict)) {
+            else if (0 == CT_String(item, Root_Literal_Tag, strict)) {
                 //
-                // !!! <modal> is not the general way to make modal args (the
-                // `@arg` notation is used), but the native specs are loaded
+                // !!! <literal> is not the general way to make literal args
+                // (`@arg` notation is used), but the native specs are loaded
                 // by a boostrap r3 that can't read them.
                 //
-                VAL_TYPESET_PARAM_CLASS_U32(typeset) = REB_P_MODAL;
+                VAL_TYPESET_PARAM_CLASS_U32(typeset) = REB_P_LITERAL;
             }
         }
         else if (IS_DATATYPE(item)) {
@@ -444,7 +444,7 @@ REBTYPE(Typeset)
             VAL_TYPESET_LOW_BITS(v) |= VAL_TYPESET_LOW_BITS(arg);
             VAL_TYPESET_HIGH_BITS(v) |= VAL_TYPESET_HIGH_BITS(arg);
             break;
-        
+
           case SYM_INTERSECT:
             VAL_TYPESET_LOW_BITS(v) &= VAL_TYPESET_LOW_BITS(arg);
             VAL_TYPESET_HIGH_BITS(v) &= VAL_TYPESET_HIGH_BITS(arg);

@@ -132,7 +132,6 @@ typedef REB_R (PORT_HOOK)(REBFRM *frame_, REBVAL *port, const REBVAL *verb);
 //
 typedef enum {
     PHF_UNREFINED = 1 << 0,  // a /refinement that takes an arg, made "normal"
-    PHF_DEMODALIZED = 1 << 1  // an @param with its refinement specialized out
 } Reb_Param_Hook_Flags;
 #define PHF_MASK_NONE 0
 typedef bool (PARAM_HOOK)(

@@ -556,8 +556,6 @@ void For_Each_Unspecialized_Param(
         if (TYPE_CHECK(param, REB_TS_REFINEMENT))
             continue;
 
-        enum Reb_Param_Class pclass = VAL_PARAM_CLASS(param);
-
         REBFLGS flags = 0;
 
         if (partials) {  // even normal parameters can appear in partials
@@ -570,16 +568,6 @@ void For_Each_Unspecialized_Param(
                 )){
                     goto skip_in_first_pass;
                 }
-            }
-        }
-
-        // If the modal parameter has had its refinement specialized out, it
-        // is no longer modal.
-        //
-        if (pclass == REB_P_MODAL) {
-            if (key + 1 != tail) {  // !!! Ideally check, + refine, on create
-                if (GET_CELL_FLAG(param + 1, VAR_MARKED_HIDDEN))
-                    flags |= PHF_DEMODALIZED;
             }
         }
 

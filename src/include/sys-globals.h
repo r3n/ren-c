@@ -120,7 +120,7 @@ PVAR REBVAL *Root_Const_Tag; // pass a CONST version of the input argument
 PVAR REBVAL *Root_In_Out_Tag;  // output followed by input alias in frame
 PVAR REBVAL *Root_Invisible_Tag;  // return value can be invisible
 PVAR REBVAL *Root_Elide_Tag;  // will make any return result act invisibly
-PVAR REBVAL *Root_Modal_Tag;  // !!! needed for bootstrap, vs @arg modal
+PVAR REBVAL *Root_Literal_Tag;  // !!! needed for bootstrap, vs @arg literal
 
 PVAR REBVAL *Root_Empty_Text; // read-only ""
 PVAR REBVAL *Root_Empty_Binary; // read-only #{}
