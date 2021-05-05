@@ -213,6 +213,10 @@
 
 %parse/parse.test.reb
 %parse/parse-collect.test.reb
+%parse/uparse.test.reb
+%parse/uparse-furthest.test.reb
+%parse/uparse-breaker.test.reb
+%parse/uparse-reword.test.reb
 
 %redbol/redbol-apply.test.reb
 

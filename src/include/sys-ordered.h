@@ -319,7 +319,7 @@ inline static enum Reb_Kind PLAINIFY_ANY_SET_KIND(REBYTE k) {
 
 inline static enum Reb_Kind PLAINIFY_ANY_SYM_KIND(REBYTE k) {
     assert(ANY_SYM_KIND(k));
-    return cast(enum Reb_Kind, k + 5);
+    return cast(enum Reb_Kind, k - 15);
 }
 
 inline static enum Reb_Kind SETIFY_ANY_PLAIN_KIND(REBYTE k) {
@@ -334,13 +334,13 @@ inline static enum Reb_Kind GETIFY_ANY_PLAIN_KIND(REBYTE k) {
 
 inline static enum Reb_Kind SYMIFY_ANY_PLAIN_KIND(REBYTE k) {
     assert(ANY_PLAIN_KIND(k));
-    return cast(enum Reb_Kind, k - 5);
+    return cast(enum Reb_Kind, k + 15);
 }
 
 
 inline static bool IS_ANY_SIGIL_KIND(REBYTE k) {
     assert(k < REB_64);  // can't do `@''x`
-    return k >= REB_SYM_BLOCK and k < REB_GET_WORD;
+    return k >= REB_SET_BLOCK and k <= REB_SYM_WORD;
 }
 
 

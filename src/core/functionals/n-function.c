@@ -613,8 +613,8 @@ REBNATIVE(unwind)
 //  {RETURN, giving a result to the caller}
 //
 //      value "If no argument is given, result will be a VOID!"
-//          [<modal> <end> <opt> any-value!]
-//      /vanishable "Modal argument can allow return to disappear completely"
+//          [<end> <opt> any-value!]
+//      /unquote "Relay argument that was quoted, NULL, or ~invisible~"
 //  ]
 //
 REBNATIVE(return)
@@ -661,26 +661,34 @@ REBNATIVE(return)
     const REBPAR *param = ACT_PARAMS_HEAD(target_fun);
     assert(KEY_SYM(ACT_KEYS_HEAD(target_fun)) == SYM_RETURN);
 
-    // There are two ways you can get an "endish nulled".  One is a plain
-    // `RETURN` with nothing following it (which is interpreted as returning
-    // a void).  The other is like `return @()` or `return @(comment "hi")`,
-    // which are asking for a fully invisible return.
-    //
-    if (IS_ENDISH_NULLED(v)) {
-        if (REF(vanishable)) {
-            FAIL_IF_NO_INVISIBLE_RETURN(target_frame);
+    if (IS_ENDISH_NULLED(v)) {  // RETURN with nothing following it.
+        if (REF(unquote))
+            fail ("Argument to RETURN required for /UNQUOTE option");
 
-            goto skip_type_check;  // already checked
-        }
-        else {
-            Init_Void(v, SYM_VOID); // `do [return]` acts as `return void`
-        }
+        Init_Void(v, SYM_VOID); // `do [return]` acts as `return void`
     }
 
-    // The only way to get a function to return a NULL-2 is with RETURN @(...)
+    // Special behaviors to get invisibility and NULL-2 returns
     //
-    if (not REF(vanishable))
-        Decay_If_Nulled(v);
+    if (REF(unquote)) {
+        if (IS_NULLED(v)) {
+            // as is
+        }
+        else if (IS_QUOTED(v)) {
+            Unquotify(v, 1);
+            if (IS_NULLED(v))
+                Init_Heavy_Nulled(v);
+        }
+        else {
+            if (not IS_VOID(v) or VAL_VOID_LABEL(v) != Canon(SYM_INVISIBLE))
+                fail ("VOID! parameter to RETURN/UNQUOTE must be ~INVISIBLE~");
+
+            FAIL_IF_NO_INVISIBLE_RETURN(target_frame);
+            Init_Endish_Nulled(v);  // how return throw protocol does invisible
+            goto skip_type_check;
+        }
+
+    }
 
     // Check type NOW instead of waiting and letting Eval_Core()
     // check it.  Reasoning is that the error can indicate the callsite,

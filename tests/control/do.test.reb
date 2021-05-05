@@ -5,17 +5,17 @@
 ; !!! Review: probably a better idea to use REEVAL for this.
 [
     (null? (1 + 2, do []))
-    (null? (1 + 2, do @[]))
+    (null? (1 + 2, do '@[]))
     (null? (1 + 2, do :[]))
     (null? (1 + 2, do [comment "hi"]))
-    (null? (1 + 2, do @[comment "hi"]))
+    (null? (1 + 2, do '@[comment "hi"]))
     (null? (1 + 2, do :[comment "hi"]))
 
     (3 = (1 + 2, do '()))
-    (3 = (1 + 2, do @()))
+    (3 = (1 + 2, do '@()))
     (3 = (1 + 2, do ':()))
     (3 = (1 + 2, do '(comment "hi")))
-    (3 = (1 + 2, do @(comment "hi")))
+    (3 = (1 + 2, do '@(comment "hi")))
     (3 = (1 + 2, do ':(comment "hi")))
 ]
 

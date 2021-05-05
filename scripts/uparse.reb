@@ -159,10 +159,10 @@ default-combinators: make map! reduce [
         <local> result
     ][
         if [result (remainder)]: parser input [
-            return result  ; on parser's success, return what it returned
+            return result  ; on parser success, return what it returned
         ]
-        set remainder input  ; on parser's failure, make OPT remainder input
-        return quote null  ; OPT succeeds on parser failure, "null-2" result
+        set remainder input  ; on parser failure, make OPT remainder input
+        return quote null  ; succeed on parser failure, "null-2" result
     ]
 
     'end combinator [
@@ -1532,9 +1532,8 @@ uparse*: func [
 
     series "Input series"
         [any-series!]
-    @rules "Block of parse rules"
+    rules "Block of parse rules"
         [block!]
-    /verbatim "If last match rule synthesizes NULL, don't return NULL-2"
 
     /combinators "List of keyword and datatype handlers used for this parse"
         [map!]
@@ -1567,11 +1566,10 @@ uparse*: func [
     f.value: rules
     f.remainder: let pos
 
-    let synthesized: do f
-    if synthesized = [] [  ; !!! Should UPARSE support invisible return?
-        synthesized: just '  ; treat it like a match
+    if '~invisible~ = let synthesized: do f [
+        synthesized: just '  ; !!! for the moment, just treat it like NULL
     ]
-    return/(if not verbatim 'vanishable) unquote/isotope synthesized
+    return/unquote synthesized
 ]
 
 uparse: comment [redescribe [  ; redescribe not working at te moment (?)
@@ -1594,9 +1592,7 @@ uparse: comment [redescribe [  ; redescribe not working at te moment (?)
             elide end  ; we want the rule product
         ]
 
-        let verbatim: f.verbatim  ; can't access after `do f`
-
-        if not let result: quote/isotope do f [
+        if not let result: @(do f) [
             return null  ; if f.rules failed to match, or end not reached
         ]
 
@@ -1612,7 +1608,7 @@ uparse: comment [redescribe [  ; redescribe not working at te moment (?)
         for-each key try gathered [
             return gathered  ; return the object if not empty
         ]
-        return @(unquote/isotope result)  ; verbatim was decided by UPARSE*
+        return/unquote result  ; verbatim was decided by UPARSE*
     ]
 )
 

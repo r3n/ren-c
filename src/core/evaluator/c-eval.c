@@ -691,8 +691,20 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     //
     // https://forum.rebol.info/t/1301
 
-      process_get_word:
+      case REB_SYM_WORD:
+        STATE_BYTE(f) = ST_EVALUATOR_SYM_WORD;
+        goto process_get_word;
+
       case REB_GET_WORD:
+        STATE_BYTE(f) = ST_EVALUATOR_GET_WORD;
+        goto process_get_word;
+
+      process_get_word:
+        assert(
+            STATE_BYTE(f) == ST_EVALUATOR_SYM_WORD
+            || STATE_BYTE(f) == ST_EVALUATOR_GET_WORD
+        );
+
         if (not gotten)
             gotten = Lookup_Word_May_Fail(v, v_specifier);
 
@@ -704,6 +716,14 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
         if (IS_ACTION(unwrap(gotten)))  // cache the word's label in the cell
             INIT_VAL_ACTION_LABEL(f->out, VAL_WORD_SYMBOL(v));
+
+        if (STATE_BYTE(f) == ST_EVALUATOR_SYM_WORD) {
+            assert(not Is_Heavy_Nulled(f->out));  // variables should not store
+            if (not IS_NULLED(f->out))  // NULL does not get quoted
+                Quotify(f->out, 1);
+        }
+
+        STATE_BYTE(f) = ST_EVALUATOR_INITIAL_ENTRY;
         break;
 
 
@@ -747,8 +767,21 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // result was produced (an output of END) and then re-trigger a step in
     // the parent frame, e.g. to pick up the 3 above.
 
+      case REB_SYM_GROUP:
+        STATE_BYTE(f) = ST_EVALUATOR_SYM_GROUP;
+        goto eval_group;
+
       case REB_GROUP:
+        STATE_BYTE(f) = ST_EVALUATOR_GROUP;
+        goto eval_group;
+
       eval_group: {
+
+        assert(
+            STATE_BYTE(f) == ST_EVALUATOR_GROUP
+            || STATE_BYTE(f) == ST_EVALUATOR_SYM_GROUP
+        );
+
         f_next_gotten = nullptr;  // arbitrary code changes fetched variables
 
         // The IS_VOID() case here is specifically for REEVAL with invisibles,
@@ -766,6 +799,22 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
         DECLARE_FEED_AT_CORE (subfeed, v, v_specifier);
 
+        // We want this behavior matrix:
+        //
+        //    >> 10 (comment "hi")
+        //    == 10
+        //
+        //    >> 10 @(comment "hi")
+        //    == ~invisible~
+        //
+        // We thus need to signal staleness in the SYM-GROUP! case.
+        //
+        if (STATE_BYTE(f) == ST_EVALUATOR_SYM_GROUP) {
+            SET_END(f->out);  // want to avoid UNDO_NOTE_STALE behavior
+            SET_CELL_FLAG(f->out, OUT_NOTE_STALE);
+            CLEAR_FEED_FLAG(f->feed, NO_LOOKAHEAD);  // !!! asserts otherwise?
+        }
+
         // "Maybe_Stale" variant leaves f->out as-is if no result generated
         // However, it sets OUT_NOTE_STALE in that case (note we may be
         // leaving an END in f->out by doing this.)
@@ -782,11 +831,26 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             goto return_thrown;
         }
 
+        if (
+            STATE_BYTE(f) == ST_EVALUATOR_SYM_GROUP
+            and GET_CELL_FLAG(f->out, OUT_NOTE_STALE)
+        ){
+            // It's important to know what @(comment "hi") produces in
+            // order to have a way to chain invisibles and recognize the
+            // invisible state.
+            //
+            Init_Void(f->out, SYM_INVISIBLE);
+            STATE_BYTE(f) = ST_EVALUATOR_INITIAL_ENTRY;
+            goto finished;
+        }
+
         // We want `3 = (1 + 2 ()) 4` to not treat the 1 + 2 as "stale", thus
         // skipping it and trying to compare `3 = 4`.  But `3 = () 1 + 2`
         // should consider the empty group stale.
         //
         if (IS_END(f->out)) {
+            STATE_BYTE(f) = ST_EVALUATOR_INITIAL_ENTRY;
+
             if (IS_END(f_next))
                 goto finished;  // nothing after to try evaluating
 
@@ -797,6 +861,13 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
         CLEAR_CELL_FLAG(f->out, UNEVALUATED);  // `(1)` considered evaluative
         CLEAR_CELL_FLAG(f->out, OUT_NOTE_STALE);  // any [(10 elide "hi")]
+
+        if (STATE_BYTE(f) == ST_EVALUATOR_SYM_GROUP) {
+            if (not Is_Light_Nulled(f->out))  // only NULL-2 gets quoted
+                Quotify(f->out, 1);
+        }
+
+        STATE_BYTE(f) = ST_EVALUATOR_INITIAL_ENTRY;
         break; }
 
 
@@ -960,10 +1031,26 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     //
    // Consistent with GET-WORD!, a GET-PATH! won't allow VOID! access.
 
+      case REB_SYM_PATH:
+      case REB_SYM_TUPLE:
+        STATE_BYTE(f) = ST_EVALUATOR_SYM_PATH_OR_SYM_TUPLE;
+        goto eval_path_or_tuple;
+
       case REB_GET_PATH:
       case REB_GET_TUPLE:
+        STATE_BYTE(f) = ST_EVALUATOR_PATH_OR_TUPLE;
+        goto eval_path_or_tuple;
+
+      eval_path_or_tuple:
+
+        assert(
+            STATE_BYTE(f) == ST_EVALUATOR_PATH_OR_TUPLE
+            or STATE_BYTE(f) == ST_EVALUATOR_SYM_PATH_OR_SYM_TUPLE
+        );
+
         if (HEART_BYTE(v) == REB_WORD) {
             assert(VAL_WORD_ID(v) == SYM__SLASH_1_);
+            STATE_BYTE(f) = ST_EVALUATOR_GET_WORD;
             goto process_get_word;
         }
 
@@ -979,6 +1066,13 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         /* assert(NOT_CELL_FLAG(f->out, CELL_FLAG_UNEVALUATED)); */
         CLEAR_CELL_FLAG(f->out, UNEVALUATED);
         Decay_If_Nulled(f->out);
+
+        if (STATE_BYTE(f) == ST_EVALUATOR_SYM_PATH_OR_SYM_TUPLE) {
+            assert(not Is_Heavy_Nulled(f->out));  // variables should not store
+            if (not IS_NULLED(f->out))  // NULL does not get quoted
+                Quotify(f->out, 1);
+        }
+        STATE_BYTE(f) = ST_EVALUATOR_INITIAL_ENTRY;
         break;
 
 
@@ -992,6 +1086,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // distinction.  For instance, it's used to escape soft quoted slots.
 
       case REB_GET_GROUP:
+        STATE_BYTE(f) = ST_EVALUATOR_GROUP;
         goto eval_group;
 
 
@@ -1270,6 +1365,21 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         break; }
 
 
+    //=//// SYM-BLOCK! ////////////////////////////////////////////////////=//
+    //
+    // Just produces a quoted version of the block it is given:
+    //
+    //    >> @[a b c]
+    //    == '[a b c]
+    //
+
+      case REB_SYM_BLOCK:
+        Inertly_Derelativize_Inheriting_Const(f->out, v, f->feed);
+        mutable_KIND3Q_BYTE(f->out) = REB_BLOCK + REB_64;  // quoted
+        mutable_HEART_BYTE(f->out) = REB_BLOCK;
+        break;
+
+
     //=////////////////////////////////////////////////////////////////////=//
     //
     // Treat all the other Is_Bindable() types as inert
@@ -1277,11 +1387,6 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     //=////////////////////////////////////////////////////////////////////=//
 
       case REB_BLOCK:
-        //
-      case REB_SYM_BLOCK:
-      case REB_SYM_GROUP:
-      case REB_SYM_PATH:
-      case REB_SYM_WORD:
         //
       case REB_BINARY:
         //

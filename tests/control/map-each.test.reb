@@ -19,13 +19,3 @@
     for-each _ [a b c] [sum: sum + 1]
     sum = 3
 )
-
-[
-    "Modal splicing control"
-
-    ([[1 1] [2 2] [3 3]] = map-each x [1 2 3] [reduce [x x]])
-
-    ([1 1 2 2 3 3] = map-each/splice x [1 2 3] [reduce [x x]])
-
-    ([1 1 2 2 3 3] = map-each x [1 2 3] @[reduce [x x]])
-]

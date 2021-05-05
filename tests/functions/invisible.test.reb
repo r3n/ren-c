@@ -369,14 +369,14 @@
 [
     (vanish-if-odd: func [return: [<invisible> integer!] x] [
         if even? x [return x]
-        return @()
+        return/unquote @()
     ] true)
 
     (2 = (<test> vanish-if-odd 2))
     (<test> = (<test> vanish-if-odd 1))
 
     (vanish-if-even: func [return: [<invisible> integer!] y] [
-       return @(vanish-if-odd y + 1)
+       return/unquote @(vanish-if-odd y + 1)
     ] true)
 
     (<test> = (<test> vanish-if-even 2))
@@ -388,16 +388,16 @@
 ; by default if not.
 [
     (
-        no-spec: func [x] [return @()]
+        no-spec: func [x] [return/unquote @()]
         <test> = (<test> no-spec 10)
     )
     (
-        int-spec: func [return: [integer!] x] [return @()]
+        int-spec: func [return: [integer!] x] [return/unquote @()]
         e: trap [int-spec 10]
         e/id = 'bad-invisible
     )
     (
-        invis-spec: func [return: [<invisible> integer!] x] [return @()]
+        invis-spec: func [return: [<invisible> integer!] x] [return/unquote @()]
         <test> = (<test> invis-spec 10)
     )
 ]

@@ -253,9 +253,6 @@ inline static bool Do_Branch_Core_Throws(
     //     >> if true @[null]
     //     ; null
     //
-    // The corollary is that RETURN will strip off the isotope status of
-    // values unless the RETURN @(...) form is used.
-    //
     if (not as_is)
         Isotopify_If_Nulled(out);
 

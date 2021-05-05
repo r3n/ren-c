@@ -332,10 +332,10 @@ parse-asn: func [
                 class: pick class-types 1 + shift byte -6
 
                 switch class [
-                    @universal [
+                    '@universal [
                         tag: pick universal-tags 1 + (byte and+ 31)
                     ]
-                    @context-specific [
+                    '@context-specific [
                         tag: <context-specific>
                         val: byte and+ 31
                     ]
@@ -367,7 +367,7 @@ parse-asn: func [
 
             #value [
                 switch class [
-                    @universal [
+                    '@universal [
                         val: copy/part data size
                         keep/only/line compose/deep/only [
                             (tag) [
@@ -379,7 +379,7 @@ parse-asn: func [
                         ]
                     ]
 
-                    @context-specific [
+                    '@context-specific [
                         keep/only/line compose/deep [(tag) [(val) (size)]]
                         parse-asn copy/part data size  ; !!! ensures valid?
                     ]
@@ -904,7 +904,7 @@ encrypt-data: func [
     ]
 
     switch ctx/crypt-method [
-        @aes [
+        '@aes [
             ctx/encrypt-stream: default [
                 aes-key ctx/client-crypt-key ctx/client-iv
             ]
@@ -938,7 +938,7 @@ decrypt-data: func [
     data [binary!]
 ][
     switch ctx/crypt-method [
-        @aes [
+        '@aes [
             ctx/decrypt-stream: default [
                 aes-key/decrypt ctx/server-crypt-key ctx/server-iv
             ]
@@ -1022,9 +1022,9 @@ parse-messages: func [
         2 <server-hello>
         11 <certificate>
         12 <server-key-exchange>
-        13 @certificate-request  ; not yet implemented
+        13 '@certificate-request  ; not yet implemented
         14 #server-hello-done
-        15 @certificate-verify  ; not yet implemented
+        15 '@certificate-verify  ; not yet implemented
         16 <client-key-exchange>
         20 <finished>
     ])
@@ -2043,7 +2043,7 @@ sys/make-scheme [
             ;
             if port/state/suite [
                 switch port/state/crypt-method [
-                    @aes [
+                    '@aes [
                         if port/state/encrypt-stream [
                             port/state/encrypt-stream: _  ; will be GC'd
                         ]

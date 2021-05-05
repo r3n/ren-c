@@ -242,7 +242,7 @@ void Push_Paramlist_Triads_May_Fail(
                 GET_CELL_FLAG(param, STACK_NOTE_LOCAL)
                 and VAL_WORD_ID(KEY_SLOT(DSP)) == SYM_RETURN
             ){
-                continue;  // !!! allow because of RETURN, still figuring... 
+                continue;  // !!! allow because of RETURN, still figuring...
             }
 
             REBSPC* derived = Derive_Specifier(VAL_SPECIFIER(spec), item);
@@ -261,7 +261,7 @@ void Push_Paramlist_Triads_May_Fail(
             bool was_refinement = TYPE_CHECK(param, REB_TS_REFINEMENT);
             VAL_TYPESET_LOW_BITS(param) = 0;
             VAL_TYPESET_HIGH_BITS(param) = 0;
-            
+
             const RELVAL *types_tail;
             const RELVAL *types_at = VAL_ARRAY_AT(&types_tail, item);
             Add_Typeset_Bits_Core(
@@ -522,7 +522,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
                 param,
                 REB_P_RETURN,
                 TS_OPT_VALUE
-                    | FLAGIT_KIND(REB_TS_INVISIBLE)  // return @() intentional
+                    | FLAGIT_KIND(REB_TS_INVISIBLE)  // return/unquote @() ok
                     | FLAGIT_KIND(REB_TS_REFINEMENT)  // need slot for types
             );
 
@@ -722,7 +722,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
         INIT_CTX_KEYLIST_SHARED(CTX(notes_varlist), keylist);
 
         RELVAL *rootvar = ARR_HEAD(notes_varlist);
-        INIT_VAL_CONTEXT_ROOTVAR(rootvar, REB_OBJECT, notes_varlist); 
+        INIT_VAL_CONTEXT_ROOTVAR(rootvar, REB_OBJECT, notes_varlist);
 
         const RELVAL *param = ARR_AT(paramlist, 1);
         REBVAL *dest = SPECIFIC(rootvar) + 1;

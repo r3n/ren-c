@@ -150,7 +150,7 @@ nihil: enfixed func* [  ; 0-arg so enfix doesn't matter, but tests issue below
     until [
         equal? '=== take remarks
     ]
-    return @()  ; return no value (invisible)
+    return/unquote @()  ; return no value (invisible)
 ]
 
 ; COMMA! is the new expression barrier.  But `||` is included as a redefine of

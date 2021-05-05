@@ -209,31 +209,6 @@ port        "external series, an I/O channel"
 varargs     "evaluator position for variable numbers of arguments"
             varargs     +       +       +       []
 
-; !!! At time of writing, VARARGS! is at 33...putting the following ranges
-; close to being 32.  That might be a useful number for math tricks on the
-; following sequences.  Right now there's no particularly fast test for
-; ANY_ARRAY(), ANY_PATH(), ANY_WORD()...due to those being less common than
-; testing for ANY_INERT() which requires the SYM-XXX forms to be low.
-
-; <ANY-SYM> (order matters, see UNSETIFY_ANY_XXX_KIND())
-
-sym-block   "alternative form of block (that also doesn't evaluate)"
-            array       *       *       *       [block array series branch]
-
-sym-group   "symbolic form of group! that does not evaluate"
-            array       *       *       *       [group array series branch]
-
-sym-path    "symbolic form of path! that does not evaluate"
-            sequence    *       *       *       [path sequence branch]
-
-sym-tuple   "symbolic form of tuple! that does not evaluate"
-            sequence    *       *       *       [tuple sequence branch]
-
-sym-word    "symbolic form of word! that does not evaluate"
-            word        -       *       +       [word branch]
-
-; <ANY-SYM> (order matters, see UNSETIFY_ANY_XXX_KIND())
-
 
 ; <ANY-PLAIN> (order matters, see UNSETIFY_ANY_XXX_KIND())
 
@@ -299,6 +274,30 @@ get-word    "the value of a word (variable)"
 ; </ANY-GET> (except for ISSUE!)
 
 
+; Right now there's no particularly fast test for ANY_ARRAY(), ANY_PATH(),
+; ANY_WORD()...due to those being less common than testing for ANY_INERT().
+; Review the decision.
+
+; <ANY-SYM> (order matters, see UNSETIFY_ANY_XXX_KIND())
+
+sym-block   "alternative form of block (that also doesn't evaluate)"
+            array       *       *       *       [block array series branch]
+
+sym-group   "symbolic form of group! that does not evaluate"
+            array       *       *       *       [group array series branch]
+
+sym-path    "symbolic form of path! that does not evaluate"
+            sequence    *       *       *       [path sequence branch]
+
+sym-tuple   "symbolic form of tuple! that does not evaluate"
+            sequence    *       *       *       [tuple sequence branch]
+
+sym-word    "symbolic form of word! that does not evaluate"
+            word        -       *       +       [word branch]
+
+; <ANY-SYM> (order matters, see UNSETIFY_ANY_XXX_KIND())
+
+
 ; COMMA! has a high number with bindable types it's evaluative, and the
 ; desire is to make the ANY_INERT() test fast with a single comparison.
 
@@ -326,7 +325,7 @@ quoted     "container for arbitrary levels of quoting"
 ; This is the end of the value cell enumerations (after REB_QUOTED is REB_MAX)
 ; and no valid cell should have bits in this range.
 ;
-; However, higher values are currently in use in places like typesets, 
+; However, higher values are currently in use in places like typesets,
 ; where bits that flag types are merged with bits that flag other things.
 ; These end at the 64th bit.
 ;

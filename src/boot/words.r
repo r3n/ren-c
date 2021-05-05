@@ -40,6 +40,7 @@ datatypes
 ;
 void
 unset
+invisible
 nulled
 blanked
 matched

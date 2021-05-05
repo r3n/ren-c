@@ -697,7 +697,7 @@ attempt: func [
     code [block! action!]
 ][
     trap [
-        return @(do code else [null])  ; want NULL-2 if was NULL
+        return/unquote (@(do code) else [just '])  ; want NULL-2 if was NULL
     ]
     return null
 ]

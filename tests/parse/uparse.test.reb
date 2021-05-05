@@ -443,8 +443,20 @@
 
 
 ; UPARSE can be used where "heavy" nulls produced by the rule products do not
-; trigger ELSE, but match failures do.  To conflate the two, the /VERBATIM
-; switch (or modal block) can be used.
+; trigger ELSE, but match failures do.
+;
+; !!! Is it worth it to add a way to do something like @[...] block rules to
+; say you don't want the NULL-2, or does that just confuse things?  Is it
+; better to just rig that up from the outside?
+;
+;     uparse data rules then result -> [
+;         ; If RESULT is null we can react differently here
+;     ] else [
+;         ; This is a match failure null
+;     ]
+;
+; Adding additional interface complexity onto UPARSE may not be worth it when
+; it's this easy to work around.
 [
     (
         x: uparse "aaa" [some "a" (null)] else [fail "Shouldn't be reached"]
@@ -454,11 +466,6 @@
         did-not-match: false
         uparse "aaa" [some "b"] else [did-not-match: true]
         did-not-match
-    )
-    (
-        acted-like-not-match: false
-        uparse "aaa" @[some "a" (null)] else [acted-like-not-match: true]
-        acted-like-not-match
     )
 ]
 
@@ -595,7 +602,7 @@
     (3 = uparse "aaa" [tally "a"])
 
     (null = uparse "aaa" [tally "b"])  ; doesn't finish parse
-    (0 = uparse "aaa" [tally "b" to end])  ; must be at end
+    (0 = uparse "aaa" [tally "b" elide to end])  ; must be at end
     (0 = uparse* "aaa" [tally "b"])  ; alternately, use non-force-completion
 
     (did all [

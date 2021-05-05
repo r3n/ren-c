@@ -1512,9 +1512,8 @@ REBNATIVE(remove_each)
 //          "Word or block of words to set each time (local)"
 //      data [<blank> any-series! any-path! action!]
 //          "The series to traverse"
-//      body [<const> <modal> block!]
+//      body [<const> block!]
 //          "Block to evaluate each time"
-//      /splice "Splice body result if it's a block"
 //  ]
 //
 REBNATIVE(map_each)
@@ -1526,7 +1525,7 @@ REBNATIVE(map_each)
 
     return Loop_Each(
         frame_,
-        REF(splice) ? LOOP_MAP_EACH_SPLICED : LOOP_MAP_EACH
+        LOOP_MAP_EACH  // will transition to MAP_EACH_SPLICED as default
     );
 }
 
