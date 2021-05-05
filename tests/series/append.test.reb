@@ -146,6 +146,15 @@
     ([a b c @d/e] = append [a b c] enblock '@d/e)
 ]
 
+; New idea: By default, a QUOTED! passed to APPEND will act as APPEND/ONLY.
+[
+    ([a b c [d e]] = append [a b c] @[d e])
+
+    ([a b c [3 d e]] = append [a b c] @ compose [(1 + 2) d e])
+
+    ([a b c] = append [a b c] @(null))
+]
+
 [#2383 (
     "abcde" = append/part "abc" ["defg"] 2
 )(

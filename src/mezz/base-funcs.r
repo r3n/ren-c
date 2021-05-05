@@ -141,23 +141,23 @@ func: func* [
     |
         :(if var '[  ; so long as we haven't reached any <local> or <with> etc.
             set var: [any-word! | any-path! | quoted!] (
-                append new-spec var  ; need quote level as-is in new spec
+                append new-spec @var  ; need quote level as-is in new spec
 
                 var: dequote var
                 case [
                     match [get-path! path!] var [
                         if (length of var != 2) or (_ <> first var) [
-                            fail ["Bad path in spec:" var]
+                            fail ["Bad path in spec:" @var]
                         ]
-                        append exclusions var/2  ; exclude args/refines
+                        append exclusions @var.2  ; exclude args/refines
                     ]
 
                     any-word? var [
-                        append exclusions var  ; exclude args/refines
+                        append exclusions @var  ; exclude args/refines
                     ]
 
                     true [  ; QUOTED! could have been anything
-                        fail ["Bad spec item" var]
+                        fail ["Bad spec item" @var]
                     ]
                 ]
             )

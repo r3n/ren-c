@@ -569,7 +569,13 @@ bool Form_Reduce_Throws(
             if (pending)
                 Form_Value(mo, delimiter);
 
-            Form_Value(mo, out);
+            if (IS_QUOTED(out)) {
+                Unquotify(out, 1);
+                Mold_Value(mo, out);
+            }
+            else
+                Form_Value(mo, out);
+
             pending = true;
         }
     } while (NOT_END(f->feed->value));

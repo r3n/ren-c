@@ -615,13 +615,17 @@ print: func* [
     return: "NULL if blank input or effectively empty block, otherwise VOID!"
         [<opt> void!]
     line "Line of text or block, blank or [] has NO output, newline allowed"
-        [<blank> char! text! block!]
+        [<blank> char! text! block! quoted!]
 ][
     if char? line [
         if line <> newline [
             fail "PRINT only allows CHAR! of newline (see WRITE-STDOUT)"
         ]
         return write-stdout line
+    ]
+
+    if quoted? line [  ; Feature: treats a quote mark as a mold request
+        line: mold unquote line
     ]
 
     (write-stdout try spaced line) then [write-stdout newline]

@@ -961,8 +961,12 @@ REBTYPE(Array)
         REBLEN index = VAL_INDEX(array);
 
         REBFLGS flags = 0;
-        if (not REF(only) and Splices_Without_Only(ARG(value)))
+
+        if (IS_QUOTED(ARG(value)))
+            Unquotify(ARG(value), 1);
+        else if (not REF(only) and Splices_Without_Only(ARG(value)))
             flags |= AM_SPLICE;
+
         if (REF(part))
             flags |= AM_PART;
         if (REF(line))
