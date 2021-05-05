@@ -1732,23 +1732,6 @@ REBNATIVE(null_2_q)
 
 
 //
-//  isotope?: native [
-//
-//  {Determine if a NULL is an isotope}
-//
-//      return: [logic!]
-//      var [word!]
-//  ]
-//
-REBNATIVE(isotope_q) {
-    INCLUDE_PARAMS_OF_ISOTOPE_Q;
-
-    const REBVAL *var = Lookup_Word_May_Fail(ARG(var), SPECIFIED);
-    return Init_Logic(D_OUT, Is_Heavy_Nulled(var));
-}
-
-
-//
 //  voidify: native [
 //
 //  "Turn nulls into voids, passing through all other values"

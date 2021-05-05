@@ -65,3 +65,7 @@
         1 = bar 10
     ]
 )
+
+(
+    null = (' then [fail "shouldn't happen because ' produces light null"])
+)

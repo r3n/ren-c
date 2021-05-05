@@ -164,8 +164,15 @@ inline static bool Rightward_Evaluate_Nonvoid_Into_Out_Throws(
         return false;
     }
 
-    if (IS_END(f_next))  // `do [x:]`, `do [o/x:]`, etc. are illegal
+    if (IS_END(f_next)) {
+        if (IS_LIT(v)) {  // allow (@), REB_LIT makes ~invisible~
+            SET_END(f->out);
+            return false;
+        }
+
+        // `do [x:]`, `do [o/x:]`, etc. are illegal
         fail (Error_Need_Non_End_Core(v, v_specifier));
+    }
 
     // Using a SET-XXX! means you always have at least two elements; it's like
     // an arity-1 function.  `1 + x: whatever ...`.  This overrides the no
@@ -201,8 +208,15 @@ inline static bool Rightward_Evaluate_Nonvoid_Into_Out_Throws(
         } while (IS_END(f->out) and NOT_END(f_next));
     }
 
-    if (IS_END(f->out))  // e.g. `do [x: ()]` or `(x: comment "hi")`.
+    if (IS_END(f->out)) {
+        if (IS_LIT(v)) {   // allow (@ comment "hi"), REB_LIT makes ~invisible~
+            SET_END(f->out);
+            return false;
+        }
+
+        // e.g. `do [x: ()]` or `(x: comment "hi")`.
         fail (Error_Need_Non_End_Core(v, v_specifier));
+    }
 
     CLEAR_CELL_FLAG(f->out, UNEVALUATED);  // this helper counts as eval
     return false;
@@ -1390,7 +1404,10 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (Rightward_Evaluate_Nonvoid_Into_Out_Throws(f, v))  // see notes
             goto return_thrown;
 
-        if (not Is_Light_Nulled(f->out))
+        if (IS_END(f->out)) {  // Rightward_Evaluate allows when v is LIT!
+            Init_Void(f->out, SYM_INVISIBLE);
+        }
+        else if (not Is_Light_Nulled(f->out))
             Quotify(f->out, 1);
         break;
 
@@ -1496,6 +1513,35 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
       default:
         Derelativize(f->out, v, v_specifier);
         Unquotify_In_Situ(f->out, 1);  // checks for illegal REB_XXX bytes
+
+        // The evaluator decays a plain quote to "light" null:
+        //
+        //    >> '
+        //    ; null
+        //
+        // This is different from what UNQUOTE does with '
+        //
+        //    >> unquote just '
+        //    ; null-2
+        //
+        // It's for a reason.  The convention UNQUOTE is based on happens
+        // in code that has more control over its environment...the variable
+        // can be known to be in a quoted-null-or-regular-null state.  But
+        // imagine a function that wants to discern NULL vs. NULL-2 that you
+        // are trying to call from a constrained situation like a COMPOSE:
+        //
+        //     >> code: compose [discerner '(expression)]
+        //     >> do code
+        //
+        // Since NULL vs. NULL-2 is a transient state, it can't be reflected
+        // in the composed block.  So it would have to be done by passing a
+        // quoted parameter, where NULL is plain NULL and NULL-2 is '
+        //
+        // If ' produces NULL and '' produces ' then you can accomplish this
+        // convention.  But if ' produces NULL-2 you can't get the convention
+        // because there's no way to make NULL!
+        //
+        Decay_If_Nulled(f->out);
         break;
     }
 

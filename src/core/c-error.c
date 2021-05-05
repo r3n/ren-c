@@ -911,7 +911,7 @@ REBCTX *Error_Need_Non_End_Core(
     const RELVAL *target,
     REBSPC *specifier
 ){
-    assert(IS_LIT(target) or IS_SET_WORD(target) or IS_SET_PATH(target));
+    assert(IS_SET_WORD(target) or IS_SET_PATH(target));
 
     DECLARE_LOCAL (specific);
     Derelativize(specific, target, specifier);

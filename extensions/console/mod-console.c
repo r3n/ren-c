@@ -218,7 +218,10 @@ static REBVAL *Run_Sandboxed_Group(REBVAL *group) {
     //
     // So don't add superfluous libRebol calls here, except to debug.
     //
-    return rebQuoteInterruptible(group);  // ownership gets proxied
+    // We want the "@" because we'd like to discern if this is a NULL or a
+    // NULL-2.  The group means code cannot look backwards and quote the @.
+    //
+    return rebValueInterruptible("@", group);  // ownership gets proxied
 }
 
 

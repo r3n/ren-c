@@ -297,7 +297,10 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 // data in cases like `(1 + 2 | comment "hi")` => 3, but
                 // left enfix should treat that just like an end.
 
-                Init_Endish_Nulled(f->arg);
+                if (pclass == REB_P_LITERAL)
+                    Init_Void(f->arg, SYM_INVISIBLE);
+                else
+                    Init_Endish_Nulled(f->arg);
                 goto continue_fulfilling;
             }
 
@@ -321,6 +324,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 Copy_Cell(f->arg, f->out);
                 if (GET_CELL_FLAG(f->out, UNEVALUATED))
                     SET_CELL_FLAG(f->arg, UNEVALUATED);
+
+                if (pclass == REB_P_LITERAL) {
+                    if (not Is_Light_Nulled(f->arg))
+                        Quotify(f->arg, 1);
+                }
                 break;
 
               case REB_P_HARD:
@@ -467,7 +475,10 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
   //=//// ERROR ON END MARKER, BAR! IF APPLICABLE /////////////////////////=//
 
         if (IS_END(f_next)) {
-            Init_Endish_Nulled(f->arg);
+            if (pclass == REB_P_LITERAL)
+                Init_Void(f->arg, SYM_INVISIBLE);  // !!! ...good answer?
+            else
+                Init_Endish_Nulled(f->arg);
             goto continue_fulfilling;
         }
 

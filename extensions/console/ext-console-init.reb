@@ -114,22 +114,43 @@ console!: make object! [
         write-stdout space
     ]
 
-    print-result: meth [return: <void> v [<opt> any-value!]] [
-        switch match void! last-result: get/any 'v [
-            null [
-                ; not a void, fall through to other printing
-            ]
-            '~void~ [
-                return  ; understood this *specific* void as output *nothing*
-            ]
-        ] else [  ; any other labeled VOID!
-            print [result mold get/any 'v]
+    print-result: meth [
+        return: <void>
+        @v "Value (done with literal parameter to discern isotope status)"
+            [<opt> any-value!]
+    ] [
+        if '~void~ = last-result: unquote v [
+            return  ; This *specific* void means don't print console output
+        ]
+
+        ; Since the parameter was literal (@v instead of v) it is usually
+        ; quoted.  But it's not quoted it if it's a "light null isotope",
+        ; e.g. the sort that will trigger ELSE.  Handle that.
+        ;
+        if null? v [
+            print "; null"  ; no representation, need to use a comment.
             return
         ]
 
+        ; For all other voids, we just print out the result.  Note that since
+        ; it is quoted as a reference parameter, we leverage that for molding.
+        ;
+        if void? unquote v [
+            print [result v]
+            return
+        ]
+
+        v: unquote v  ; Now handle everything else
+
         case [
-            null? :v [  ; no representation, use comment
-                print ["; null" if isotope? 'v [#-2]]
+            null? :v [
+                ;
+                ; If the value was a *quoted* NULL, that indicates the "heavy"
+                ; isotope of NULL.  This is a transient state that only a
+                ; literal parameter's quoting allows us to see.  But it's good
+                ; for console users to be aware of the distinction.
+                ;
+                print ["; null-2"]  ; no representation, use comment
             ]
 
             free? :v [
@@ -348,12 +369,20 @@ ext-console-impl: func [
     prior "BLOCK! or GROUP! that last invocation of HOST-CONSOLE requested"
         [blank! block! group!]
     result "Quoted result from evaluating PRIOR, or non-quoted error"
-        [blank! quoted! error!]
+        [<opt> blank! quoted! void! error!]
     resumable "Is the RESUME function allowed to exit this console"
         [logic!]
     skin "Console skin to use if the console has to be launched"
         [<opt> object! file!]
 ][
+    ; To make sure anyone handling invisibles knows what they are doing, the
+    ; system makes it an ornery term--despite being escaped.  That makes it
+    ; harder to handle.  Change it to something easier.
+    ;
+    if '~invisible~ = get/any 'result [
+        result: #invisible
+    ]
+
     === {HOOK RETURN FUNCTION TO GIVE EMITTED INSTRUCTION} ===
 
     ; The C caller can be given a BLOCK! representing an code the console is
@@ -606,12 +635,32 @@ ext-console-impl: func [
         return <prompt>
     ]
 
-    assert [quoted? :result]
+    ; The call to `rebValueInterruptible() on `@ (code)` can produce a void
+    ; if the code vanishes completely.  Just cycle the prompt if it does.  (We
+    ; transformed from ~invisible~ => #invisible at top of function for easier
+    ; handling... e.g. we got the memo that we're handling a weird result.)
+    ;
+    if result = #invisible [
+        return <prompt>
+    ]
+
+    match [<opt> quoted! void!] result else [
+        fail "Expected QUOTED!, VOID!, or NULL"
+    ]
 
     === {HANDLE RESULT FROM EXECUTION OF CODE ON USER'S BEHALF} ===
 
     if group? prior [
-        emit [system/console/print-result (<*> get/any 'result)]
+        ;
+        ; The result is NULL if the evaluation was a "light null isotope"
+        ; and ' if it was a "heavy null isotope".  Or just a quoted result
+        ; value otherwise.  We need to quote it in the composition (or else
+        ; the null would vanish and there'd be no argument to PRINT-RESULT),
+        ; but that quote will be evaluated away.  Then, UNQUOTE knows how to
+        ; handle the NULL vs. quoted NULL, and PRINT-RESULT uses the @literal
+        ; parameter convention to sense the null-vs-null-2 distinction.  Neat!
+        ;
+        emit [system/console/print-result unquote '(<*> result)]
         return <prompt>
     ]
 

@@ -930,13 +930,13 @@ REBVAL *RL_rebQuote(unsigned char quotes, const void *p, va_list *vaptr)
 
 
 //
-//  rebQuoteInterruptible: RL_API
+//  rebValueInterruptible: RL_API
 //
-// !!! The core interruptible routine used at the moment is rebQuote, inside
-// of console code.  More will be needed, but this is made to quarantine the
-// unfinished design points to one routine for now.
+// !!! The core interruptible routine used is this one inside of console code.
+// More will be needed, but this is made to quarantine the unfinished design
+// points to one routine for now.
 //
-REBVAL *RL_rebQuoteInterruptible(
+REBVAL *RL_rebValueInterruptible(
     unsigned char quotes,
     const void *p,
     va_list *vaptr
@@ -946,7 +946,11 @@ REBVAL *RL_rebQuoteInterruptible(
     REBVAL *result = Alloc_Value();
     Run_Va_May_Fail_Core(result, true, quotes, p, vaptr);  // calls va_end()
 
-    return Quotify(result, 1);  // nulled cells legal for API if quoted
+    if (not IS_NULLED(result))
+        return result;  // caller must rebRelease()
+
+    rebRelease(result);
+    return nullptr;  // No NULLED cells in API, see notes on NULLIFY_NULLED()
 }
 
 //
