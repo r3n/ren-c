@@ -256,9 +256,9 @@ REBNATIVE(shove)
 
 
 //
-//  Do_Frame_Throws: C
+//  Do_Frame_Maybe_Stale_Throws: C
 //
-bool Do_Frame_Throws(REBVAL *out, REBVAL *frame) {
+bool Do_Frame_Maybe_Stale_Throws(REBVAL *out, REBVAL *frame) {
     if (IS_FRAME_PHASED(frame))  // see REDO for tail-call recursion
         fail ("Use REDO to restart a running FRAME! (not DO)");
 
@@ -284,7 +284,7 @@ bool Do_Frame_Throws(REBVAL *out, REBVAL *frame) {
 
     Begin_Prefix_Action(f, VAL_FRAME_LABEL(frame));
 
-    bool threw = Process_Action_Throws(f);
+    bool threw = Process_Action_Maybe_Stale_Throws(f);
     assert(threw or IS_END(f->feed->value));  // we started at END_FLAG
 
     Drop_Frame(f);
@@ -300,10 +300,10 @@ bool Do_Frame_Throws(REBVAL *out, REBVAL *frame) {
 //      return: [<opt> <invisible> any-value!]
 //      source [
 //          <blank>  ; opts out of the DO, returns null
-//          block!  ; source code in block form, will be void if empty
+//          block!  ; source code in block form
 //          get-block!  ; same
 //          sym-block!  ; same
-//          group!  ; source code in group form, will vanish if empty
+//          group!  ; same
 //          get-group!  ; same
 //          sym-group!  ; same
 //          text!  ; source code in text form
@@ -320,11 +320,16 @@ bool Do_Frame_Throws(REBVAL *out, REBVAL *frame) {
 //      /args "Sets system/script/args if doing a script (usually a TEXT!)"
 //          [any-value!]
 //      /only "Don't catch QUIT (default behavior for BLOCK!)"
+//      /void "Allow overall DO operation to vanish if product is void"
 //  ]
 //
 REBNATIVE(do)
 {
     INCLUDE_PARAMS_OF_DO;
+    assert(ACT_HAS_RETURN(FRM_PHASE(frame_)));
+
+    // !!! This flag isn't necessarily set on input (?)
+    SET_CELL_FLAG(D_OUT, OUT_NOTE_STALE);
 
     REBVAL *source = ARG(source);
 
@@ -347,14 +352,10 @@ REBNATIVE(do)
     switch (VAL_TYPE(source)) {
       case REB_BLOCK:
       case REB_SYM_BLOCK:
-      case REB_GET_BLOCK: {  // `do []` and `do [comment "hi"]` return void
-        if (Do_Any_Array_At_Throws(D_OUT, source, SPECIFIED))
-            return R_THROWN;
-        return D_OUT; }
-
+      case REB_GET_BLOCK:
       case REB_GROUP:
       case REB_SYM_GROUP:
-      case REB_GET_GROUP: {  // `do '()` and `do '(comment "hi")` vanish
+      case REB_GET_GROUP: {
         DECLARE_FEED_AT_CORE (feed, source, SPECIFIED);
         if (Do_Feed_To_End_Maybe_Stale_Throws(
             D_OUT,
@@ -363,7 +364,7 @@ REBNATIVE(do)
         )){
             return R_THROWN;
         }
-        return D_OUT; }  // may be stale, which would mean invisible
+        goto handle_void; }  // may be stale, which would mean invisible
 
       case REB_VARARGS: {
         REBVAL *position;
@@ -463,25 +464,37 @@ REBNATIVE(do)
         if (First_Unspecialized_Param(nullptr, VAL_ACTION(source)))
             fail (Error_Do_Arity_Non_Zero_Raw());
 
-        if (Eval_Value_Throws(D_OUT, source, SPECIFIED))
+        if (Eval_Value_Maybe_Stale_Throws(D_OUT, source, SPECIFIED))
             return R_THROWN;
-        return D_OUT; }
+        break; }
 
       case REB_FRAME: {
-        if (Do_Frame_Throws(D_OUT, source))
+        if (Do_Frame_Maybe_Stale_Throws(D_OUT, source))
             return R_THROWN; // prohibits recovery from exits
 
-        return D_OUT; }
+        goto handle_void; }
 
       case REB_QUOTED:
         Copy_Cell(D_OUT, ARG(source));
         return Unquotify(D_OUT, 1);
 
       default:
-        break;
+        fail (Error_Do_Arity_Non_Zero_Raw());  // https://trello.com/c/YMAb89dv
     }
 
-    fail (Error_Do_Arity_Non_Zero_Raw());  // https://trello.com/c/YMAb89dv
+  handle_void:
+
+    // An invisible operation should not have written to the output slot.
+    //
+    // !!! If vanishing semantics are not requested, giving NULL back is
+    // abrasive...is it worth it to do so, to avoid misconstruing results
+    // (e.g. not thinking a DO returned NULL when it didn't?)  For now,
+    // err on the side of caution.
+    //
+    if (not REF(void) and GET_CELL_FLAG(D_OUT, OUT_NOTE_STALE))
+        Init_Reified_Invisible(D_OUT);
+
+    return D_OUT;
 }
 
 
@@ -522,7 +535,7 @@ REBNATIVE(evaluate)
       case REB_GROUP: {
         if (VAL_LEN_AT(source) == 0) {  // `evaluate []` should return null
             Init_Nulled(D_OUT);
-            Init_Empty_Nulled(D_SPARE);
+            Init_Reified_Invisible(D_SPARE);
         }
         else {
             DECLARE_FEED_AT_CORE (feed, source, SPECIFIED);
@@ -578,7 +591,7 @@ REBNATIVE(evaluate)
                 //
                 // https://forum.rebol.info/t/1173/
                 //
-                Init_Empty_Nulled(D_SPARE);
+                Init_Reified_Invisible(D_SPARE);
                 Quotify(D_OUT, 1);  // void-is-invisible signal on array
             }
         }

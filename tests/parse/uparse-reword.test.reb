@@ -23,8 +23,8 @@
 
     out: make (type of source) length of source
 
-    prefix: null
-    suffix: null
+    prefix: '~unset~
+    suffix: '~unset~
     case [
         null? escape [prefix: "$"]  ; refinement not used, so use default
 
@@ -32,7 +32,8 @@
             escape = ""
             escape = []
         ][
-            prefix: null  ; pure search and replace, no prefix/suffix
+            ; !!! Review: NULL not supported by UPARSE at the moment
+            prefix: ""  ; pure search and replace, no prefix/suffix
         ]
 
         block? escape [
@@ -46,6 +47,11 @@
     ] else [
         prefix: ensure delimiter-types escape
     ]
+
+    ; !!! UPARSE doesn't allow fetched blank or fetched NULL at the moment.
+    ; Use an empty string.
+    ;
+    suffix: default [""]  ; default to no suffix
 
     if match [integer! word!] prefix [prefix: to-text prefix]
     if match [integer! word!] suffix [suffix: to-text suffix]
@@ -113,7 +119,7 @@
         (append out a)  ; finalize output - transfer any remainder verbatim
     ]
 
-    uparse/(case_REWORD) source rule else [fail]  ; should succeed
+    uparse*/(case_REWORD) source rule else [fail]  ; should succeed
     return out
 ])
 

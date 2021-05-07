@@ -99,9 +99,7 @@ REB_R Void_Dispatcher(REBFRM *f)
 //  Empty_Dispatcher: C
 //
 // If you write `func [...] []` it uses this dispatcher instead of running
-// Eval_Core() on an empty block.  The subtlety of returning ~ instead of
-// ~void~ is to make sure that it acts the same as `do []`...and helps
-// to clue people into the importance of normalizing the return results.
+// Eval_Core() on an empty block.  It returns ~void~, the same as `do []`.
 //
 REB_R Empty_Dispatcher(REBFRM *f)
 {
@@ -109,7 +107,7 @@ REB_R Empty_Dispatcher(REBFRM *f)
     assert(VAL_LEN_AT(ARR_AT(details, IDX_DETAILS_1)) == 0);  // empty body
     UNUSED(details);
 
-    return Init_Empty_Nulled(f->out);
+    return Init_Reified_Invisible(f->out);
 }
 
 
@@ -612,9 +610,9 @@ REBNATIVE(unwind)
 //
 //  {RETURN, giving a result to the caller}
 //
-//      value "If no argument is given, result will be a VOID!"
+//      value "If no argument is given, result will be ~void~"
 //          [<end> <opt> any-value!]
-//      /unquote "Relay argument that was quoted, NULL, or ~invisible~"
+//      /unquote "Relay argument that was quoted, NULL, or ~void~"
 //  ]
 //
 REBNATIVE(return)
@@ -680,8 +678,8 @@ REBNATIVE(return)
                 Init_Heavy_Nulled(v);
         }
         else {
-            if (not IS_VOID(v) or VAL_VOID_LABEL(v) != Canon(SYM_INVISIBLE))
-                fail ("VOID! parameter to RETURN/UNQUOTE must be ~INVISIBLE~");
+            if (not IS_VOID(v) or VAL_VOID_LABEL(v) != Canon(SYM_VOID))
+                fail ("BAD-WORD! parameter to RETURN/UNQUOTE must be ~VOID~");
 
             FAIL_IF_NO_INVISIBLE_RETURN(target_frame);
             Init_Endish_Nulled(v);  // how return throw protocol does invisible

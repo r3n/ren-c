@@ -363,7 +363,7 @@ inline static bool Eval_Step_In_Any_Array_At_Throws(
 // *and* check that you ended properly.  It means this function will need
 // two different signatures (and so will each caller of this routine).
 //
-inline static bool Eval_Step_In_Va_Throws_Core(
+inline static bool Eval_Step_In_Va_Maybe_Stale_Throws(
     REBVAL *out,  // must be initialized, won't change if all empty/invisible
     REBFLGS feed_flags,
     const void *p,
@@ -375,7 +375,7 @@ inline static bool Eval_Step_In_Va_Throws_Core(
     DECLARE_FRAME (f, feed, eval_flags | EVAL_FLAG_ALLOCATED_FEED);
 
     Push_Frame(out, f);
-    bool threw = Eval_Throws(f);
+    bool threw = Eval_Maybe_Stale_Throws(f);
 
     bool too_many = (eval_flags & EVAL_FLAG_NO_RESIDUE)
         and NOT_END(feed->value);  // feed will be freed in Drop_Frame()
@@ -397,7 +397,7 @@ inline static bool Eval_Step_In_Va_Throws_Core(
 }
 
 
-inline static bool Eval_Value_Maybe_End_Throws(
+inline static bool Eval_Value_Maybe_Stale_Throws(
     REBVAL *out,
     const RELVAL *value,  // e.g. a BLOCK! here would just evaluate to itself!
     REBSPC *specifier
@@ -406,11 +406,6 @@ inline static bool Eval_Value_Maybe_End_Throws(
         Derelativize(out, value, specifier);
         return false;  // fast things that don't need frames (should inline)
     }
-
-    // We need the const bits on this value to apply, so have to use a low
-    // level call.
-
-    SET_END(out);
 
     // Passes `first` so can't use DECLARE_ARRAY_FEED
     REBFED *feed = Alloc_Feed();
@@ -426,7 +421,7 @@ inline static bool Eval_Value_Maybe_End_Throws(
     DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED);
 
     Push_Frame(out, f);
-    bool threw = Eval_Throws(f);
+    bool threw = Eval_Maybe_Stale_Throws(f);
     Drop_Frame(f);
 
     return threw;
@@ -444,7 +439,8 @@ inline static bool Eval_Value_Throws(
     const RELVAL *value,  // note this is not `unstable`, direct pointer used
     REBSPC *specifier
 ){
-    if (Eval_Value_Maybe_End_Throws(out, value, specifier))
+    SET_END(out);
+    if (Eval_Value_Maybe_Stale_Throws(out, value, specifier))
         return true;
 
     if (IS_END(out))

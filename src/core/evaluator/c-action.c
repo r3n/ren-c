@@ -298,7 +298,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 // left enfix should treat that just like an end.
 
                 if (pclass == REB_P_LITERAL)
-                    Init_Void(f->arg, SYM_INVISIBLE);
+                    Init_Reified_Invisible(f->arg);
                 else
                     Init_Endish_Nulled(f->arg);
                 goto continue_fulfilling;
@@ -476,7 +476,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
         if (IS_END(f_next)) {
             if (pclass == REB_P_LITERAL)
-                Init_Void(f->arg, SYM_INVISIBLE);  // !!! ...good answer?
+                Init_Reified_Invisible(f->arg);
             else
                 Init_Endish_Nulled(f->arg);
             goto continue_fulfilling;
@@ -491,7 +491,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
           case REB_P_LITERAL: {
             if (GET_FEED_FLAG(f->feed, BARRIER_HIT)) {
                 if (pclass == REB_P_LITERAL)
-                    Init_Void(f->arg, SYM_INVISIBLE);  // !!! ...good answer?
+                    Init_Reified_Invisible(f->arg);
                 else
                     Init_Endish_Nulled(f->arg);
                 goto continue_fulfilling;
@@ -510,7 +510,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
             if (IS_END(f->arg)) {
                 if (pclass == REB_P_LITERAL)
-                    Init_Void(f->arg, SYM_INVISIBLE);  // !!! ...good answer?
+                    Init_Reified_Invisible(f->arg);
                 else
                     Init_Endish_Nulled(f->arg);
             }

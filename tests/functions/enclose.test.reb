@@ -21,3 +21,46 @@
         25 = n-add 20 20
     ]
 )
+
+; Enclose should be able to be invisible
+[(
+    var: #before
+    inner: func [] [
+        var: 1020
+    ]
+    outer: enclose :inner func [f] [
+        assert [1020 = do f]
+        return/unquote '~void~
+    ]
+    did all [
+        304 = 304 outer
+        '~void~ = @(outer)
+        var = 1020
+    ]
+)(
+    var: #before
+    inner: func [] [
+        var: 1020
+        return/unquote '~void~
+    ]
+    outer: enclose :inner func [f] [
+        return @(do/vanishable f)  ; don't unquote it here
+    ]
+    did all [
+        '~void~ = outer
+        var = 1020
+    ]
+)(
+    var: #before
+    inner: func [] [
+        var: 1020
+        return/unquote '~void~
+    ]
+    outer: enclose :inner func [f] [
+        return/unquote probe @(do/vanishable f)  ; now try unquoting
+    ]
+    did all [
+        '~void~ = @(outer)
+        var = 1020
+    ]
+)]

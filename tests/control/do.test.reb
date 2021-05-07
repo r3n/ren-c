@@ -1,22 +1,35 @@
 ; functions/control/do.r
 
-; Empty BLOCK! forms will return NULL if empty
-; Empty GROUP! forms will vaporize
-; !!! Review: probably a better idea to use REEVAL for this.
+; By default, DO will not be invisible.  You get an "ornery" return result
+; on invisibility to help remind you that you are not seeing the whole
+; picture.  Returning NULL might seem "friendlier" but it is misleading.
 [
-    (null? (1 + 2, do []))
-    (null? (1 + 2, do '@[]))
-    (null? (1 + 2, do :[]))
-    (null? (1 + 2, do [comment "hi"]))
-    (null? (1 + 2, do '@[comment "hi"]))
-    (null? (1 + 2, do :[comment "hi"]))
+    ('~void~ = do [])
+    ('~void~ = do [comment "hi"])
+    ('~void~ = do make frame! :nihil)
+    (else? do [null])
+    (null-2? do [if true [null]])
 
-    (3 = (1 + 2, do '()))
-    (3 = (1 + 2, do '@()))
-    (3 = (1 + 2, do ':()))
-    (3 = (1 + 2, do '(comment "hi")))
-    (3 = (1 + 2, do '@(comment "hi")))
-    (3 = (1 + 2, do ':(comment "hi")))
+    (''~void~ = @(do []))
+    (''~void~ = @(do [comment "hi"]))
+    (''~void~ = @(do make frame! :nihil))
+    (else? @(do [null]))
+    ('' = @(do [if true [null]]))
+
+    ('~void~ = @(do/void []))
+    ('~void~ = @(do/void [comment "hi"]))
+    ('~void~ = @(do/void make frame! :nihil))
+    (else? @(do/void [null]))
+    ('' = @(do/void [null-2]))
+    ('' = @(do/void [if true [null]]))
+
+    ; Try standalone @ operator so long as we're at it.
+    ('~void~ = @ do/void [])
+    ('~void~ = @ do/void [comment "hi"])
+    ('~void~ = @ do/void make frame! :nihil)
+    (else? @ do/void [null])
+    ((just ') = @ do/void [null-2])
+    ((just ') = @ do/void [if true [null]])
 ]
 
 

@@ -164,19 +164,25 @@
 )
 
 
-; ACROSS is UPARSE's version of historical PARSE COPY.  But it is available as
-; a SYM-BLOCK! as well for a shorthand.
+; ACROSS is UPARSE's version of historical PARSE COPY.
+; !!! It is likely that this will change back, due to making peace with the
+; ambiguity that COPY represents as a term, given all the other ambiguities.
 [
     (did all [
         uparse? "aaabbb" [x: across some "a", y: across [some "b"]]
         x = "aaa"
         y = "bbb"
     ])
+]
 
-    (did all [
-        uparse? "aaabbb" [x: @[some "a"], y: @[some "b"]]
-        x = "aaa"
-        y = "bbb"
+
+; SYM-BLOCK! runs a rule, but with "literalizing" result semantics.  If it
+; was invisible, it gives ~void~.  This helps write higher level tools
+; that might want to know about invisibility status.
+[
+    (did all  [
+        then? uparse "" [synthesized: @[]]  ; NULL-2 result (success)
+        '~void~ = get/any 'synthesized
     ])
 ]
 
@@ -311,7 +317,7 @@
        let filename: "demo.txt"
        using uparse filename [
             emit base: between here "."
-            emit extension: @[thru end]
+            emit extension: across [thru end]
         ] else [
             fail "Not a file with an extension"
         ]
@@ -503,8 +509,6 @@
     uparse? "baaabccc" [into [between "b" "b"] ["a" to end] "c" to end]
 )(
     uparse? "aaabccc" [into [across to "b"] [some "a"] to end]
-)(
-    uparse? "aaabccc" [into @[to "b"] [some "a"] to end]
 )]
 
 
@@ -550,6 +554,10 @@
 ; TO and THRU would be too costly to be implicitly value bearing by making
 ; copies; you need to use ACROSS.
 [(
+    "" = uparse "abc" [to end]
+)(
+    then? uparse "abc" [elide to end]
+)(
     "b" = uparse "aaabbb" [thru "b" elide to end]
 )(
     "b" = uparse "aaabbb" [to "b" elide to end]
@@ -717,6 +725,15 @@
     ("c" = uparse "ac" ["a" || "b" | "c"])
     ("b" = uparse "ab" ["a" || "b" | "c"])
     (null = uparse "ax" ["a" || "b" | "c"])
+]
+
+
+; No-op rules need thought in UPARSE, in terms of NULL/BLANK! behavior.  But
+; empty string should be a no-op on string input, and an empty rule should
+; always match.
+[
+    (uparse? "" [[]])
+    ("" = uparse "" [""])
 ]
 
 

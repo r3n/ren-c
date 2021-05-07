@@ -10,12 +10,18 @@
     (null = detector null)
     ((just ') = detector if true [null])
 
-    ('~invisible~ = detector (comment "hi"))
-    ('~invisible~ = detector)
+    ('~void~ = detector (comment "hi"))
+    ('~void~ = detector)
 
     (did left-detector: enfixed :detector)
 
     ((just '1) = (1 left-detector))
-    ('~invisible~ = left-detector)
-    ('~invisible~ = (left-detector))
+    ('~void~ = left-detector)
+    ('~void~ = (left-detector))
 ]
+
+(
+    x: false
+    @(nihil) then [x: true]
+    x
+)

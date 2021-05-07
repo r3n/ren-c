@@ -379,7 +379,7 @@ ext-console-impl: func [
     ; system makes it an ornery term--despite being escaped.  That makes it
     ; harder to handle.  Change it to something easier.
     ;
-    if '~invisible~ = get/any 'result [
+    if '~void~ = get/any 'result [
         result: #invisible
     ]
 
@@ -637,7 +637,7 @@ ext-console-impl: func [
 
     ; The call to `rebValueInterruptible() on `@ (code)` can produce a void
     ; if the code vanishes completely.  Just cycle the prompt if it does.  (We
-    ; transformed from ~invisible~ => #invisible at top of function for easier
+    ; transformed from ~void~ => #invisible at top of function for easier
     ; handling... e.g. we got the memo that we're handling a weird result.)
     ;
     if result = #invisible [

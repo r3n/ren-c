@@ -511,7 +511,7 @@ enum {
 
 
 inline static bool Process_Action_Throws(REBFRM *f) {
-    Init_Empty_Nulled(f->out);
+    Init_Reified_Invisible(f->out);
     SET_CELL_FLAG(f->out, OUT_NOTE_STALE);
     bool threw = Process_Action_Maybe_Stale_Throws(f);
     CLEAR_CELL_FLAG(f->out, OUT_NOTE_STALE);

@@ -74,7 +74,7 @@ inline static bool Do_Any_Array_At_Throws(
 
     // ^-- Voidify out *after* feed initialization (if any_array == out)
     //
-    Init_Empty_Nulled(out);
+    Init_Reified_Invisible(out);
 
     bool threw = Do_Feed_To_End_Maybe_Stale_Throws(
         out,
@@ -124,7 +124,7 @@ inline static bool Do_At_Mutable_Throws(
     REBLEN index,
     REBSPC *specifier
 ){
-    Init_Empty_Nulled(out);
+    Init_Reified_Invisible(out);
 
     bool threw = Do_At_Mutable_Maybe_Stale_Throws(
         out,
@@ -155,7 +155,7 @@ inline static bool RunQ_Throws(
     va_list va;
     va_start(va, p);
 
-    bool threw = Eval_Step_In_Va_Throws_Core(
+    bool threw = Eval_Step_In_Va_Maybe_Stale_Throws(
         SET_END(out),  // start at END to detect error if no eval product
         FEED_MASK_DEFAULT | FLAG_QUOTING_BYTE(1),
         p,  // first argument (C variadic protocol: at least 1 normal arg)
@@ -166,6 +166,30 @@ inline static bool RunQ_Throws(
 
     if (IS_END(out))
         fail ("Run_Throws() empty or just COMMENTs/ELIDEs/BAR!s");
+
+    assert(NOT_CELL_FLAG(out, OUT_NOTE_STALE));  // value changed
+
+    return threw;
+}
+
+
+inline static bool RunQ_Maybe_Stale_Throws(
+    REBVAL *out,
+    bool fully,
+    const void *p,  // last param before ... mentioned in va_start()
+    ...
+){
+    va_list va;
+    va_start(va, p);
+
+    bool threw = Eval_Step_In_Va_Maybe_Stale_Throws(
+        out,
+        FEED_MASK_DEFAULT | FLAG_QUOTING_BYTE(1),
+        p,  // first argument (C variadic protocol: at least 1 normal arg)
+        &va,  // va_end() handled by Eval_Va_Core on success/fail/throw
+        EVAL_MASK_DEFAULT
+            | (fully ? EVAL_FLAG_NO_RESIDUE : 0)
+    );
 
     return threw;
 }

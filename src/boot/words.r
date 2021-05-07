@@ -34,13 +34,12 @@ any-branch!
 
 datatypes
 
-; === NAMED VOIDS ===
+; === NAMED BAD WORDS ===
 ; A new Ren-C feature is that voids are interned like WORD!, so they can be
 ; more communicative.  These are standard symbols passed to Init_Void().
 ;
 void
 unset
-invisible
 nulled
 blanked
 falsey

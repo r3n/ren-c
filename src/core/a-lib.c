@@ -842,7 +842,7 @@ static void Run_Va_May_Fail_Core(
     const void *p,  // first pointer (may be END, nullptr means NULLED)
     va_list *vaptr  // va_end() handled by feed for all cases (throws, fails)
 ){
-    Init_Empty_Nulled(out);
+    Init_Reified_Invisible(out);
 
     REBFLGS flags = EVAL_MASK_DEFAULT | FLAG_QUOTING_BYTE(quotes);
 

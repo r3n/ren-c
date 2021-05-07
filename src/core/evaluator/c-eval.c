@@ -158,17 +158,36 @@ inline static bool Rightward_Evaluate_Nonvoid_Into_Out_Throws(
     REBFRM *f,
     const RELVAL *v
 ){
-    if (GET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT))  {  // e.g. `10 -> x:`
+    // This flag is used for enfix processing, but it's also applied as an
+    // internal trick to make SHOVE (>-) work:
+    //
+    //    >> 10 >- x:
+    //    == 10
+    //
+    //    >> x
+    //    == 10
+    //
+    if (GET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT))  {
         CLEAR_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT);
         CLEAR_CELL_FLAG(f->out, UNEVALUATED);  // this helper counts as eval
         return false;
     }
 
+    // Beyond the trick for `>-` the output cell should not be visible to the
+    // assignment:
+    //
+    //    >> (1 + 2 x: comment "x should not be three")
+    //    ** This should be an error!
+    //
+    // So all rightward evaluations set the output to end.  Note that any
+    // enfix quoting operators that would quote backwards to see the `x:` would
+    // have intercepted it during a lookahead...pre-empting this code.
+    //
+    SET_END(f->out);
+
     if (IS_END(f_next)) {
-        if (IS_LIT(v)) {  // allow (@), REB_LIT makes ~invisible~
-            SET_END(f->out);
+        if (IS_LIT(v))  // allow (@), REB_LIT case makes END into ~void~
             return false;
-        }
 
         // `do [x:]`, `do [o/x:]`, etc. are illegal
         fail (Error_Need_Non_End_Core(v, v_specifier));
@@ -182,8 +201,6 @@ inline static bool Rightward_Evaluate_Nonvoid_Into_Out_Throws(
 
     REBFLGS flags = EVAL_MASK_DEFAULT
             | (f->flags.bits & EVAL_FLAG_FULFILLING_ARG);  // if f was, we are
-
-    SET_END(f->out);  // `1 x: comment "hi"` shouldn't set x to 1!
 
     if (CURRENT_CHANGES_IF_FETCH_NEXT) {  // must use new frame
         if (Eval_Step_In_Subframe_Throws(f->out, f, flags))
@@ -209,10 +226,8 @@ inline static bool Rightward_Evaluate_Nonvoid_Into_Out_Throws(
     }
 
     if (IS_END(f->out)) {
-        if (IS_LIT(v)) {   // allow (@ comment "hi"), REB_LIT makes ~invisible~
-            SET_END(f->out);
+        if (IS_LIT(v))   // allow (@ comment "hi"), REB_LIT makes ~void~
             return false;
-        }
 
         // e.g. `do [x: ()]` or `(x: comment "hi")`.
         fail (Error_Need_Non_End_Core(v, v_specifier));
@@ -819,7 +834,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         //    == 10
         //
         //    >> 10 @(comment "hi")
-        //    == ~invisible~
+        //    == ~void~
         //
         // We thus need to signal staleness in the SYM-GROUP! case.
         //
@@ -853,9 +868,9 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             // order to have a way to chain invisibles and recognize the
             // invisible state.
             //
-            Init_Void(f->out, SYM_INVISIBLE);
+            Init_Reified_Invisible(f->out);
             STATE_BYTE(f) = ST_EVALUATOR_INITIAL_ENTRY;
-            goto finished;
+            goto lookahead;
         }
 
         // We want `3 = (1 + 2 ()) 4` to not treat the 1 + 2 as "stale", thus
@@ -863,6 +878,9 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // should consider the empty group stale.
         //
         if (IS_END(f->out)) {
+            if (STATE_BYTE(f) == ST_EVALUATOR_SYM_GROUP)
+                Init_Reified_Invisible(f->out);
+
             STATE_BYTE(f) = ST_EVALUATOR_INITIAL_ENTRY;
 
             if (IS_END(f_next))
@@ -870,7 +888,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
             gotten = f_next_gotten;
             v = Lookback_While_Fetching_Next(f);
-            goto evaluate;
+            goto lookahead;
         }
 
         CLEAR_CELL_FLAG(f->out, UNEVALUATED);  // `(1)` considered evaluative
@@ -929,24 +947,19 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             }
         }
 
-        REBVAL *where = GET_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT)
-            ? f_spare
-            : f->out;
-
         if (Eval_Path_Throws_Core(
-            where,
+            f_spare,  // can't overwrite f->out (in case action is invisible)
             v,  // !!! may not be array-based
             v_specifier,
             nullptr, // `setval`: null means don't treat as SET-PATH!
             EVAL_MASK_DEFAULT | EVAL_FLAG_PUSH_PATH_REFINES
         )){
-            if (where != f->out)
-                Copy_Cell(f->out, where);
+            Copy_Cell(f->out, f_spare);
             goto return_thrown;
         }
 
-        if (IS_ACTION(where)) {  // try this branch before fail on void+null
-            REBACT *act = VAL_ACTION(where);
+        if (IS_ACTION(f_spare)) {  // try this branch before fail on void+null
+            REBACT *act = VAL_ACTION(f_spare);
 
             // PATH! dispatch is costly and can error in more ways than WORD!:
             //
@@ -962,24 +975,18 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             Push_Frame(f->out, subframe);
             Push_Action(
                 subframe,
-                VAL_ACTION(where),
-                VAL_ACTION_BINDING(where)
+                VAL_ACTION(f_spare),
+                VAL_ACTION_BINDING(f_spare)
             );
-            Begin_Prefix_Action(subframe, VAL_ACTION_LABEL(where));
-
-            if (where == subframe->out)
-                Expire_Out_Cell_Unless_Invisible(subframe);
+            Begin_Prefix_Action(subframe, VAL_ACTION_LABEL(f_spare));
 
             goto process_action;
         }
 
-        if (IS_VOID(where))  // need `:x/y` if it's void (unset)
-            fail (Error_Need_Non_Void_Core(v, v_specifier, where));
+        if (IS_VOID(f_spare))  // need `:x/y` if it's void (unset)
+            fail (Error_Need_Non_Void_Core(v, v_specifier, f_spare));
 
-        if (where != f->out)
-            Copy_Cell(f->out, where);  // won't move CELL_FLAG_UNEVALUATED
-        else
-            CLEAR_CELL_FLAG(f->out, UNEVALUATED);
+        Copy_Cell(f->out, f_spare);  // won't move CELL_FLAG_UNEVALUATED
         Decay_If_Nulled(f->out);
         break; }
 
@@ -1202,6 +1209,15 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
       case REB_SET_BLOCK: {
         assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));
 
+        // As with the other SET-XXX! variations, we don't want to be able to
+        // see what's to the left of the assignment in the case of the right
+        // hand side vanishing:
+        //
+        //     >> (10 [x]: comment "we don't want this to be 10")
+        //     ** This should be an error.
+        //
+        SET_END(f->out);
+
         // We pre-process the SET-BLOCK! first, because we are going to
         // advance the feed in order to build a frame for the following code.
         // It makes more sense for any GROUP!s to be evaluated on the left
@@ -1292,6 +1308,20 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             SET_CELL_FLAG(DS_AT(f->dsp_orig + 1), STACK_NOTE_CIRCLED);
      }
 
+        bool literalize = false;
+
+        // !!! There is not currently support for `[x]: @(do/vanishable code)`
+        // due to the problems of multi-return and groups...which should be
+        // addressed at least for common cases by tolerating GROUP!s that do
+        // not contain more than one evaluation.  It's easier for the moment
+        // to handle the case of `([x]: @ do/vanishable code)` because it stays
+        // in the same feed.
+        //
+        if (IS_LIT(f_next)) {
+            literalize = true;
+            Fetch_Next_Forget_Lookback(f);  // pushed all we needed to know
+        }
+
         // Build a frame for the function call by fulfilling its arguments.
         // The function will be in a state that it can be called, but not
         // invoked yet.
@@ -1340,9 +1370,20 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
         // Now run the frame...
         //
-        if (Do_Frame_Throws(f->out, f_spare)) {
+        if (Do_Frame_Maybe_Stale_Throws(f->out, f_spare)) {
             DS_DROP_TO(f->dsp_orig);
             goto return_thrown;
+        }
+
+        if (literalize) {
+            if (IS_END(f->out)) {
+                // started at end, as can't leak `(1 + 2 [x]: @)` => '3
+                Init_Reified_Invisible(f->out);
+            }
+            else {
+                if (not Is_Light_Nulled(f->out))
+                    Quotify(f->out, 1);
+            }
         }
 
         // Take care of the SET for the main result.
@@ -1405,7 +1446,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             goto return_thrown;
 
         if (IS_END(f->out)) {  // Rightward_Evaluate allows when v is LIT!
-            Init_Void(f->out, SYM_INVISIBLE);
+            Init_Reified_Invisible(f->out);
         }
         else if (not Is_Light_Nulled(f->out))
             Quotify(f->out, 1);

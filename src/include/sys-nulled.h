@@ -56,13 +56,17 @@ inline static REBVAL *Init_Nulled_Core(RELVAL *out) {
     Init_Nulled_Core(TRACK_CELL_IF_DEBUG(out))
 
 // This helps find callsites that are following the convention for what
-// `do []` should do.  This has changed to be NULL from the historical choice
-// to make it an "ornery" value (e.g. `~unset~`):
+// `do []` should do.  Historically this was the "ornery" value that was the
+// same as unset variables.  It is still chosen as an ornery value, as a
+// "BAD-WORD!" with the label `~void~`.  This helps point you toward the idea
+// that if you use a more labor intensive mechanism you could probably get
+// at the true voidness (unless it's just a stray ~void~ that isn't actually
+// arising from a void function invocation)
 //
 // https://forum.rebol.info/t/what-should-do-do/1426
 //
-#define Init_Empty_Nulled(out) \
-    Init_Nulled(out)
+#define Init_Reified_Invisible(out) \
+    Init_Void(out, SYM_VOID)
 
 
 //=//// NULL ISOTOPE (NULL-2) /////////////////////////////////////////////=//

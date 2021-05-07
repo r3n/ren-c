@@ -2,9 +2,9 @@
 
 (sym-group! = type of '@(a b c))
 
-('~invisible~ = @())
-('~invisible~ = @(comment "hi"))
-('~invisible~ = @(nihil))
+('~void~ = @())
+('~void~ = @(comment "hi"))
+('~void~ = @(nihil))
 ((just '10) = @(10 comment "hi"))
 
 (null = @(null))
