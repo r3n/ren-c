@@ -39,18 +39,18 @@
 )]
 
 [
-    (null = find "" "")
-    (null = find "a" "")
-    (null = find tail "a" "")
+    ("" = find "" "")
+    ("a" = find "a" "")
+    ("" = find tail "a" "")
     (null = find "" "a")
 
     ("ab" = find "ab" "a")
     ("b" = find "ab" "b")
     (null = find "ab" "c")
 
-    (null = find-reverse "" "")
-    (null = find-reverse "a" "")
-    (null = find-reverse tail "a" "")
+    ("" = find-reverse "" "")
+    ("a" = find-reverse "a" "")
+    ("" = find-reverse tail "a" "")
     (null = find-reverse "" "a")
 
     ("ab" = find-reverse tail "ab" "a")

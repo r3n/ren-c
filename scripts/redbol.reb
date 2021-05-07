@@ -1088,8 +1088,8 @@ denuller: helper [
         chain [
             :action
                 |
-            func [x [<opt> any-value!]] [
-                match any-value! get/any 'x else [blank]
+            func [x] [
+                get/any 'x else '_
             ]
         ]
     ]
@@ -1164,7 +1164,21 @@ forskip: emulate [denuller :iterate-skip]
 any: emulate [denuller :any]
 all: emulate [denuller :all]
 
-find: emulate [denuller :find]
+; Historically Rebol/Red consider `find "abc" ""` to be NONE.  While it could
+; be argued what this "should" be, the fact that BLANK! (or NULL) could be
+; used to opt out of the search suggests the opportunity is being lost to have
+; a way of opting into a match unconditionally.
+;
+find: emulate [
+    enclose :find func [f] [
+        all [
+            any-series? f.pattern
+            empty? f.pattern
+        ] then [return _]
+
+        do f else '_  ; NULL -> BLANK!
+    ]
+]
 select: emulate [denuller :select]
 pick: emulate [denuller :pick]
 

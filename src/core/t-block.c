@@ -378,6 +378,14 @@ REBLEN Find_In_Array(
     REBFLGS flags, // see AM_FIND_XXX
     REBINT skip // skip factor
 ){
+    // If not using FIND/ONLY, then looking for an empty block should match
+    // any position (there are infinitely many empty blocks spliced in at
+    // any block location).
+    //
+    if (not (flags & AM_FIND_ONLY) and (len == 0)) {
+        return index_unsigned;
+    }
+
     REBINT index = index_unsigned;  // skip can be negative, tested >= 0
     REBINT end = end_unsigned;
 
