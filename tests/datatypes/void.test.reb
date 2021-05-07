@@ -61,10 +61,10 @@
     '~unset~ = get/any 'asiieiajiaosdfbjakbsjxbjkchasdf
 )
 
-; MATCH will match a void as-is, but falsey inputs produce ~matched~
+; MATCH will match a void as-is, but falsey inputs produce ~falsey~
 [
     ('~preserved~ = match void! '~preserved~)
-    ('~matched~ = match null null)
+    ('~falsey~ = match null null)
 ]
 
 ; CYCLE once differentiated a STOP result from BREAK with ~stopped~, but now

@@ -86,16 +86,22 @@
     (10 = ensure integer! 10)
 ]
 
-; NON is an inverted form of ENSURE, that fails when the argument *matches*
+; NON is an inverted form of MATCH, that fails when the argument *matches*
+; It is a specialization of MATCH/NOT
 [
-    (error? trap [non action! :append])
+    (null = non action! :append)
     (10 = non action! 10)
 
-    (error? trap [non integer! 10])
+    (null = non integer! 10)
     (:append = non integer! :append)
 
     (10 = non null 10)
+
+    ; !!! Review the special handling of this case...no good result can be
+    ; returned to signal this failure.  Currently it just errors.
+    ;
     (error? trap [non null null])
+    (error? trap [non logic! false])
 ]
 
 
@@ -140,13 +146,12 @@
                 if action? get test [
                     f: make frame! args
                     first-arg: get in f first parameters of action of f
-                    either-match false do f [return first-arg]
-                    return null
+                    return ((match true do f) then @first-arg)
                 ]
             ]
         ]
 
-        either-match :(take args) (take args-normal) @null
+        match :(take args) (take args-normal) else @null
     ]
     true)
 

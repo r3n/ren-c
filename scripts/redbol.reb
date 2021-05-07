@@ -1089,7 +1089,7 @@ denuller: helper [
             :action
                 |
             func [x [<opt> any-value!]] [
-                either-match any-value! get/any 'x [blank]
+                match any-value! get/any 'x else [blank]
             ]
         ]
     ]

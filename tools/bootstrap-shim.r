@@ -104,8 +104,7 @@ load-all: :load/all
 do compose [(to set-word! first [->]) enfix :lambda]
 unset first [=>]
 
-; SET was changed to accept VOID!, use SET VAR NON VOID! (...EXPRESSION...)
-; if that is what was intended.
+; SET was changed to accept VOID!
 ;
 set: specialize :lib/set [opt: true]
 
@@ -113,16 +112,6 @@ set: specialize :lib/set [opt: true]
 ;
 print: func [value] [
     lib/print either value == newline [""][value]
-]
-
-
-; NON is a new helpful opposite to ENSURE
-;
-non: func [type [<opt> datatype!] value [<opt> any-value!]] [
-    if :type = type of :value [
-        fail ["NON Didn't Expect Value to be of type" type else [<null>]]
-    ]
-    return :value
 ]
 
 ; PARSE is being changed to a more powerful interface that returns synthesized

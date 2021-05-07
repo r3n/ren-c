@@ -176,6 +176,13 @@ tweak :|| 'barrier on
 ]
 
 
+; MATCH isn't always used with ELSE and THEN.  So its result can trigger false
+; negatives on matches when CASE clauses and `IF MATCH` when the matched value
+; returned is falsey.  By default, make matches voidify falsey results.
+;
+match: :match*/safe
+
+
 ; !!! While POINTFREE is being experimented with in its design, it is being
 ; designed in usermode.  It would be turned into an optimized native when it
 ; is finalized (and when it is comfortably believed a user could have written

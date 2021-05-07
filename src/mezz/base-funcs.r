@@ -541,6 +541,12 @@ so: enfixed func [
 tweak :so 'postpone on
 
 
+matches: enfixed redescribe [
+    {Check value using tests (match types, TRUE or FALSE, or filter action)}
+](
+    chain [:match | :then?]
+)
+
 matched: enfixed redescribe [
     "Assert that the left hand side--when fully evaluated--MATCHES the right"
 ](
@@ -608,57 +614,34 @@ gunzip: redescribe [
 ensure: redescribe [
     {Pass through value if it matches test, otherwise trigger a FAIL}
 ](
-    specialize :either-match [
-        branch: func [arg [<opt> any-value!]] [
-            ;
-            ; !!! Can't use FAIL/WHERE until there is a good way to SPECIALIZE
-            ; a conditional with a branch referring to invocation parameters:
+    enclose :match* func [f] [  ; don't plain MATCH safety (voidifies results)
+        let value: :f.value  ; DO makes frame arguments unavailable
+        do f else [
+            ; !!! Can't use FAIL/WHERE until we can implicate the callsite.
             ;
             ; https://github.com/metaeducation/ren-c/issues/587
             ;
             fail [
                 "ENSURE failed with argument of type"
-                    type of get* 'arg else ["NULL"]
+                    type of get* 'value else ["NULL"]
             ]
         ]
     ]
 )
 
 non: redescribe [
-    {Pass through value if it *doesn't* match test, otherwise trigger a FAIL}
+    {Pass through value if it *doesn't* match test (e.g. MATCH/NOT)}
 ](
-    specialize :either-match [
-        not: #
-        branch: func [arg [<opt> any-value!]] [
-            ;
-            ; !!! Can't use FAIL/WHERE until there is a good way to SPECIALIZE
-            ; a conditional with a branch referring to invocation parameters:
-            ;
-            ; https://github.com/metaeducation/ren-c/issues/587
-            ;
-            fail [
-                "NON failed with argument of type"
-                    (type of get* 'arg) else ["NULL"]
-            ]
-        ]
-    ]
+    :match/not
 )
 
-really: func [
+the: func [
     {FAIL if value is null, otherwise pass it through}
 
     return: [any-value!]
-    value [any-value!]  ; always checked for null, since no <opt>
+    value [any-value!]  ; not <opt>!
 ][
-    ; While DEFAULT requires a BLOCK!, REALLY does not.  Catch mistakes such
-    ; as `x: really [...]`
-    ;
-    if semiquoted? 'value [
-        fail @value [
-            "Literal" type of :value "used w/REALLY, use () if intentional"
-        ]
-    ]
-
+    ; Note: Doesn't check explicitly for NULL, as parameter is not marked <opt>
     :value
 ]
 

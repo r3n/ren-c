@@ -482,7 +482,7 @@ REBNATIVE(also)  // see `tweak :also #defer on` in %base-defs.r
 
 
 //
-//  either-match: native [
+//  match*: native [
 //
 //  {Check value using tests (match types, TRUE or FALSE, or filter action)}
 //
@@ -500,108 +500,56 @@ REBNATIVE(also)  // see `tweak :also #defer on` in %base-defs.r
 //              integer!  ; matches length of series
 //          ]
 //      value [<opt> any-value!]
-//      :branch "Branch to run on non-matches, passed VALUE if ACTION!"
-//          [any-branch!]
 //      /not "Invert the result of the the test (used by NON)"
+//      /safe "Voidify falsey results to avoid IF MATCH LOGIC! FALSE bugs"
 //  ]
 //
-REBNATIVE(either_match)
+REBNATIVE(match_p)
 {
-    INCLUDE_PARAMS_OF_EITHER_MATCH;
+    INCLUDE_PARAMS_OF_MATCH_P;
 
-    if (Match_Core_Throws(D_OUT, ARG(test), SPECIFIED, ARG(value), SPECIFIED))
-        return R_THROWN;
-
-    if (
-        (not REF(_not_) and VAL_LOGIC(D_OUT))
-        or (REF(_not_) and not VAL_LOGIC(D_OUT)
-    )){
-        RETURN (ARG(value));
-    }
-
-    if (Do_Branch_With_Throws(D_OUT, ARG(branch), ARG(value)))
-        return R_THROWN;
-
-    return D_OUT;
-}
-
-
-//
-//  match: native [
-//
-//  {Check value using tests (match types, TRUE or FALSE, or filter action)}
-//
-//      return: "Input if it matched, otherwise null (void if falsey match)"
-//          [<opt> any-value!]
-//      test "Typeset membership, LOGIC! to test for truth, filter function"
-//          [<opt>
-//              action!  ; arity-1 filter function
-//              path!  ; AND'd tests
-//              block!  ; OR'd tests
-//              datatype! typeset!  ; literals accepted
-//              logic!  ; tests TO-LOGIC compatibility
-//              tag!  ; just <opt> for now
-//              integer!  ; matches length of series
-//              quoted!  ; same test, but make quote level part of the test
-//          ]
-//      value [<opt> any-value!]
-//  ]
-//
-REBNATIVE(match)
-{
-    INCLUDE_PARAMS_OF_MATCH;
-
-    REBVAL *test = ARG(test);
     REBVAL *v = ARG(value);
 
-    DECLARE_LOCAL (temp);
-    if (Match_Core_Throws(temp, test, SPECIFIED, v, SPECIFIED))
+    if (Match_Core_Throws(D_OUT, ARG(test), SPECIFIED, v, SPECIFIED))
         return R_THROWN;
 
-    if (VAL_LOGIC(temp)) {
-        if (IS_VOID(v) or IS_TRUTHY(v))
-            RETURN (v);
-
-        // Falsey matched values return a VOID! to show they did match, but
-        // to avoid misleading falseness of the result.
+    if (did REF(_not_) == VAL_LOGIC(D_OUT)) {
         //
-        return Init_Void(D_OUT, SYM_MATCHED);
+        // Note: There's no good value we can return to signal failure
+        // in a safe mode here:
+        //
+        //    if not non null (null) [print "user intended this to run"]
+        //    non null (null) else [print "user intended this to run"]
+        //
+        // If we return nullptr, we break the first case.  But if we return
+        // anything else--like a void to cause a tripwire on the first case--
+        // we break the second case.
+        //
+        // So we have to fail here if trying to be safe.  TBD: Improve error.
+        //
+        if (REF(_not_))
+            if (REF(safe) and not IS_VOID(v) and IS_FALSEY(v))
+                fail ("Maybe-confusing NULL return in failed MATCH*/SAFE/NOT");
+
+        return nullptr;  // light null isotope if no match
     }
 
-    return nullptr;
-}
+    if (REF(safe) and not IS_VOID(v) and IS_FALSEY(v)) {
+        //
+        // In "safe" operation, falsey matched values return a VOID! to show
+        // they did match, but to avoid misleading falseness of the result.
+        //
+        return Init_Void(D_OUT, SYM_FALSEY);
+    }
 
+    Move_Cell(D_OUT, v);  // Otherwise, input is the result
 
-//
-//  matches: enfix native [
-//
-//  {Check value using tests (match types, TRUE or FALSE, or filter action)}
-//
-//      return: "Input if it matched, otherwise null (void if falsey match)"
-//          [<opt> any-value!]
-//       value [<opt> any-value!]
-//      'test "Typeset membership, LOGIC! to test for truth, filter function"
-//          [
-//              word!  ; GET to find actual test
-//              action! get-word! get-path!  ; arity-1 filter function
-//              path!  ; AND'd tests
-//              block!  ; OR'd tests
-//              datatype! typeset!  ; literals accepted
-//              logic!  ; tests TO-LOGIC compatibility
-//              tag!  ; just <opt> for now
-//              integer!  ; matches length of series
-//              quoted!  ; same test, but make quote level part of the test
-//          ]
-//  ]
-//
-REBNATIVE(matches)
-{
-    INCLUDE_PARAMS_OF_MATCHES;
-
-    if (Match_Core_Throws(D_OUT, ARG(test), SPECIFIED, ARG(value), SPECIFIED))
-        return R_THROWN;
-
-    assert(IS_LOGIC(D_OUT));
+    // We turn nulls that matched the rule into heavy nulls.
+    //
+    //    >> match [<opt> integer!] null then [print "We want this to run!"]
+    //    We want this to run!
+    //
+    Isotopify_If_Nulled(D_OUT);
     return D_OUT;
 }
 

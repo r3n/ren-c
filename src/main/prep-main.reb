@@ -62,9 +62,9 @@ for-each file [
     header: ensure block! load header  ; Loaded as BLOCK!, not object
 
     append/line buf mold/flat compose [
-        Title: (non null header/Title)  ; !!! Affected by case-sensitivity
-        Version: (non null header/Version)
-        Name: (non null header/Name)
+        Title: (header/Title else [fail])  ; !!! Affected by case-sensitivity
+        Version: (header/Version else [fail])
+        Name: (header/Name else [fail])
     ]
 
     append/line buf "["
