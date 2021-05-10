@@ -282,7 +282,7 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
             feed->value = &feed->fetched;
             rebRelease(single);  // *is* the instruction
             break; }
-        
+
           default:
             //
             // Besides instructions, other series types aren't currenlty
@@ -292,7 +292,7 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
             // altogether (e.g. no usable cell pattern guaranteed at the head)
             // but it's important in several APIs to emphasize a value gives
             // phase information, while archetypes do not.
-            // 
+            //
             panic (inst1);
         }
         break; }
@@ -515,8 +515,8 @@ inline static REBFED* Alloc_Feed(void) {
     feed->tick = TG_Tick;
   #endif
 
-    Init_Unreadable_Void(Prep_Cell(&feed->fetched));
-    Init_Unreadable_Void(Prep_Cell(&feed->lookback));
+    Init_Unreadable(Prep_Cell(&feed->fetched));
+    Init_Unreadable(Prep_Cell(&feed->lookback));
 
     REBSER *s = &feed->singular;  // SER() not yet valid
     s->leader.bits = NODE_FLAG_NODE | FLAG_FLAVOR(FEED);

@@ -51,7 +51,7 @@ description-of: function [
     v [<blank> any-value!]
 ][
     switch type of get/any 'v [
-        void! [null]
+        bad-word! [null]
         any-array! [spaced ["array of length:" length of v]]
         image! [spaced ["size:" v/size]]
         datatype! [
@@ -82,17 +82,17 @@ browse: function [
 help: function [
     "Prints information about words and values (if no args, general help)."
 
-    return: [void!]
+    return: []
     'topic [<end> any-value!]
         "WORD! whose value to explain, or other HELP target (try HELP HELP)"
     /doc "Open web browser to related documentation."
 ][
-    if undefined? 'topic [
+    if bad-word? @topic [
         ;
         ; !!! This should lead to a web page that offers help on the nature
         ; of specific void usages.
         ;
-        print [mold get/any 'topic "is a literal VOID! value"]
+        print [mold get/any 'topic "is an error-inducing BAD-WORD! value"]
         return
     ]
 
@@ -212,8 +212,8 @@ help: function [
                 null [
                     print [topic "is null"]
                 ]
-                void! [
-                    print [topic "is not defined (e.g. has a VOID! value)"]
+                bad-word! [
+                    print [topic "is not defined (e.g. has a BAD-WORD! value)"]
                 ]
             ] then [
                 return
@@ -460,13 +460,11 @@ source: function [
 what: function [
     {Prints a list of known actions}
 
-    return: [void! block!]
+    return: [bad-word! block!]
     'name [<end> word! lit-word!]
         "Optional module name"
-    /args
-        "Show arguments not titles"
-    /as-block
-        "Return data as block"
+    /args "Show arguments not titles"
+    /as-block "Return data as block"
 ][
     list: make block! 400
     size: 0

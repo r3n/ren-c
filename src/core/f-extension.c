@@ -353,7 +353,7 @@ static const REBVAL *Unloaded_Dispatcher(REBFRM *f)
 //
 //  "Unload an extension"
 //
-//      return: [void!]
+//      return: []
 //      ext "The extension to be unloaded"
 //          [object!]
 //      /cleanup "The RX_Quit pointer for the builtin extension"

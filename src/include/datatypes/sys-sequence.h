@@ -256,7 +256,7 @@ inline static REBVAL *Try_Init_Any_Sequence_All_Integers(
     REBLEN len
 ){
   #if !defined(NDEBUG)
-    Init_Unreadable_Void(out);  // not used for "blaming" a non-integer
+    Init_Unreadable(out);  // not used for "blaming" a non-integer
   #endif
 
     if (len > sizeof(PAYLOAD(Bytes, out)).at_least_8)
@@ -418,7 +418,7 @@ inline static REBVAL *Try_Pop_Sequence_Or_Element_Or_Nulled(
             else if (kind == REB_SYM_PATH)
                 Symify(SPECIFIC(out));
         }
-        
+
         return cast(REBVAL*, out);  // valid path element, standing alone
     }
 
@@ -510,7 +510,7 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
 ){
   #if !defined(NDEBUG)
     if (store != sequence)
-        Init_Unreadable_Void(store);  // catch use in case we don't write it
+        Init_Unreadable(store);  // catch use in case we don't write it
   #endif
 
     assert(ANY_SEQUENCE_KIND(CELL_KIND(sequence)));
@@ -551,7 +551,7 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
         assert(n < 2);
         if (n == 1)
             return BLANK_VALUE;
- 
+
         // Because the cell is being viewed as a PATH!, we cannot view it as
         // a WORD! also unless we fiddle the bits at a new location.
         //

@@ -407,6 +407,16 @@ static void Propagate_All_GC_Marks(void)
                 /*if (Is_Heavy_Nulled(v))
                     panic (a);*/
             }
+
+            if (
+                KIND3Q_BYTE_UNCHECKED(v) == REB_BAD_WORD
+                and NOT_CELL_FLAG(v, ISOTOPE)
+            ){
+                // Non isotope voids may not exist in blocks, they can only
+                // be in objects/frames.
+                //
+                assert(IS_VARLIST(a) or IS_PATCH(a));
+            }
           #endif
         }
 

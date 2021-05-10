@@ -182,8 +182,17 @@
 [
     (did all  [
         then? uparse "" [synthesized: @[]]  ; NULL-2 result (success)
-        '~void~ = get/any 'synthesized
+        '~void~ = synthesized
     ])
+    (did all  [
+        then? uparse "" [synthesized: @[('~void~)]]  ; NULL-2 result (success)
+        (just '~void~) = synthesized  ; friendly if user made it friendly
+    ])
+    (did all  [
+        then? uparse "" [synthesized: @[(~void~)]]  ; NULL-2 result (success)
+        '~void~ = synthesized  ; user didn't quote it, so suggests unfriendly
+    ])
+    ((just '~friendly~) = @(uparse [~friendly~] [bad-word!]))
 ]
 
 
@@ -480,6 +489,7 @@
 ; As does Haskell Parsec, e.g. (notFollowedBy . notFollowedBy != lookAhead)
 ; https://github.com/haskell/parsec/issues/8
 [
+    ("a" = match-uparse "a" [[ahead "a"] "a"])
     ("a" = match-uparse "a" [[not not "a"] "a"])
 ]
 
@@ -556,7 +566,7 @@
 [(
     "" = uparse "abc" [to end]
 )(
-    then? uparse "abc" [elide to end]
+    '~void~ = @(uparse "abc" [elide to end])  ; ornery void
 )(
     "b" = uparse "aaabbb" [thru "b" elide to end]
 )(

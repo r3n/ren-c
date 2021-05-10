@@ -45,7 +45,7 @@
 (
     foo: '~void~
     e: trap [parse "a" [foo]]
-    e/id = 'need-non-void
+    e/id = 'bad-word-get
 )(
     foo: quote '~void~
     parse? [~void~] [foo end]

@@ -67,9 +67,6 @@ REBOL [
 #null       "!!! `NULL!` isn't a datatype, `null` can't be stored in blocks"
             0           0       0       +       []
 
-void        "value that triggers errors if accessed via WORD!/PATH!/TUPLE!"
-            void        -       +       +       []
-
 blank       "placeholder unit type which acts as conditionally false"
             blank       +       -       +       [unit branch]
 
@@ -316,6 +313,18 @@ comma       "separator between full evaluations (that is otherwise invisible)"
 
 action      "an invokable Rebol subroutine"
             action      +       +       +       [branch]
+
+
+; BAD-WORD! is not inert, because it needs to become "unfriendly" when it is
+; evaluated.
+;
+; !!! Because it does not have a binding, it is not an actual WORD!.  There
+; could be questions about whether it should be more wordlike, or if there
+; should be BAD-BLOCK! ~[]~ and it should fit into a system of
+
+bad-word    "value which evaluates to a form that triggers errors on access"
+            bad-word     -       +       +       []
+
 
 ; ============================================================================
 ; BEGIN QUOTED RANGE

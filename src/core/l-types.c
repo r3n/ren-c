@@ -35,7 +35,7 @@
 //
 
 #define return_NULL \
-    do { Init_Unreadable_Void(out); return NULL; } while (1)
+    do { Init_Unreadable(out); return NULL; } while (1)
 
 
 //
@@ -1321,7 +1321,7 @@ REBNATIVE(scan_net_header)
                 // Does it already use a block?
                 if (IS_BLOCK(item + 1)) {
                     // Block of values already exists:
-                    val = Init_Unreadable_Void(
+                    val = Init_Unreadable(
                         Alloc_Tail_Array(VAL_ARRAY_ENSURE_MUTABLE(item + 1))
                     );
                 }
@@ -1333,7 +1333,7 @@ REBNATIVE(scan_net_header)
                         item + 1, // prior value
                         SPECIFIED // no relative values added
                     );
-                    val = Init_Unreadable_Void(Alloc_Tail_Array(a));
+                    val = Init_Unreadable(Alloc_Tail_Array(a));
                     Init_Block(item + 1, a);
                 }
                 break;
@@ -1342,7 +1342,7 @@ REBNATIVE(scan_net_header)
 
         if (item == item_tail) {  // didn't break, add space for new word/value
             Init_Set_Word(Alloc_Tail_Array(result), name);
-            val = Init_Unreadable_Void(Alloc_Tail_Array(result));
+            val = Init_Unreadable(Alloc_Tail_Array(result));
         }
 
         while (IS_LEX_SPACE(*cp)) cp++;

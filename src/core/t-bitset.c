@@ -707,8 +707,7 @@ REBTYPE(Bitset)
             break;
 
           default:
-            action = rebVoid();
-            assert(false);
+            panic (nullptr);
         }
 
         REBVAL *processed = rebValue(rebR(action), rebQ(v), rebQ(arg));

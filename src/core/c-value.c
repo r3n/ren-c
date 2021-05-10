@@ -96,10 +96,8 @@ REBNOD *Dump_Value_Debug(const RELVAL *v)
 // it can find it).  This will allow those using Address Sanitizer or
 // Valgrind to know a bit more about where the value came from.
 //
-// Additionally, if it happens to be NULLED, VOID!, LOGIC!, BAR!, BLANK!, or
-// a trash cell, it will dump out where the initialization happened if that
-// information was stored.  (See DEBUG_TRACK_EXTEND_CELLS for more intense
-// debugging scenarios, which track all cell types, but at greater cost.)
+// Additionally, it can dump out where the initialization happened if that
+// information was stored.  See DEBUG_TRACK_EXTEND_CELLS.
 //
 ATTRIBUTE_NO_RETURN void Panic_Value_Debug(const RELVAL *v) {
     REBNOD *containing = Dump_Value_Debug(v);
@@ -249,14 +247,22 @@ void* Probe_Core_Debug(
       #if !defined(NDEBUG)  // IS_NULLED() asserts on unreadable void
         if (IS_UNREADABLE_DEBUG(v)) {
             Probe_Print_Helper(p, expr, "Value", file, line);
-            Append_Ascii(mo->series, "\\\\Unreadable VOID!\\\\");
+            Append_Ascii(mo->series, "\\\\Unreadable Cell\\\\");
             break;
         }
       #endif
 
         Probe_Print_Helper(p, expr, "Value", file, line);
-        if (IS_NULLED(v))
+        if (IS_NULLED(v)) {
             Append_Ascii(mo->series, "; null");
+            if (GET_CELL_FLAG(v, ISOTOPE))
+                Append_Ascii(mo->series, " isotope");
+        }
+        else if (IS_BAD_WORD(v)) {
+            Mold_Value(mo, v);
+            if (GET_CELL_FLAG(v, ISOTOPE))
+                Append_Ascii(mo->series, "  ; isotope");
+        }
         else
             Mold_Value(mo, v);
         break; }

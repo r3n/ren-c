@@ -50,7 +50,7 @@
 //
 // * While similar to ERROR!s that are "raised" with FAIL, throwing is a
 //   lighter-weight mechanism and doesn't subvert the C call stack.
-//   
+//
 // * ALL calls into the evaluator to generate values must check for the
 //   thrown flag.  This is helped by naming conventions, e.g. `XXX_Throws()`
 //   to remind callers they have to handle it, pass it up the stack, or
@@ -98,7 +98,7 @@ inline static REB_R Init_Thrown_With_Label(
     //
     if (SPORADICALLY(2)) {
         Copy_Cell(&TG_Thrown_Label_Debug, label);
-        Init_Unreadable_Void(out);
+        Init_Unreadable(out);
     }
     else {
         if (out != label)

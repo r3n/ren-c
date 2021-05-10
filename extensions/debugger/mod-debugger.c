@@ -86,7 +86,7 @@ bool Do_Breakpoint_Throws(
         // longer available.  Debugging is being reviewed in light of a
         // stackless model and is non-functional at time of writing.
 
-        Init_Void(out, SYM_VOID);
+        Init_None(out);
         return false;  // no throw, run normally (but now, hooked)
     }
 
@@ -130,7 +130,7 @@ REBNATIVE(breakpoint_p)
     // return *either* a value or no-value...if breakpoint were variadic, it
     // could splice in a value in place of what comes after it.
     //
-    if (not IS_VOID(D_SPARE))
+    if (not IS_BAD_WORD(D_SPARE))
         fail ("BREAKPOINT is invisible, can't RESUME/WITH code (use PAUSE)");
 
     RETURN_INVISIBLE;

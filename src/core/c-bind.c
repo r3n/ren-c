@@ -252,7 +252,7 @@ REBARR *Make_Let_Patch(
             | SERIES_FLAG_INFO_NODE_NEEDS_MARK
     );
 
-    Init_Void(ARR_SINGLE(patch), SYM_UNSET);  // start variable off as unset
+    Init_Unset(ARR_SINGLE(patch));  // start variable off as unset
 
     // The way it is designed, the list of patches terminates in either a
     // nullptr or a context pointer that represents the specifying frame for
@@ -550,7 +550,7 @@ REBNATIVE(add_let_binding) {
 //
 //  {Experimental function for adding an object's worth of binding to a frame}
 //
-//      return: [void!]
+//      return: []
 //      frame [frame!]
 //      object [object!]
 //  ]
@@ -573,7 +573,7 @@ REBNATIVE(add_use_object) {
 
     mutable_BINDING(FEED_SINGLE(f->feed)) = patch;
 
-    return Init_Void(D_OUT, REB_VOID);
+    return Init_None(D_OUT);
 }
 
 
@@ -1002,12 +1002,10 @@ void Virtual_Bind_Deep_To_New_Context(
 
             // !!! For loops, nothing should be able to be aware of this
             // synthesized variable until the loop code has initialized it
-            // with something.  However, in case any other code gets run,
-            // it can't be left trash...so we'd need it to be at least an
-            // unreadable void.  But since this code is also shared with USE,
-            // it doesn't do any initialization...so go ahead and put void.
+            // with something.  But this code is shared with USE, so the user
+            // can get their hands on the variable.  Can't be trash.
             //
-            Init_Void(var, SYM_VOID);
+            Init_Unset(var);
 
             assert(rebinding); // shouldn't get here unless we're rebinding
 

@@ -231,24 +231,60 @@ REBNATIVE(quote)
 //
 //      return: "Value with quotes removed (NULL is passed through as NULL)"
 //          [<opt> any-value!]
-//      value [<opt> any-value!]
+//      value [<opt> <literal> any-value!]
 //      /depth "Number of quoting levels to remove (default 1)"
 //          [integer!]
 //  ]
 //
 REBNATIVE(unquote)
+//
+// Note: Taking literalized parameters allows `unquote ~meanie~` e.g. on what
+// would usually be an error-inducing stable bad word.  This was introduced as
+// a way around a situation like this:
+//
+//     result: @(some expression)  ; NULL -> NULL, NULL-2 -> '
+//     do compose [
+//         detect-isotope unquote (
+//              match bad-word! result else [
+//                  quote result  ; NULL -> ' and ' -> ''
+//              ]
+//          )
+//     ]
+//
+// DETECT-ISOTOPE wants to avoid forcing its caller to use a quoted argument
+// calling convention.  Yet it still wants to know if its argument is a NULL-2
+// vs. a NULL, or a stable BAD-WORD! vs. an isotope BAD-WORD!.  That's what
+// @literal arguments are for...but it runs up against a wall when forced to
+// run from code hardened into a BLOCK!.
+//
+// This could go another route with an added operation, something along the
+// lines of `unquote make-friendly ~meanie~`.  But given that the output from
+// an unquote on a plain BAD-WORD! will be mean regardless of the input makes
+// it superfluous...the UNQUOTE doesn't have any side effects to worry about,
+// and if the output is just going to be mean again it's not somehow harmful
+// to understanding.
+//
+// (It's also not clear offering a MAKE-FRIENDLY operation is a good idea.)
 {
     INCLUDE_PARAMS_OF_UNQUOTE;
 
-    REBVAL *v = ARG(value);
+    REBVAL *v = Unliteralize(ARG(value));  // remove @value quoting level
 
-    // Some scenarios use nulls when "true NULL" has to be distinguished from
-    // a "meaningful NULL".  Then they dequote later.  To make these cases
-    // easier to use with null isotopes, produce true NULL if UNQUOTE gets
-    // a NULL in...it's just more convenient.
+    // Critical to the design of literalization is that @(null) => null, and
+    // not ' (if you want ' then use QUOTE instead).  And critical to reversing
+    // that is that UNQUOTE NULL => NULL
     //
     if (IS_NULLED(v))
-        return nullptr;  // (unquote null) => null
+        return nullptr;
+
+    // Make sure any non-quoted void--isotope or not--becomes the stable/mean
+    // form of the void.  (Quoted voids will be unquoted to the isotope form.)
+    //
+    if (IS_BAD_WORD(v)) {
+        Move_Cell(D_OUT, v);
+        CLEAR_CELL_FLAG(D_OUT, ISOTOPE);
+        return D_OUT;
+    }
 
     REBINT depth = REF(depth) ? VAL_INT32(ARG(depth)) : 1;
     if (depth < 0)
@@ -257,8 +293,14 @@ REBNATIVE(unquote)
         fail ("Value not quoted enough for unquote depth requested");
 
     Unquotify(Copy_Cell(D_OUT, v), depth);
-    if (IS_NULLED(D_OUT))
-        Init_Heavy_Nulled(D_OUT);  // (unquote just ') => null-2
+
+    // One of the big tools of the quoting with @(...) is that it's possible
+    // to detect the isotope forms.  UNQUOTE should make sure an input quoted
+    // form comes back as an isotope.
+    //
+    if (IS_NULLED(D_OUT) or IS_BAD_WORD(D_OUT))
+        SET_CELL_FLAG(D_OUT, ISOTOPE);  // (unquote just ') => null-2
+
     return D_OUT;
 }
 

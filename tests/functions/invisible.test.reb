@@ -9,7 +9,7 @@
     1 = do [1 comment "a"]
 )
 (
-    null? do [comment "a"]
+    '~void~ = @ do [comment "a"]
 )
 
 (
@@ -55,7 +55,7 @@
     1 = do [1 elide "a"]
 )
 (
-    null? do [elide "a"]
+    '~void~ = @ do [elide "a"]
 )
 
 (
@@ -144,7 +144,7 @@
 ]
 
 (
-    null? do [|||]
+    '~void~ = @ do [|||]
 )
 (
     3 = do [1 + 2 ||| 10 + 20, 100 + 200]
@@ -323,8 +323,8 @@
     ]
 )
 
-(null-2? (if true [] else [<else>]))
-(null-2? (if true [comment <true-branch>] else [<else>]))
+('~void~ = @ (if true [] else [<else>]))
+('~void~ = @ (if true [comment <true-branch>] else [<else>]))
 
 (1 = all [1 elide <vaporize>])
 (1 = any [1 elide <vaporize>])
@@ -369,14 +369,14 @@
 [
     (vanish-if-odd: func [return: [<invisible> integer!] x] [
         if even? x [return x]
-        return/unquote @()
+        return/void
     ] true)
 
     (2 = (<test> vanish-if-odd 2))
     (<test> = (<test> vanish-if-odd 1))
 
     (vanish-if-even: func [return: [<invisible> integer!] y] [
-       return/unquote @(vanish-if-odd y + 1)
+       return/void unquote @(vanish-if-odd y + 1)
     ] true)
 
     (<test> = (<test> vanish-if-even 2))
@@ -388,16 +388,18 @@
 ; by default if not.
 [
     (
-        no-spec: func [x] [return/unquote @()]
+        no-spec: func [x] [return/void ()]
         <test> = (<test> no-spec 10)
     )
     (
-        int-spec: func [return: [integer!] x] [return/unquote @()]
+        int-spec: func [return: [integer!] x] [return/void]
         e: trap [int-spec 10]
         e/id = 'bad-invisible
     )
     (
-        invis-spec: func [return: [<invisible> integer!] x] [return/unquote @()]
+        invis-spec: func [return: [<invisible> integer!] x] [
+            return/void ~void~
+        ]
         <test> = (<test> invis-spec 10)
     )
 ]

@@ -315,21 +315,16 @@ main-startup: func [
         ]
     ]
 
-    ; The core presumes no built-in I/O ability in the release build, hence
-    ; during boot PANIC and PANIC-VALUE can only do printf() in the debug
-    ; build.  While there's no way to hook the core panic() or panic_at()
-    ; calls, the rebPanic() API dispatches to PANIC and PANIC-VALUE.  Hook
-    ; them just to show we can...use I/O to print a message.
+    ; The internal panic() and panic_at() calls in C code cannot be hooked.
+    ; However, if you use the PANIC native in usermode, that *can* be hijacked.
+    ; This prints a message to distinguish the source of the panic, which is
+    ; useful to know that is what happened (and it demonstrates the ability
+    ; to hook it, just to remind us that we can).
     ;
     hijack :panic adapt (copy :panic) [
-        print "PANIC ACTION! called (explicitly or by rebPanic() API)"
+        print "PANIC ACTION! is being triggered from a usermode call"
         ;
         ; ...adaptation falls through to our copy of the original PANIC
-    ]
-    hijack :panic-value adapt (copy :panic-value) [
-        print "PANIC-VALUE ACTION! called (explicitly or by rebPanic() API)"
-        ;
-        ; ...adaptation falls through to our copy of the original PANIC-VALUE
     ]
 
     system/product: 'core

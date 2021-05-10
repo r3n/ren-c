@@ -1204,7 +1204,7 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
 
           case LEX_DELIMIT_TILDE: {
             ++cp;
-            if (*cp == '~') {  // only legal multi-tilde is the `~~~` VOID!
+            if (*cp == '~') {  // only legal multi-tilde is the `~~~` BAD-WORD!
                 ++cp;
                 if (*cp != '~') {
                     ss->end = cp;
@@ -1901,7 +1901,14 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         assert(*bp == '~');
         assert(bp[len - 1] == '~');
         const REBSTR *label = Intern_UTF8_Managed(bp + 1, len - 2);
-        Init_Void_Core(DS_PUSH(), label);
+
+        // !!! At time of writing it is still being established when it is
+        // best to set isotope bits.  You'd like isotope bits in blocks being
+        // produced, because people might path pick out.  Whether the path
+        // picking has to clear it or there's an invariant that blocks
+        // never hold isotopes needs to be decided.
+        //
+        Init_Bad_Word_Core(DS_PUSH(), label, CELL_FLAG_ISOTOPE);  // "friendly"
         break; }
 
       case TOKEN_COMMA:
@@ -2302,7 +2309,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
             // data stack could go bad on any DS_PUSH() or DS_DROP().
             //
             DECLARE_LOCAL (cell);
-            Init_Unreadable_Void(cell);
+            Init_Unreadable(cell);
             PUSH_GC_GUARD(cell);
 
             PUSH_GC_GUARD(array);
@@ -2350,9 +2357,15 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                 Init_True(DS_PUSH());
                 break;
 
-              case SYM_UNSET:  // !!! Should be under a LEGACY flag
-                case SYM_VOID:
-                Init_Void(DS_PUSH(), SYM_VOID);
+              case SYM_UNSET:  // !!! Should be under a LEGACY flag...
+                //
+                // BAD-WORD!s are put in blocks, are "friendly" isotopes.
+                //
+                Init_Bad_Word_Core(
+                    DS_PUSH(),
+                    Canon(SYM_UNSET),
+                    CELL_FLAG_ISOTOPE
+                );
                 break;
 
               default: {

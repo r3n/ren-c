@@ -47,7 +47,7 @@
 //   to leak and clear it on the cell (it is NODE_FLAG_MARKED and could be
 //   misinterpreted--very easily so as VAR_MARKED_HIDDEN!)
 //
-// * The usermode REEVAL function chooses to make `reeval comment "hi"` VOID!
+// * The usermode REEVAL function chooses to make `reeval comment "hi"` ~void~
 //   rather than to raise an error.  However, the non-"Maybe_Stale" versions
 //   of code here have another option...which is to give the result as END.
 //   Currently this is what all the Eval_Step() routines which aren't stale

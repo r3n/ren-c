@@ -69,7 +69,7 @@
         ; === Bad Path Element Tests ===
         ;
         ; TUPLE! can go in PATH! but not vice-versa.  Besides that, only
-        ; INTEGER!, WORD!, GROUP!, BLOCK!, TEXT!, TAG!, and VOID! are
+        ; INTEGER!, WORD!, GROUP!, BLOCK!, TEXT!, TAG!, and BAD-WORD! are
         ; currently allowed in either sequence form.
 
         "/#a"  !!  <scan-invalid>

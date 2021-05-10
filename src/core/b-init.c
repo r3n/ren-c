@@ -887,7 +887,7 @@ void Startup_Core(void)
 
     // Initialize UNSET_VALUE (must be done after symbols loaded)
     //
-    Init_Void(Prep_Cell(&PG_Unset_Value), SYM_UNSET);  // symbol never GC'd
+    Init_Unset(Prep_Cell(&PG_Unset_Value));  // symbol not GC'd
 
     // ID_OF_SYMBOL(), VAL_WORD_ID() and Canon(SYM_XXX) now available
 

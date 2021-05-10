@@ -56,7 +56,7 @@ trap [
     ;
     do %../scripts/make-file.r  ; Experimental!  Trying to replace PD_File...
 
-    ; OPT has behavior of turning NULLs into VOID! to keep you from optioning
+    ; OPT has behavior of turning NULLs into ~nulled~ to keep you from opting
     ; something you don't need to, but with refinement changes bootstrap code
     ; would get ugly if it had to turn every OPT of a refinement into OPT TRY.
     ; Bypass the voidification for the refinement sake.
@@ -104,7 +104,7 @@ load-all: :load/all
 do compose [(to set-word! first [->]) enfix :lambda]
 unset first [=>]
 
-; SET was changed to accept VOID!
+; SET was changed to accept BAD-WORD! isotopes
 ;
 set: specialize :lib/set [opt: true]
 
@@ -144,7 +144,7 @@ enfixed: enfix :enfix
 ; which could be also thought of as typos.  This was okay because NULL access
 ; would cause errors through word or path access.  As NULL became more
 ; normalized, the idea of an "unset" variable (no value) was complemented with
-; "undefined" variables (set to a VOID! value).  Older Ren-C conflated these.
+; "undefined" variables (set to ~unset~ value).  Older Ren-C conflated these.
 ;
 defined?: :set?
 undefined?: :unset?
@@ -557,10 +557,10 @@ dequote: func [x] [
 ; If there is no SOURCE/2, it gets NULL...which it turns into a blank because
 ; there was no <opt> in match.
 ;
-; But then if that blank matches, it gives a VOID! so you don't get misled
+; But then if that blank matches, it gives ~falsey~ so you don't get misled
 ; in tests exactly like this one.  (!)
 ;
-; Temporarily make void matches just return true for duration of the zip.
+; Temporarily make falsey matches just return true for duration of the zip.
 ; Also, make PRINT accept FILE! and TEXT! so the /VERBOSE option will work.
 ;
 zip: enclose :zip func [f] [
@@ -580,7 +580,7 @@ zip: enclose :zip func [f] [
 
     lib/match: func [type value [<opt> any-value!]] [
         let answer
-        if void? set* 'answer match type value [
+        if bad-word? set* 'answer match type value [
             return true
         ]
         return get 'answer

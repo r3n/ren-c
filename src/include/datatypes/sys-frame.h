@@ -531,7 +531,7 @@ inline static void Prep_Frame_Core(
 
     f->feed = feed;
     Prep_Cell(&f->spare);
-    Init_Unreadable_Void(&f->spare);
+    Init_Unreadable(&f->spare);
     f->dsp_orig = DS_Index;
     TRASH_POINTER_IF_DEBUG(f->out);
 

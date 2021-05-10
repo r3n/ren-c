@@ -36,13 +36,15 @@ datatypes
 
 ; === NAMED BAD WORDS ===
 ; A new Ren-C feature is that voids are interned like WORD!, so they can be
-; more communicative.  These are standard symbols passed to Init_Void().
+; more communicative.  These are standard symbols passed to Init_Bad_Word().
 ;
 void
+stale  ; for non-/VOID DO, e.g. `(1 + 2 do [comment "hi"])` is ~stale~
 unset
 nulled
 blanked
 falsey
+errored  ; when rebRescue() has no handler and evaluates to non-fail ERROR!
 unreadable  ; only release build uses, debug build uses NULL as the label
 
 

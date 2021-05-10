@@ -25,7 +25,7 @@ verify: function [
             continue
         ]
 
-        any [void? :result, not :result] then [
+        any [bad-word? :result, not :result] then [
             ;
             ; including commas in the failure report looks messy, skip them
             ;
@@ -37,7 +37,7 @@ verify: function [
                 arg1: compose [
                     ((copy/part conditions pos)) ** (case [
                         unset? 'result ['null]
-                        void? result ['void]
+                        bad-word? result ['void]
                         blank? result ['blank]
                         result = false ['false]
                     ])

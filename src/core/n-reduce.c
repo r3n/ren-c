@@ -312,7 +312,7 @@ REB_R Compose_To_Stack_Core(
                 }
             }
             else {
-                // !!! What about VOID!s?  REDUCE and other routines have
+                // !!! What about VBAD-WORD!s?  REDUCE and other routines have
                 // become more lenient, and let you worry about it later.
 
                 // compose [(1 + 2) inserts as-is] => [3 inserts as-is]
@@ -346,7 +346,7 @@ REB_R Compose_To_Stack_Core(
                 rebRelease(insert);
 
           #ifdef DEBUG_UNREADABLE_VOIDS
-            Init_Unreadable_Void(out);  // shouldn't leak temp eval to caller
+            Init_Unreadable(out);  // shouldn't leak temp eval to caller
           #endif
 
             changed = true;

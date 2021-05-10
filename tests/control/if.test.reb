@@ -12,7 +12,7 @@
 (1 = if true [1])
 
 (null? if false [])
-(null-2? if true [])
+('~void~ = @ if true [])
 
 (error? if true [trap [1 / 0]])
 ; RETURN stops the evaluation
@@ -102,7 +102,7 @@
 (1 = if not false [1])
 
 (null? if not true [1])
-(null-2? if not false [])
+(null-2? if not false [null])
 
 (error? if not false [trap [1 / 0]])
 

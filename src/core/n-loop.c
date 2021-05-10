@@ -590,7 +590,7 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
           case LOOP_MAP_EACH:
           case LOOP_MAP_EACH_SPLICED:
             if (IS_NULLED(les->out))
-                Init_Void(les->out, SYM_NULLED);  // null signals break only
+                Init_Bad_Word(les->out, SYM_NULLED);  // null signals break only
             else if (
                 les->mode == LOOP_MAP_EACH_SPLICED
                 and IS_BLOCK(les->out)
@@ -763,7 +763,7 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
         // any other value is the last body result, and is truthy
         // only illegal value here is void (would cause error if body gave it)
         //
-        assert(not IS_VOID(D_OUT));
+        assert(not IS_BAD_WORD(D_OUT));
         return D_OUT;
 
       case LOOP_MAP_EACH:
@@ -969,7 +969,7 @@ REBNATIVE(for_skip)
 //
 //  {End the current iteration of CYCLE and return a value (nulls allowed)}
 //
-//      value "If no argument is provided, assume VOID!"
+//      value "If no argument is provided, assume ~none~"
 //          [<opt> <end> any-value!]
 //  ]
 //
@@ -1314,8 +1314,8 @@ static REB_R Remove_Each_Core(struct Remove_Each_State *res)
                 // CONTINUE - res->out may not be void if /WITH refinement used
             }
         }
-        if (IS_VOID(res->out))
-            fail (Error_Void_Conditional_Raw());  // neither true nor false
+        if (IS_BAD_WORD(res->out))
+            fail (Error_Bad_Conditional_Raw());  // neither true nor false
 
         if (ANY_ARRAY(res->data)) {
             if (IS_NULLED(res->out) or IS_FALSEY(res->out)) {
@@ -1415,7 +1415,7 @@ REBNATIVE(remove_each)
         // If index is past the series end, then there's nothing removable.
         //
         // !!! Should REMOVE-EACH follow the "loop conventions" where if the
-        // body never gets a chance to run, the return value is void?
+        // body never gets a chance to run, the return value is bad-word?
         //
         return Init_Integer(D_OUT, 0);
     }

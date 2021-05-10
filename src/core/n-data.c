@@ -488,7 +488,7 @@ void Get_Var_May_Fail(
     REBVAL *out,
     const RELVAL *source,  // ANY-WORD! or ANY-PATH! (maybe quoted)
     REBSPC *specifier,
-    bool any,  // should a VOID! value be gotten normally vs. error
+    bool any,  // transform stable voids into isotopes without erroring
     bool hard  // should GROUP!s in paths not be evaluated
 ){
     enum Reb_Kind kind = CELL_KIND(VAL_UNESCAPED(source));
@@ -516,11 +516,18 @@ void Get_Var_May_Fail(
     else
         fail (Error_Bad_Value_Core(source, specifier));
 
-    if (IS_VOID(out) and not any)
-        fail (Error_Need_Non_Void_Core(source, specifier, out));
+    if (IS_BAD_WORD(out)) {
+        if (NOT_CELL_FLAG(out, ISOTOPE)) {
+            if (not any)
+                fail (Error_Bad_Word_Get_Core(source, specifier, out));
+            SET_CELL_FLAG(out, ISOTOPE);
+        }
+    }
 
-    if (not any)  // default to not letting NULL-2 out unless /ANY is used
-        Decay_If_Nulled(out);
+    // !!! Variables should not store null isotopes, but they currently can...
+    // look into a systemic answer of how and where to stop this.
+    //
+    Decay_If_Nulled(out);
 }
 
 
@@ -532,7 +539,7 @@ void Get_Var_May_Fail(
 //      return: [<opt> any-value!]
 //      source "Word or path to get, or block of words or paths"
 //          [<blank> any-word! any-sequence! block!]
-//      /any "Retrieve ANY-VALUE! (e.g. do not error on VOID!)"
+//      /any "Retrieve ANY-VALUE! (e.g. do not error on plain BAD-WORD!)"
 //      /hard "Do not evaluate GROUP!s in PATH! (assume pre-COMPOSE'd)"
 //  ]
 //
@@ -567,8 +574,8 @@ REBNATIVE(get)
             did REF(any),
             did REF(hard)
         );
-        if (IS_NULLED(temp))
-            Init_Void(dest, SYM_NULLED);  // blocks can't contain nulls
+        if (IS_NULLED(temp))  // blocks can't contain nulls
+            Init_Bad_Word(dest, SYM_NULLED);
         else
             Copy_Cell(dest, temp);
     }
@@ -581,7 +588,7 @@ REBNATIVE(get)
 //
 //  get*: native [
 //
-//  {Gets the value of a word or path, allows VOID!}
+//  {Gets the value of a word or path, allows BAD-WORD!}
 //
 //      return: [<opt> any-value!]
 //      source "Word or path to get"
@@ -600,7 +607,7 @@ REBNATIVE(get_p)
         D_OUT,
         ARG(source),
         SPECIFIED,
-        true,  // allow VOID!, e.g. GET/ANY
+        true,  // allow BAD-WORD!, e.g. GET/ANY
         false  // evaluate GROUP!s, e.g. not GET/HARD
     );
     return D_OUT;
@@ -759,7 +766,7 @@ REBNATIVE(set)
 //
 //  try: native [
 //
-//  {Turn nulls into blanks, all non-voids pass through (see also: OPT)}
+//  {Turn nulls into blanks, everything else passes through (see also: OPT)}
 //
 //      return: "blank if input was null, or original value otherwise"
 //          [any-value!]
@@ -770,10 +777,12 @@ REBNATIVE(try)
 {
     INCLUDE_PARAMS_OF_TRY;
 
-    if (IS_NULLED(ARG(optional)))
+    REBVAL *optional = ARG(optional);
+
+    if (IS_NULLED(optional))
         return Init_Blank(D_OUT);
 
-    RETURN (ARG(optional));  // Accepts VOID! for generality (once it didn't)
+    RETURN (optional);
 }
 
 
@@ -782,7 +791,7 @@ REBNATIVE(try)
 //
 //  {Convert blanks to nulls, pass through most other values (See Also: TRY)}
 //
-//      return: "null on blank, void if input was null, else original value"
+//      return: "null on blank, ~nulled~ if input was NULL, or original value"
 //          [<opt> any-value!]
 //      optional [<opt> <blank> any-value!]
 //  ]
@@ -791,15 +800,12 @@ REBNATIVE(opt)
 {
     INCLUDE_PARAMS_OF_OPT;
 
-    if (IS_VOID(ARG(optional)))
-        fail ("OPT cannot accept VOID! values");
-
-    // !!! Experimental idea: opting a null gives you a void.  You generally
+    // !!! Experimental: opting a null gives you a bad word.  You generally
     // don't put OPT on expressions you believe can be null, so this permits
     // creating a likely error in those cases.  To get around it, OPT TRY
     //
     if (IS_NULLED(ARG(optional)))
-        return Init_Void(D_OUT, SYM_NULLED);
+        return Init_Bad_Word(D_OUT, SYM_NULLED);
 
     RETURN (ARG(optional));
 }
@@ -933,7 +939,7 @@ REBNATIVE(identity) // sample uses: https://stackoverflow.com/q/3136338
 //
 //  {Releases the underlying data of a value so it can no longer be accessed}
 //
-//      return: [void!]
+//      return: []
 //      memory [any-series! any-context! handle!]
 //  ]
 //
@@ -951,7 +957,7 @@ REBNATIVE(free)
         fail ("Cannot FREE already freed series");
 
     Decay_Series(s);
-    return Init_Void(D_OUT, SYM_VOID); // !!! Could return freed value
+    return Init_None(D_OUT); // !!! Could return freed value
 }
 
 
@@ -1596,11 +1602,11 @@ inline static bool Is_Set(const REBVAL *location)
 inline static bool Is_Defined(const REBVAL *location)
 {
     if (ANY_WORD(location))
-        return not IS_VOID(Lookup_Word_May_Fail(location, SPECIFIED));
+        return not IS_BAD_WORD(Lookup_Word_May_Fail(location, SPECIFIED));
 
     DECLARE_LOCAL (temp); // result may be generated
     Get_Path_Core(temp, location, SPECIFIED);
-    return not IS_VOID(temp);
+    return not IS_BAD_WORD(temp);
 }
 
 
@@ -1650,7 +1656,7 @@ REBNATIVE(unset_q)
 //      return: [logic!]
 //      location [any-word! any-path!]
 //  ][
-//      not void? get/any location
+//      not bad-word? get/any location
 //  ]
 //
 REBNATIVE(defined_q)
@@ -1669,7 +1675,7 @@ REBNATIVE(defined_q)
 //      return: [logic!]
 //      location [any-word! any-path!]
 //  ][
-//      void? get/any location
+//      bad-word? get/any location
 //  ]
 //
 REBNATIVE(undefined_q)
@@ -1681,21 +1687,39 @@ REBNATIVE(undefined_q)
 
 
 //
-//  null?: native/body [
+//  null?: native [
 //
 //  "Tells you if the argument is not a value"
 //
 //      return: [logic!]
-//      optional [<opt> any-value!]
-//  ][
-//      null = type of :optional
+//      optional [<opt> <literal> any-value!]
+//      /isotope "Check if it's special variant of null that can trigger ELSE"
 //  ]
 //
-REBNATIVE(null_q)
+REBNATIVE(null_q)  // NULL/ISOTOPE is specialized as NULL-2?
+//
+// Note: We could tell whether something is null-2 or null without the @literal
+// convention in native code, by looking at CELL_FLAG_ISOTOPE on a normal
+// parameter.  But we try not to make it more aboveboard by having the same
+// function spec a usermode function would need to detect the condition.
 {
     INCLUDE_PARAMS_OF_NULL_Q;
 
-    return Init_Logic(D_OUT, IS_NULLED(ARG(optional)));
+    REBVAL *v = ARG(optional);
+
+    // Be consistent with other typecheckers and error if given a non-isotope
+    // form of a BAD-WORD!.  (@params should be used sparingly/carefully.)
+    //
+    if (IS_BAD_WORD(v))  // @param gives non-quoted void if stable void was input
+        fail (PAR(optional));
+
+    if (REF(isotope))  // isotope form @literalizes as quoted null, (just ')
+        return Init_Logic(D_OUT, KIND3Q_BYTE(v) == REB_NULL + REB_64);
+
+    return Init_Logic(
+        D_OUT,
+        KIND3Q_BYTE(v) == REB_NULL or KIND3Q_BYTE(v) == REB_NULL + REB_64
+    );
 }
 
 
@@ -1715,23 +1739,6 @@ REBNATIVE(null_2) {
 
 
 //
-//  null-2?: native [
-//
-//  "Tells you if the argument is the heavy isotope of NULL (triggers THEN)"
-//
-//      return: [logic!]
-//      optional [<opt> any-value!]
-//  ]
-//
-REBNATIVE(null_2_q)
-{
-    INCLUDE_PARAMS_OF_NULL_2_Q;
-
-    return Init_Logic(D_OUT, Is_Heavy_Nulled(ARG(optional)));
-}
-
-
-//
 //  voidify: native [
 //
 //  "Turn nulls into voids, passing through all other values"
@@ -1745,7 +1752,7 @@ REBNATIVE(voidify)
     INCLUDE_PARAMS_OF_VOIDIFY;
 
     if (IS_NULLED(ARG(optional)))
-        return Init_Void(D_OUT, SYM_NULLED);
+        return Init_Bad_Word(D_OUT, SYM_NULLED);
 
     RETURN (ARG(optional));
 }
@@ -1764,7 +1771,7 @@ REBNATIVE(devoid)
 {
     INCLUDE_PARAMS_OF_DEVOID;
 
-    if (IS_VOID(ARG(optional)))
+    if (IS_BAD_WORD(ARG(optional)))
         return Init_Nulled(D_OUT);
 
     RETURN (ARG(optional));
@@ -1791,7 +1798,7 @@ REBNATIVE(nothing_q)
 
     return Init_Logic(
         D_OUT,
-        IS_VOID(ARG(value))  // Should unset be also considered "nothing"?
+        IS_BAD_WORD(ARG(value))  // Should unset be also considered "nothing"?
             or IS_NULLED_OR_BLANK(ARG(value))
     );
 }

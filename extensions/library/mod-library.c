@@ -65,7 +65,7 @@ REB_R MAKE_Library(
         fail (arg);
 
     REBLIB *lib = Alloc_Singular(FLAG_FLAVOR(LIBRARY) | NODE_FLAG_MANAGED);
-    Init_Unreadable_Void(ARR_SINGLE(lib));  // !!! save name? other data?
+    Init_Unreadable(ARR_SINGLE(lib));  // !!! save name? other data?
 
     lib->link.fd = fd;  // seen as shared by all instances
     node_MISC(Meta, lib) = nullptr;  // !!! build from spec, e.g. arg?
@@ -132,7 +132,7 @@ REBTYPE(Library)
 //
 //  {Register the LIBRARY! datatype (so MAKE LIBRARY! [] etc. work)}
 //
-//      return: [void!]
+//      return: []
 //      generics [block!]
 //  ]
 //
@@ -156,7 +156,7 @@ REBNATIVE(register_library_hooks)
 
     Extend_Generics_Someday(ARG(generics));  // !!! See comments
 
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
 }
 
 
@@ -211,5 +211,5 @@ REBNATIVE(unregister_library_hooks)
     Unhook_Datatype(EG_Library_Type);
     EG_Library_Type = nullptr;
 
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
 }

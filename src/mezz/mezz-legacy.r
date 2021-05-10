@@ -17,12 +17,18 @@ REBOL [
 ]
 
 
-; We are in the evaluation period of deciding if JUST is a more literate short
-; term than LIT for getting values literally.  But LIT is used some places
-; (like <json>) so keep it for compatibility until a decision is reached.
+; LIT now has new meanings, but is used some places (like <json>) until the
+; JUST change has propagated completely.
 ; https://forum.rebol.info/t/just-vs-lit-literal-literally/1453
 ;
 lit: :just
+
+
+; !!! Compatibility for VOID!, remove as time goes on.  BAD-WORD! has come
+; to stay.
+;
+void!: bad-word!
+void?: :bad-word?
 
 
 ; See notes on the future where FUNC and FUNCTION are synonyms (same will be

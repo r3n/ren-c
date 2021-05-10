@@ -356,9 +356,9 @@ static bool Subparse_Throws(
 
     // Locals in frame would be void on entry if called by action dispatch.
     //
-    Init_Void(Prep_Cell(ARG(num_quotes)), SYM_UNSET);
-    Init_Void(Prep_Cell(ARG(position)), SYM_UNSET);
-    Init_Void(Prep_Cell(ARG(save)), SYM_UNSET);
+    Init_Unset(Prep_Cell(ARG(num_quotes)));
+    Init_Unset(Prep_Cell(ARG(position)));
+    Init_Unset(Prep_Cell(ARG(save)));
 
     // !!! By calling the subparse native here directly from its C function
     // vs. going through the evaluator, we don't get the opportunity to do
@@ -2674,8 +2674,8 @@ REBNATIVE(subparse)
 //
 //  "Parse series according to grammar rules"
 //
-//      return: "TBD: parse product, currently either VOID! or NULL"
-//          [<opt> void! any-series!]
+//      return: "TBD: parse product, currently either ~parsed~ or NULL"
+//          [<opt> bad-word! any-series!]
 //
 //      input "Input series to parse"
 //          [<blank> any-series!]

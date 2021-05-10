@@ -1,12 +1,12 @@
 ; datatypes/unset.r
 
-(not void? 1)
+(not bad-word? 1)
 
-; Labeled VOID!s can be literal, or created from WORD!
+; Labeled BAD-WORD!s can be literal, or created from WORD!
 (
-    v: make void! 'labeled
+    v: make bad-word! 'labeled
     did all [
-        void? get/any 'v
+        bad-word? get/any 'v
         undefined? 'v
         '~labeled~ = get/any 'v
         'labeled = label of get/any 'v
@@ -14,57 +14,78 @@
 )
 
 ; Plain ~ is not a void, but a WORD!.  But things like ~~~ are not WORD!,
-; because that would be ambiguous with a VOID! with the word-label of ~.
+; because that would be ambiguous with a BAD-WORD! with the word-label of ~.
 ; So ~ is the only "~-word"
 ;
 (word? first [~])
 ('scan-invalid = ((trap [load-value "~~"])/id))
-(void? first [~~~])
+(bad-word? first [~~~])
 ('~ = label of '~~~)
 
 ; NULL is the response for when there is no content:
 ; https://forum.rebol.info/t/what-should-do-do/1426
 ;
-(null? do [])
+('~void~ = @ do [])
 (
     foo: func [] []
-    null? foo
+    '~void~ = @ foo
 )
-(null? applique :foo [])
-(null? do :foo)
+('~void~ = @ applique :foo [])
+('~void~ = @ do :foo)
 
-; ~void~ is the convention for what you get by RETURN with no argument, or
+; ~void~ is the convention for what you get by RETURN/VOID with no argument, or
 ; if the spec says <void> any result.
-(
-    foo: func [return: <void>] []
-    '~void~ = foo
+[(
+    foo: func [] [return/void]
+    '~void~ = @ foo
 )(
-    foo: func [] [return]
-    '~void~ = foo
-)
-('~void~ = applique :foo [])
-('~void~ = do :foo)
-(
+    foo: func [] [return/void ~void~]
+    '~void~ = @ foo
+)(
+    foo: func [] [return/void ~void~]  ; /VOID only invisible if arg is void
+    '~void~ = @ foo
+)(
+    foo: func [] [return]  ; if you don't specify /VOID
+    '~void~ = @ foo
+)]
+
+[(
+    foo: func [] [return/void]
+    '~void~ = @ foo
+)(
+    '~void~ = @ applique :foo []
+)(
+    '~void~ = @ do :foo
+)]
+
+[(
+    foo: func [return: <void>] []
+    '~none~ = @ foo
+)(
     data: [a b c]
     f: func [return: <void>] [append data [1 2 3]]
-    '~void~ = f
-)
+    '~none~ = @ f
+)]
 
 ; ~unset~ is the type of locals before they are assigned
 (
     f: func [<local> loc] [get/any 'loc]
     f = '~unset~
+)(
+    f: func [<local> loc] [@loc]
+    f = '~unset~
 )
+
 
 ; ~unset~ is also the type of things that just were never declared
 (
     '~unset~ = get/any 'asiieiajiaosdfbjakbsjxbjkchasdf
 )
 
-; MATCH will match a void as-is, but falsey inputs produce ~falsey~
+; MATCH will match a bad-word! as-is, but falsey inputs produce ~falsey~
 [
-    ('~preserved~ = match void! '~preserved~)
-    ('~falsey~ = match null null)
+    (''~preserved~ = @ match bad-word! '~preserved~)
+    ('~falsey~ = @ match null null)
 ]
 
 ; CYCLE once differentiated a STOP result from BREAK with ~stopped~, but now
@@ -74,20 +95,21 @@
     (null = cycle [break])
 ]
 
-; ~quit~ is the label of the VOID! you get by default from QUIT
+; ~quit~ is the label of the BAD-WORD! you get by default from QUIT
 ; Note: DO of BLOCK! does not catch quits, so TEXT! is used here.
 [
     (1 = do "quit 1")
-    ('~quit~ = do "quit")
-    ('~unmodified~ = do "quit '~unmodified~")
+    ('~quit~ =  @ do "quit")
+    ('~unmodified~ = @ do "quit '~unmodified~")
 ]
 
-; It's tougher to write generic routines that handle VOID! than to error on
-; them, but a good general routine should probably do it.
+; Isotopes make it easier to write generic routines that handle BAD-WORD!
+; values, so long as they are "friendly" (e.g. come from picking out of a
+; block vs. running it, or come from a quote evaluation).
 ;
 ([~abc~ ~def~] = collect [keep '~abc~, keep '~def~])
 
-; Erroring modes of VOID! are being fetched by WORD! and logic tests.
+; Erroring modes of BAD-WORD! are being fetched by WORD! and logic tests.
 ; They are inert values otherwise, so PARSE should treat them such.
 ;
 ; !!! Review: PARSE should probably error on rules like `some ~foo~`, and
@@ -101,7 +123,7 @@
     e: trap [
         parse [~foo~ ~foo~] [some foo]  ; not acceptable  !!! how to overcome?
     ]
-    e/id = 'need-non-void
+    e/id = 'bad-word-get
 )
 
 (
@@ -114,11 +136,11 @@
 ]
 
 
-(error? trap [a: '~void~, a])
+(error? trap [a: ~void~, a])
 (not error? trap [set 'a '~void~])
 
 (
-    a-value: '~void~
+    a-value: ~void~
     e: trap [a-value]
-    e/id = 'need-non-void
+    e/id = 'bad-word-get
 )

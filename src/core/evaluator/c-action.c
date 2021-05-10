@@ -160,7 +160,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
       skip_fulfilling_arg_for_now:  // the GC marks args up through f->arg...
 
-        Init_Unreadable_Void(f->arg);  // ...so cell must have valid bits
+        Init_Unreadable(f->arg);  // ...so cell must have valid bits
         continue;
 
   //=//// ACTUAL LOOP BODY ////////////////////////////////////////////////=//
@@ -298,7 +298,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 // left enfix should treat that just like an end.
 
                 if (pclass == REB_P_LITERAL)
-                    Init_Reified_Invisible(f->arg);
+                    Init_Void(f->arg);
                 else
                     Init_Endish_Nulled(f->arg);
                 goto continue_fulfilling;
@@ -325,10 +325,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 if (GET_CELL_FLAG(f->out, UNEVALUATED))
                     SET_CELL_FLAG(f->arg, UNEVALUATED);
 
-                if (pclass == REB_P_LITERAL) {
-                    if (not Is_Light_Nulled(f->arg))
-                        Quotify(f->arg, 1);
-                }
+                if (pclass == REB_P_LITERAL)
+                    Literalize(f->arg);
                 break;
 
               case REB_P_HARD:
@@ -347,6 +345,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
                 Copy_Cell(f->arg, f->out);
                 SET_CELL_FLAG(f->arg, UNEVALUATED);
+
+                if (IS_BAD_WORD(f->arg))  // source should only be isotope form
+                    SET_CELL_FLAG(f->arg, ISOTOPE);
                 break;
 
               case REB_P_SOFT:
@@ -378,6 +379,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 else {
                     Copy_Cell(f->arg, f->out);
                     SET_CELL_FLAG(f->arg, UNEVALUATED);
+
+                    if (IS_BAD_WORD(f->arg))  // !!! source should only be isotope
+                        SET_CELL_FLAG(f->arg, ISOTOPE);
                 }
                 break;
 
@@ -476,7 +480,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
         if (IS_END(f_next)) {
             if (pclass == REB_P_LITERAL)
-                Init_Reified_Invisible(f->arg);
+                Init_Void(f->arg);
             else
                 Init_Endish_Nulled(f->arg);
             goto continue_fulfilling;
@@ -491,7 +495,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
           case REB_P_LITERAL: {
             if (GET_FEED_FLAG(f->feed, BARRIER_HIT)) {
                 if (pclass == REB_P_LITERAL)
-                    Init_Reified_Invisible(f->arg);
+                    Init_Void(f->arg);
                 else
                     Init_Endish_Nulled(f->arg);
                 goto continue_fulfilling;
@@ -500,9 +504,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             REBFLGS flags = EVAL_MASK_DEFAULT
                 | EVAL_FLAG_FULFILLING_ARG;
 
-            if (IS_VOID(f_next))  // Eval_Step() has callers test this
-                fail (Error_Void_Evaluation_Raw());  // must be quoted
-
             if (Eval_Step_In_Subframe_Throws(f->arg, f, flags)) {
                 Copy_Cell(f->out, f->arg);
                 goto abort_action;
@@ -510,16 +511,12 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
             if (IS_END(f->arg)) {
                 if (pclass == REB_P_LITERAL)
-                    Init_Reified_Invisible(f->arg);
+                    Init_Void(f->arg);
                 else
                     Init_Endish_Nulled(f->arg);
             }
-            else if (pclass == REB_P_LITERAL) {
-                if (Is_Light_Nulled(f->arg))
-                    Init_Nulled(f->arg);
-                else
-                    Quotify(f->arg, 1);
-            }
+            else if (pclass == REB_P_LITERAL)
+                Literalize(f->arg);
             break; }
 
   //=//// HARD QUOTED ARG-OR-REFINEMENT-ARG ///////////////////////////////=//
@@ -536,6 +533,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 Literal_Next_In_Frame(f->arg, f);
                 SET_CELL_FLAG(f->arg, UNEVALUATED);
             }
+
+            if (IS_BAD_WORD(f->arg))  // !!! Source should only be isotope form
+                SET_CELL_FLAG(f->arg, ISOTOPE);
 
             // Have to account for enfix deferrals in cases like:
             //
@@ -603,9 +603,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     | FLAG_STATE_BYTE(ST_EVALUATOR_LOOKING_AHEAD)
                     | EVAL_FLAG_INERT_OPTIMIZATION;
 
-                if (IS_VOID(f_next))  // Eval_Step() has callers test this
-                    fail (Error_Void_Evaluation_Raw());  // must be quoted
-
                 DECLARE_FRAME (subframe, f->feed, flags);
 
                 Push_Frame(f->arg, subframe);
@@ -628,6 +625,10 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     Copy_Cell(f->out, f->arg);
                     goto abort_action;
                 }
+            }
+            else {
+                if (IS_BAD_WORD(f->arg))  // !!! Source should only be isotope form
+                    SET_CELL_FLAG(f->arg, ISOTOPE);
             }
             break;
 
@@ -780,7 +781,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
             if (
                 GET_EVAL_FLAG(f, FULLY_SPECIALIZED)
-                and Is_Void_With_Sym(f->arg, SYM_UNSET)
+                and Is_Unset(f->arg)
             ){
                 Init_Nulled(f->arg);
             }
@@ -824,6 +825,19 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         ){
             SET_EVAL_FLAG(f, TYPECHECK_ONLY);
             continue;
+        }
+
+        if (REB_P_LITERAL == VAL_PARAM_CLASS(f->param)) {
+            if (
+                kind_byte != REB_BAD_WORD
+                and kind_byte != REB_NULL
+                and not IS_QUOTED_KIND(kind_byte)
+            ){
+                fail ("Literal arguments must be quoted!, bad-word!, or null");
+            }
+        }
+        else if (kind_byte == REB_BAD_WORD and NOT_CELL_FLAG(f->arg, ISOTOPE)) {
+            fail ("Only literal parameters allow non-isotope BAD-WORD!s");
         }
 
         // Apply constness if requested.

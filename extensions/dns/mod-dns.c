@@ -178,7 +178,7 @@ static REB_R DNS_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         RETURN (port); }
 
       case SYM_ON_WAKE_UP:
-        return Init_Void(D_OUT, SYM_VOID);
+        return Init_Void(D_OUT);
 
       default:
         break;

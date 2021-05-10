@@ -386,7 +386,7 @@ REBNATIVE(rc4_key)
 //
 //  "Encrypt/decrypt data (modifies) using RC4 algorithm."
 //
-//      return: [void!]
+//      return: []
 //      ctx "Stream cipher context"
 //          [handle!]
 //      data "Data to encrypt/decrypt (modified)"
@@ -421,7 +421,7 @@ REBNATIVE(rc4_stream)
      if (error)
         rebJumps ("fail", error);
 
-    return rebVoid();
+    return rebNone();
 }
 
 
@@ -1264,7 +1264,7 @@ REBNATIVE(ecdh_shared_secret)
 //
 //  {Initialize random number generators and OS-provided crypto services}
 //
-//      return: [void!]
+//      return: []
 //  ]
 //
 REBNATIVE(init_crypto)
@@ -1279,13 +1279,13 @@ REBNATIVE(init_crypto)
         PROV_RSA_FULL,
         CRYPT_VERIFYCONTEXT | CRYPT_SILENT
     )){
-        return rebVoid();
+        return rebNone();
     }
     gCryptProv = 0;
   #else
     rng_fd = open("/dev/urandom", O_RDONLY);
     if (rng_fd != -1)
-        return rebVoid();
+        return rebNone();
   #endif
 
     // !!! Should we fail here, or wait to fail until the system tries to
@@ -1300,7 +1300,7 @@ REBNATIVE(init_crypto)
 //
 //  {Shut down random number generators and OS-provided crypto services}
 //
-//      return: [void!]
+//      return: []
 //  ]
 //
 REBNATIVE(shutdown_crypto)
@@ -1319,5 +1319,5 @@ REBNATIVE(shutdown_crypto)
     }
   #endif
 
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
 }

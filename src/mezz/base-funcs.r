@@ -256,11 +256,12 @@ func: func* [
         end accept
     |
         other: here (
-            print mold other/1
+            print mold @other/1
             fail [
                 ; <where> spec
                 ; <near> other
-                "Invalid spec item:" (mold other/1)
+                "Invalid spec item:" (mold @other/1)
+                "in spec" @spec
             ]
         )
     ] end]
@@ -566,7 +567,7 @@ matched: enfixed redescribe [
 )
 tweak :matched 'postpone on
 
-; Rare case where a `?` variant is useful, to avoid VOID! on falsey matches
+; Rare case where a `?` variant is useful, to avoid BAD-WORD! on falsey matches
 match?: chain [:match | :value?]
 
 
@@ -680,7 +681,7 @@ attempt: func [
     code [block! action!]
 ][
     trap [
-        return/unquote (@(do code) else [just '])  ; want NULL-2 if was NULL
+        return/isotope (do code else [null])  ; want NULL-2 if was NULL
     ]
     return null
 ]

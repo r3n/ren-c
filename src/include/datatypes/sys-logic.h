@@ -40,8 +40,8 @@ inline static bool VAL_LOGIC(REBCEL(const*) v) {
 inline static bool IS_TRUTHY(const RELVAL *v) {
     if (KIND3Q_BYTE(v) > REB_LOGIC)
         return true;  // includes JUST: `if just '_ [-- "this is truthy"]`
-    if (IS_VOID(v))
-        fail (Error_Void_Conditional_Raw());
+    if (IS_BAD_WORD(v))
+        fail (Error_Bad_Conditional_Raw());
     if (IS_LOGIC(v))
         return VAL_LOGIC(v);
     assert(IS_BLANK(v) or IS_NULLED(v));

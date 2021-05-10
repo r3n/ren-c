@@ -158,7 +158,7 @@ void Push_Paramlist_Triads_May_Fail(
                 or IS_TEXT(notes)  // !!! we overwrite, but should we append?
             );
 
-            if (IS_VOID(KEY_SLOT(DSP))) {  // no keys seen, act as description
+            if (IS_BAD_WORD(KEY_SLOT(DSP))) {  // no keys seen, act as description
                 Init_Text(notes, Copy_String_At(item));
                 *flags |= MKF_HAS_DESCRIPTION;
             }
@@ -183,9 +183,9 @@ void Push_Paramlist_Triads_May_Fail(
                 continue;
             }
             else if (0 == CT_String(item, Root_Void_Tag, strict)) {
-                *flags |= MKF_IS_VOIDER;  // use Voider_Dispatcher()
+                *flags |= MKF_IS_BAD_WORDER;  // use Opaque_Dispatcher()
 
-                // Fake as if they said [void!] !!! make more efficient
+                // Fake as if they said []  !!! use EMPTY_BLOCK?
                 //
                 item = Get_System(SYS_STANDARD, STD_PROC_RETURN_TYPE);
                 goto process_typeset_block;
@@ -206,12 +206,12 @@ void Push_Paramlist_Triads_May_Fail(
 
         if (IS_BLOCK(item)) {
           process_typeset_block:
-            if (IS_VOID(KEY_SLOT(DSP)))  // too early, `func [[integer!] {!}]`
+            if (IS_BAD_WORD(KEY_SLOT(DSP)))  // too early, `func [[integer!] {!}]`
                 fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
 
             STKVAL(*) types = TYPES_SLOT(DSP);
 
-            if (IS_BLOCK(types))  // too many, `func [x [void!] [blank!]]`
+            if (IS_BLOCK(types))  // too many, `func [x [integer!] [blank!]]`
                 fail (Error_Bad_Func_Def_Raw(rebUnrelativize(item)));
 
             assert(IS_NULLED(types));
@@ -422,19 +422,15 @@ void Push_Paramlist_Triads_May_Fail(
 
         STKVAL(*) param = PARAM_SLOT(DSP);
 
-        // Non-annotated arguments disallow ACTION!, VOID! and NULL.  Not
-        // having to worry about ACTION! and NULL means by default, code
-        // does not have to worry about "disarming" arguments via GET-WORD!.
-        // Also, keeping NULL a bit "prickly" helps discourage its use as
-        // an input parameter...because it faces problems being used in
-        // SPECIALIZE and other scenarios.
+        // Non-annotated arguments allow all parameter types, but a normal
+        // parameter cannot pick up a non-isotope form of BAD-WORD!.
         //
         // Note there are currently two ways to get NULL: <opt> and <end>.
         // If the typeset bits contain REB_NULL, that indicates <opt>.
         // But Is_Param_Endable() indicates <end>.
 
         if (pclass == REB_P_LOCAL) {
-            Init_Void(param, SYM_UNSET);
+            Init_Unset(param);
             SET_CELL_FLAG(param, STACK_NOTE_LOCAL);
         }
         else if (refinement) {
@@ -510,15 +506,14 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
 
             STKVAL(*) param = PARAM_SLOT(DSP);
 
-            // While default arguments disallow ACTION!, VOID!, and NULL...
-            // they are allowed to return anything.  Generally speaking, the
-            // checks are on the input side, not the output.
+            // By default, you can return anything.  This goes with the bias
+            // that checks happen on the reading side of things, not writing.
             //
             Init_Param(
                 param,
                 REB_P_RETURN,
                 TS_OPT_VALUE
-                    | FLAGIT_KIND(REB_TS_INVISIBLE)  // return/unquote @() ok
+                    | FLAGIT_KIND(REB_TS_INVISIBLE)  // return/void ok
                     | FLAGIT_KIND(REB_TS_REFINEMENT)  // need slot for types
             );
 
@@ -573,7 +568,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
     const REBSYM *duplicate = nullptr;
 
   blockscope {
-    REBVAL *param = Init_Unreadable_Void(ARR_HEAD(paramlist)) + 1;
+    REBVAL *param = Init_Unreadable(ARR_HEAD(paramlist)) + 1;
     REBKEY *key = SER_HEAD(REBKEY, keylist);
 
     if (definitional_return_dsp != 0) {
@@ -804,9 +799,9 @@ REBARR *Make_Paramlist_Managed_May_Fail(
     // the function description--it will be extracted from the slot before
     // it is turned into a rootkey for param_notes.
     //
-    Init_Void(KEY_SLOT(DSP), SYM_VOID);  // signal for no parameters pushed
-    Init_Unreadable_Void(PARAM_SLOT(DSP));  // not used at all
-    Init_Unreadable_Void(TYPES_SLOT(DSP));  // not used at all
+    Init_Void(KEY_SLOT(DSP));  // signal for no parameters pushed
+    Init_Unreadable(PARAM_SLOT(DSP));  // not used at all
+    Init_Unreadable(TYPES_SLOT(DSP));  // not used at all
     Init_Nulled(NOTES_SLOT(DSP));  // overwritten if description
 
     // The process is broken up into phases so that the spec analysis code
@@ -1042,10 +1037,10 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
     UNUSED(binding);
 
     if (
-        ACT_DISPATCHER(a) == &Void_Dispatcher
+        ACT_DISPATCHER(a) == &None_Dispatcher
         or ACT_DISPATCHER(a) == &Empty_Dispatcher
         or ACT_DISPATCHER(a) == &Unchecked_Dispatcher
-        or ACT_DISPATCHER(a) == &Voider_Dispatcher
+        or ACT_DISPATCHER(a) == &Opaque_Dispatcher
         or ACT_DISPATCHER(a) == &Returner_Dispatcher
         or ACT_DISPATCHER(a) == &Block_Dispatcher
     ){
@@ -1061,7 +1056,7 @@ void Get_Maybe_Fake_Action_Body(REBVAL *out, const REBVAL *action)
 
         REBVAL *example;
         REBLEN real_body_index;
-        if (ACT_DISPATCHER(a) == &Voider_Dispatcher) {
+        if (ACT_DISPATCHER(a) == &Opaque_Dispatcher) {
             example = Get_System(SYS_STANDARD, STD_PROC_BODY);
             real_body_index = 4;
         }
@@ -1247,14 +1242,19 @@ REBNATIVE(tweak)
         break;
 
       case SYM_DEFER:  // Special enfix behavior used by THEN, ELSE, ALSO...
-        if (pclass != REB_P_NORMAL)
+        if (pclass != REB_P_NORMAL and pclass != REB_P_LITERAL)
             fail ("TWEAK defer only actions with evaluative 1st params");
         flag = DETAILS_FLAG_DEFERS_LOOKBACK;
         break;
 
       case SYM_POSTPONE:  // Wait as long as it can to run w/o changing order
-        if (pclass != REB_P_NORMAL and pclass != REB_P_SOFT)
+        if (
+            pclass != REB_P_NORMAL
+            and pclass != REB_P_SOFT
+            and pclass != REB_P_LITERAL
+        ){
             fail ("TWEAK postpone only actions with evaluative 1st params");
+        }
         flag = DETAILS_FLAG_POSTPONES_ENTIRELY;
         break;
 

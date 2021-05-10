@@ -74,7 +74,7 @@ console!: make object! [
     repl: true  ; used to identify this as a console! object
     is-loaded: false  ; if true then this is a loaded (external) skin
     was-updated: false  ; if true then console! object found in loaded skin
-    last-result: '~startup~  ; last evaluated result (sent by HOST-CONSOLE)
+    last-result: ~startup~  ; last evaluated result (sent by HOST-CONSOLE)
 
     === APPEARANCE (can be overridden) ===
 
@@ -119,41 +119,122 @@ console!: make object! [
         @v "Value (done with literal parameter to discern isotope status)"
             [<opt> any-value!]
     ] [
-        if '~void~ = last-result: unquote v [
-            return  ; This *specific* void means don't print console output
-        ]
+        last-result: unquote v  ; preserves isotope status of void (not null)
 
-        ; Since the parameter was literal (@v instead of v) it is usually
-        ; quoted.  But it's not quoted it if it's a "light null isotope",
-        ; e.g. the sort that will trigger ELSE.  Handle that.
-        ;
-        if null? v [
-            print "; null"  ; no representation, need to use a comment.
+        === PLAIN BAD WORDS (typically would fail on WORD!/PATH! access) ===
+
+        if v = '~void~ [
+            ;
+            ; ~void~ is an intent of invisibility.  This happens when an
+            ; expression's entire results vaporize:
+            ;
+            ;     >> comment "hi" elide 1 + 2
+            ;
+            ; Some functions that run arbitrary code and other functions will
+            ; return it even though they don't "vaporize" by default:
+            ;
+            ;     >> do [comment "all this code" comment "is invisible"]
+            ;
+            ; But if the system notices that the expression on the whole would
+            ; not vaporize, the result of such a relayer (like DO) is changed
+            ; from ~void~ to ~stale~:
+            ;
+            ;     >> 1 + 2 do [comment "DO is invisible, but whole line isn't"]
+            ;     == ~stale~
+            ;
+            ; At the moment you get this by just hitting enter or any other
+            ; variation of empty whitespace, in addition to `>> comment "hi"`
+            ; or other all-invisible evaluations.  It just cycles the prompt
+            ; and shows no output for cleanliness, but perhaps if the input
+            ; was non-trivial it should say `; invisible` ?
+            ;
             return
         ]
 
-        ; For all other voids, we just print out the result.  Note that since
-        ; it is quoted as a reference parameter, we leverage that for molding.
-        ;
-        if void? unquote v [
-            print [result v]
+        if v = '~none~ [
+            ;
+            ; We also suppress display of the ~none~ state, which is the
+            ; default return value from RETURN with no arguments.  It is for
+            ; situations that don't have useful values to give back, but do
+            ; not want to commit to invisibility so callsites depend on it.
+            ;
+            ; Even if something never wanted to change its result, not being
+            ; actually invisible has benefits:
+            ;
+            ;     >> 1 + 2 help append
+            ;
             return
         ]
+
+        if bad-word? v [  ; gets isotope from stable form
+            ;
+            ; All other non-isotope bads are printed as normal output values.
+            ; They can be LOAD-ed naturally, so this seems consistent:
+            ;
+            ;     >> x: ~something~  ; the stable form is the "natural" form
+            ;     == ~something~
+            ;
+            ; The "unnatural" aspect only happens when you access them without
+            ; using GET/ANY or literalize them with @x:
+            ;
+            ;     >> x
+            ;     ** Error: x is non-isotope form of ~something~
+            ;
+            ; But the console seems like it's giving you the right feedback to
+            ; show it undecorated.
+            ;
+            print [result mold v]
+            return
+        ]
+
+        === NULL VARIATIONS ===
+
+        if v = null [  ; not an isotope, e.g. can trigger ELSE
+            ;
+            ; Key to NULL's purpose is that it lacks any value representation,
+            ; and only exists as an evaluation product you can store in a
+            ; variable.  So there's nothing we can print like `== null` (which
+            ; would look like the WORD! null), and no special syntax exists for
+            ; them...that's by design.
+            ;
+            ; It might seem that giving no output would be the most natural
+            ; case for such a situation.  But it provides more grounding to
+            ; show *something*, so we are tricky here in the text medium and
+            ; display a line in comment form, without the ==.  It has settled
+            ; into being a good compromise for the situation...helping to
+            ; ground users in what is going on.
+            ;
+            print "; null"
+            return
+        ]
+
+        if v = (just ') [
+            ;
+            ; If the @ processed a value into a *quoted* NULL, that indicates
+            ; the "heavy" isotope of NULL.  This is a transient state that only
+            ; a literal parameter's quoting allows us to see.  But it's good
+            ; for console users to be aware of the distinction.
+            ;
+            print ["; null isotope"]  ; no representation, use comment
+        ]
+
+        === ORDNARY RETURN VALUES (@ parameter convention passes as quoted) ===
 
         v: unquote v  ; Now handle everything else
 
         case [
-            null? :v [
+            bad-word? :v [
                 ;
-                ; If the value was a *quoted* NULL, that indicates the "heavy"
-                ; isotope of NULL.  This is a transient state that only a
-                ; literal parameter's quoting allows us to see.  But it's good
-                ; for console users to be aware of the distinction.
+                ; If the @ processed a value into a ~quoted~ BAD-WORD!, that's
+                ; another "isotope" form.  These are friendlier than plain bad
+                ; words and can be accessed without triggering an error.  To
+                ; help build the intuition about the difference, label them.
                 ;
-                print ["; null-2"]  ; no representation, use comment
+                print [result mold v space space "; isotope"]
             ]
 
             free? :v [
+                ;
                 ; Molding a freed value would cause an error...which is
                 ; usually okay (you shouldn't be working with freed series)
                 ; but if we didn't special case it here, the error would seem
@@ -369,20 +450,12 @@ ext-console-impl: func [
     prior "BLOCK! or GROUP! that last invocation of HOST-CONSOLE requested"
         [blank! block! group!]
     result "Quoted result from evaluating PRIOR, or non-quoted error"
-        [<opt> blank! quoted! void! error!]
+        [<opt> blank! quoted! bad-word! error!]
     resumable "Is the RESUME function allowed to exit this console"
         [logic!]
     skin "Console skin to use if the console has to be launched"
         [<opt> object! file!]
 ][
-    ; To make sure anyone handling invisibles knows what they are doing, the
-    ; system makes it an ornery term--despite being escaped.  That makes it
-    ; harder to handle.  Change it to something easier.
-    ;
-    if '~void~ = get/any 'result [
-        result: #invisible
-    ]
-
     === {HOOK RETURN FUNCTION TO GIVE EMITTED INSTRUCTION} ===
 
     ; The C caller can be given a BLOCK! representing an code the console is
@@ -518,7 +591,7 @@ ext-console-impl: func [
         :result/arg2 = :quit  ; throw's /NAME
     ] then [
         return switch type of get* 'result/arg1 [
-            void! [0]  ; plain QUIT, no /WITH, call that success
+            bad-word! [0]  ; plain QUIT, no /WITH, call that success
 
             logic! [either :result/arg1 [0] [1]]  ; logic true is success
 
@@ -635,32 +708,20 @@ ext-console-impl: func [
         return <prompt>
     ]
 
-    ; The call to `rebValueInterruptible() on `@ (code)` can produce a void
-    ; if the code vanishes completely.  Just cycle the prompt if it does.  (We
-    ; transformed from ~void~ => #invisible at top of function for easier
-    ; handling... e.g. we got the memo that we're handling a weird result.)
-    ;
-    if result = #invisible [
-        return <prompt>
-    ]
-
-    match [<opt> quoted! void!] result else [
-        fail "Expected QUOTED!, VOID!, or NULL"
-    ]
-
     === {HANDLE RESULT FROM EXECUTION OF CODE ON USER'S BEHALF} ===
+
+    ensure [<opt> quoted! bad-word!] result
 
     if group? prior [
         ;
-        ; The result is NULL if the evaluation was a "light null isotope"
-        ; and ' if it was a "heavy null isotope".  Or just a quoted result
-        ; value otherwise.  We need to quote it in the composition (or else
-        ; the null would vanish and there'd be no argument to PRINT-RESULT),
-        ; but that quote will be evaluated away.  Then, UNQUOTE knows how to
-        ; handle the NULL vs. quoted NULL, and PRINT-RESULT uses the @literal
-        ; parameter convention to sense the null-vs-null-2 distinction.  Neat!
+        ; Working with COMPOSE here is a bit tricky because we can't compose
+        ; in a NULL.  So we have to do a quoted form and then unquote it in
+        ; the invocation.  This is more pleasing than making PRINT-RESULT
+        ; speak in a quoted protocol for the sake of sensing isotopes.
         ;
-        emit [system/console/print-result unquote '(<*> result)]
+        emit [system/console/print-result unquote (<*>
+            either bad-word? result [result] [quote result]
+        )]
         return <prompt>
     ]
 
@@ -698,7 +759,7 @@ ext-console-impl: func [
         ; APIs on windows, on a keystroke-by-keystroke basis vs reading a
         ; whole line at a time.
         ;
-        emit [system/console/print-result '~void~]
+        emit [system/console/print-result ~void~]
         return <prompt>
     ]
 

@@ -4,21 +4,24 @@
 ; on invisibility to help remind you that you are not seeing the whole
 ; picture.  Returning NULL might seem "friendlier" but it is misleading.
 [
-    ('~void~ = do [])
-    ('~void~ = do [comment "hi"])
-    ('~void~ = do make frame! :nihil)
+    ('~stale~ = @ (10 + 20 do []))
+    ('~stale~ = @ (10 + 20 do [nihil]))
+    ('~stale~ = @ (10 + 20 do [comment "hi"]))
+    ('~stale~ = @ (10 + 20 do make frame! :nihil))
     (else? do [null])
     (null-2? do [if true [null]])
 
-    (''~void~ = @(do []))
-    (''~void~ = @(do [comment "hi"]))
-    (''~void~ = @(do make frame! :nihil))
+    ('~void~ = @ comment "HI" do [comment "HI"])
+
+    ('~void~ = (10 + 20 @(do [])))
+    ('~void~ = (10 + 20 @(do [comment "hi"])))
+    ('~void~ = (10 + 20 @(do make frame! :nihil)))
     (else? @(do [null]))
     ('' = @(do [if true [null]]))
 
-    ('~void~ = @(do/void []))
-    ('~void~ = @(do/void [comment "hi"]))
-    ('~void~ = @(do/void make frame! :nihil))
+    (30 = (10 + 20 do/void []))
+    (30 = (10 + 20 do/void [comment "hi"]))
+    (30 = (10 + 20 do/void make frame! :nihil))
     (else? @(do/void [null]))
     ('' = @(do/void [null-2]))
     ('' = @(do/void [if true [null]]))
@@ -32,6 +35,19 @@
     ((just ') = @ do/void [if true [null]])
 ]
 
+
+[
+    ('~stale~ = @ (1 + 2 do [comment "HI"]))
+    ('~void~ = @ do [comment "HI"])
+
+    (
+        x: (1 + 2 y: do [comment "HI"])
+        did all [
+            '~stale~ = @x
+            '~void~ = @y
+        ]
+    )
+]
 
 (
     success: false
@@ -135,7 +151,7 @@
 )
 (0:00 == do [0:00])
 (0.0.0 == do [0.0.0])
-(null? do [()])
+('~void~ = @ do [()])
 ('a == do ['a])
 (error? trap [do trap [1 / 0] 1])
 (
@@ -146,7 +162,7 @@
     a-value: "1"
     1 == do :a-value
 )
-(null? do "")
+('~void~ = @ do "")
 (1 = do "1")
 (3 = do "1 2 3")
 
@@ -191,8 +207,8 @@
 (
     value: <overwritten>
     did all [
-        null? [# value]: evaluate []
-        null? value
+        null? @ [# value]: evaluate []
+        '~void~ = @value
     ]
 )
 (

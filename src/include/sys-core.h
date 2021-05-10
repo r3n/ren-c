@@ -294,7 +294,7 @@ enum {
 
     // These flags are also set during the spec analysis process.
     //
-    MKF_IS_VOIDER = 1 << 6,
+    MKF_IS_BAD_WORDER = 1 << 6,
     MKF_IS_ELIDER = 1 << 7,
     MKF_HAS_RETURN = 1 << 8
 };

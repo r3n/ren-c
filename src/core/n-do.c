@@ -189,7 +189,7 @@ REBNATIVE(shove)
     // into may want it evaluative.  (Enfix handling itself does soft quoting)
     //
   #if !defined(NDEBUG)
-    Init_Unreadable_Void(D_OUT); // make sure we reassign it
+    Init_Unreadable(D_OUT); // make sure we reassign it
   #endif
 
     if (REF(set)) {
@@ -328,10 +328,16 @@ REBNATIVE(do)
     INCLUDE_PARAMS_OF_DO;
     assert(ACT_HAS_RETURN(FRM_PHASE(frame_)));
 
-    // !!! This flag isn't necessarily set on input (?)
-    SET_CELL_FLAG(D_OUT, OUT_NOTE_STALE);
-
     REBVAL *source = ARG(source);
+
+    // Due to the mechanics of true invisibility, `1 + 2 do [comment "hi"]`
+    // cannot rely on OUT_NOTE_STALE...because it clears the stale flag.  This
+    // may be a bug or bad mechanic overall, but getting the right information
+    // in this case (stale vs. invisible) requires making a note and starting
+    // from end.
+    //
+    if (not REF(void))
+        SET_END(D_OUT);  // !!! need to defeat enfix invisibles, review
 
     // If `source` is not const, tweak it to be explicitly mutable--because
     // otherwise, it would wind up inheriting the FEED_MASK_CONST of our
@@ -384,7 +390,7 @@ REBNATIVE(do)
                 // varargs does.  This will cause an assert if reused, and
                 // having BLANK! mean "thrown" may evolve into a convention.
                 //
-                Init_Unreadable_Void(position);
+                Init_Unreadable(position);
                 return R_THROWN;
             }
 
@@ -400,7 +406,7 @@ REBNATIVE(do)
         // the varargs came from.  It's still on the stack, and we don't want
         // to disrupt its state.  Use a subframe.
 
-        Init_Void(D_OUT, SYM_VOID);
+        Init_Void(D_OUT);
         if (IS_END(f->feed->value))
             return D_OUT;
 
@@ -484,15 +490,12 @@ REBNATIVE(do)
 
   handle_void:
 
-    // An invisible operation should not have written to the output slot.
-    //
-    // !!! If vanishing semantics are not requested, giving NULL back is
-    // abrasive...is it worth it to do so, to avoid misconstruing results
-    // (e.g. not thinking a DO returned NULL when it didn't?)  For now,
-    // err on the side of caution.
-    //
-    if (not REF(void) and GET_CELL_FLAG(D_OUT, OUT_NOTE_STALE))
-        Init_Reified_Invisible(D_OUT);
+    if (
+        not REF(void)  // the default
+        and IS_END(D_OUT)  // didn't make new result (non-/VOID forced END)
+    ){
+        Init_Void(D_OUT);  // may be overridden by Init_Stale()
+    }
 
     return D_OUT;
 }
@@ -535,7 +538,7 @@ REBNATIVE(evaluate)
       case REB_GROUP: {
         if (VAL_LEN_AT(source) == 0) {  // `evaluate []` should return null
             Init_Nulled(D_OUT);
-            Init_Reified_Invisible(D_SPARE);
+            Init_Void(D_SPARE);
         }
         else {
             DECLARE_FEED_AT_CORE (feed, source, SPECIFIED);
@@ -591,7 +594,7 @@ REBNATIVE(evaluate)
                 //
                 // https://forum.rebol.info/t/1173/
                 //
-                Init_Reified_Invisible(D_SPARE);
+                Init_Void(D_SPARE);
                 Quotify(D_OUT, 1);  // void-is-invisible signal on array
             }
         }
@@ -621,7 +624,7 @@ REBNATIVE(evaluate)
                 // varargs does.  This will cause an assert if reused, and
                 // having BLANK! mean "thrown" may evolve into a convention.
                 //
-                Init_Unreadable_Void(position);
+                Init_Unreadable(position);
                 Move_Cell(D_OUT, D_SPARE);
                 return R_THROWN;
             }
@@ -811,7 +814,7 @@ REBNATIVE(applique)
         // !!! This is another case where if you want to literaly apply
         // with ~unset~ you have to manually hide the frame key.
         //
-        if (Is_Void_With_Sym(var, SYM_UNSET))
+        if (Is_Unset(var))
             Init_Nulled(var);
 
         Remove_Binder_Index(&binder, KEY_SYMBOL(key));

@@ -81,11 +81,13 @@
 
     (
         takes-2-logics: func [x [logic!] y [logic!]] [x]
-        infix-voider: enfixed func [return: <void> x y] []
+        infix-voider: enfixed func [return: [bad-word!] x y] [
+            return/isotope '~none~
+        ]
         true
     )
 
-    (takes-2-logics ('~void~) = '~void~ false)
+    (takes-2-logics ('~none~) = '~none~ false)
 
     ('expect-arg = (trap [takes-2-logics true infix-voider true false])/id)
 ]

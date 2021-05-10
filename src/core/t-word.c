@@ -28,7 +28,7 @@
 //
 //  Compare_Spellings: C
 //
-// Used in CT_Word() and CT_Void()
+// Used in CT_Word() and CT_Bad_Word()
 //
 REBINT Compare_Spellings(const REBSYM *a, const REBSYM *b, bool strict)
 {

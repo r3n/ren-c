@@ -78,20 +78,20 @@
 
 
 //
-//  Void_Dispatcher: C
+//  None_Dispatcher: C
 //
-// If you write `func [return: <void> ...] []` it uses this dispatcher instead
+// If you write `func [return: [] ...] []` it uses this dispatcher instead
 // of running Eval_Core() on an empty block.  This serves more of a point than
 // it sounds, because you can make fast stub actions that only cost if they
 // are HIJACK'd (e.g. ASSERT is done this way).
 //
-REB_R Void_Dispatcher(REBFRM *f)
+REB_R None_Dispatcher(REBFRM *f)
 {
     REBARR *details = ACT_DETAILS(FRM_PHASE(f));
     assert(VAL_LEN_AT(ARR_HEAD(details)) == 0);
     UNUSED(details);
 
-    return Init_Void(f->out, SYM_VOID);
+    return Init_None(f->out);
 }
 
 
@@ -107,7 +107,7 @@ REB_R Empty_Dispatcher(REBFRM *f)
     assert(VAL_LEN_AT(ARR_AT(details, IDX_DETAILS_1)) == 0);  // empty body
     UNUSED(details);
 
-    return Init_Reified_Invisible(f->out);
+    return Init_Void(f->out);
 }
 
 
@@ -210,11 +210,11 @@ REB_R Unchecked_Dispatcher(REBFRM *f)
 
 
 //
-//  Voider_Dispatcher: C
+//  Opaque_Dispatcher: C
 //
-// Runs block, then overwrites result w/void (e.g. RETURN: <void>)
+// Runs block, then overwrites result w/none (e.g. RETURN: [])
 //
-REB_R Voider_Dispatcher(REBFRM *f)
+REB_R Opaque_Dispatcher(REBFRM *f)
 {
     REBVAL *spare = FRM_SPARE(f);  // write to spare in case invisible RETURN
     bool returned;
@@ -223,7 +223,7 @@ REB_R Voider_Dispatcher(REBFRM *f)
         return R_THROWN;
     }
     UNUSED(returned);  // no additional work to bypass
-    return Init_Void(f->out, SYM_VOID);
+    return Init_None(f->out);
 }
 
 
@@ -383,14 +383,14 @@ REBACT *Make_Interpreted_Action_May_Fail(
         if (mkf_flags & MKF_IS_ELIDER) {
             INIT_ACT_DISPATCHER(a, &Commenter_Dispatcher);
         }
-        else if (mkf_flags & MKF_IS_VOIDER) {
-            INIT_ACT_DISPATCHER(a, &Voider_Dispatcher);  // !!! ^-- see note
+        else if (mkf_flags & MKF_IS_BAD_WORDER) {
+            INIT_ACT_DISPATCHER(a, &Opaque_Dispatcher);  // !!! ^-- see note
         }
         else if (ACT_HAS_RETURN(a)) {
             const REBPAR *param = ACT_PARAMS_HEAD(a);
             assert(KEY_SYM(ACT_KEYS_HEAD(a)) == SYM_RETURN);
 
-            if (not TYPE_CHECK(param, REB_VOID))  // `do []` returns
+            if (not TYPE_CHECK(param, REB_BAD_WORD))  // `do []` returns
                 INIT_ACT_DISPATCHER(a, &Returner_Dispatcher);  // error later
         }
         else {
@@ -405,8 +405,8 @@ REBACT *Make_Interpreted_Action_May_Fail(
 
         if (mkf_flags & MKF_IS_ELIDER)
             INIT_ACT_DISPATCHER(a, &Elider_Dispatcher);  // no f->out mutation
-        else if (mkf_flags & MKF_IS_VOIDER) // !!! see note
-            INIT_ACT_DISPATCHER(a, &Voider_Dispatcher);  // forces f->out void
+        else if (mkf_flags & MKF_IS_BAD_WORDER) // !!! see note
+            INIT_ACT_DISPATCHER(a, &Opaque_Dispatcher);  // forces f->out void
         else if (ACT_HAS_RETURN(a))
             INIT_ACT_DISPATCHER(a, &Returner_Dispatcher);  // typecheck f->out
         else
@@ -599,7 +599,7 @@ REBNATIVE(unwind)
     INCLUDE_PARAMS_OF_UNWIND;
 
     if (IS_ENDISH_NULLED(ARG(result)))
-        Init_Void(ARG(result), SYM_VOID);
+        Init_Void(ARG(result));
 
     return Init_Thrown_Unwind_Value(D_OUT, ARG(level), ARG(result), frame_);
 }
@@ -611,8 +611,9 @@ REBNATIVE(unwind)
 //  {RETURN, giving a result to the caller}
 //
 //      value "If no argument is given, result will be ~void~"
-//          [<end> <opt> any-value!]
-//      /unquote "Relay argument that was quoted, NULL, or ~void~"
+//          [<end> <opt> <literal> any-value!]
+//      /isotope "Relay isotope status of NULL or void return values"
+//      /void "Stable ~void~ (or no value) intends an invisible return"
 //  ]
 //
 REBNATIVE(return)
@@ -652,6 +653,7 @@ REBNATIVE(return)
     REBACT *target_fun = target_frame->original;
 
     REBVAL *v = ARG(value);
+    Unliteralize(v);  // we will read the ISOTOPE flags (don't want it quoted)
 
     // Defininitional returns are "locals"--there's no argument type check.
     // So TYPESET! bits in the RETURN param are used for legal return types.
@@ -660,32 +662,36 @@ REBNATIVE(return)
     assert(KEY_SYM(ACT_KEYS_HEAD(target_fun)) == SYM_RETURN);
 
     if (IS_ENDISH_NULLED(v)) {  // RETURN with nothing following it.
-        if (REF(unquote))
-            fail ("Argument to RETURN required for /UNQUOTE option");
-
-        Init_Void(v, SYM_VOID); // `do [return]` acts as `return void`
+        //
+        // `do [return]` acts as `return ~void~`, e.g. the "stable" form.  If
+        // a caller tries to set a variable to that result, it will raise an
+        // error.  This result is recognized by the console that since it is
+        // not an isotope it will not be displayed.
+        //
+        // However, `do [return/void]` will act as invisible.  So will
+        // `do [return/void ~void~]`, while RETURN/VOID will *not* turn other
+        // types invisible.  (RETURN/VANISHABLE ?)
+        //
+        Init_Void(v);  // handled below as if you passed ~void~
     }
 
-    // Special behaviors to get invisibility and NULL-2 returns
-    //
-    if (REF(unquote)) {
-        if (IS_NULLED(v)) {
-            // as is
-        }
-        else if (IS_QUOTED(v)) {
-            Unquotify(v, 1);
-            if (IS_NULLED(v))
-                Init_Heavy_Nulled(v);
-        }
-        else {
-            if (not IS_VOID(v) or VAL_VOID_LABEL(v) != Canon(SYM_VOID))
-                fail ("BAD-WORD! parameter to RETURN/UNQUOTE must be ~VOID~");
+    if (not REF(isotope)) {
+        //
+        // If we aren't paying attention to isotope status, then remove it
+        // from the value...so NULL-2 decays to null.
+        //
+        if (IS_NULLED(v))
+            CLEAR_CELL_FLAG(v, ISOTOPE);
+    }
 
-            FAIL_IF_NO_INVISIBLE_RETURN(target_frame);
-            Init_Endish_Nulled(v);  // how return throw protocol does invisible
-            goto skip_type_check;
-        }
-
+    if (
+        REF(void)
+        and Is_Bad_Word_With_Sym(v, SYM_VOID)
+        and NOT_CELL_FLAG(v, ISOTOPE)
+    ){
+        FAIL_IF_NO_INVISIBLE_RETURN(target_frame);
+        Init_Endish_Nulled(v);  // how return throw protocol does invisible
+        goto skip_type_check;
     }
 
     // Check type NOW instead of waiting and letting Eval_Core()
@@ -698,8 +704,15 @@ REBNATIVE(return)
     // take [<opt> any-value!] as its argument, and then report the error
     // itself...implicating the frame (in a way parallel to this native).
     //
-    if (not TYPE_CHECK(param, VAL_TYPE(v)))
-        fail (Error_Bad_Return_Type(target_frame, VAL_TYPE(v)));
+    if (IS_BAD_WORD(v) and NOT_CELL_FLAG(v, ISOTOPE)) {
+        //
+        // allow, so that you can say `return ~none~` in functions whose spec
+        // is written as `return: []`
+    }
+    else {
+        if (not TYPE_CHECK(param, VAL_TYPE(v)))
+            fail (Error_Bad_Return_Type(target_frame, VAL_TYPE(v)));
+    }
 
   skip_type_check: {
     Copy_Cell(D_OUT, NATIVE_VAL(unwind)); // see also Make_Thrown_Unwind_Value

@@ -253,7 +253,7 @@
 
 (
     did all [
-        void? x: '~void~
-        void? get/any 'x
+        bad-word? x: '~void~
+        bad-word? get/any 'x
     ]
 )

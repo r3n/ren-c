@@ -17,7 +17,7 @@
 (null = match :even? 3)
 
 
-(void? match blank! _)
+('~falsey~ = @ match blank! _)
 (null = match blank! 10)
 (null = match blank! false)
 
@@ -58,17 +58,17 @@
 (null = match [block!/3 integer!/[:even?]] 303)
 
 
-; Falsey things are turned to VOID! in order to avoid cases like:
+; Falsey things are turned to BAD-WORD! in order to avoid cases like:
 ;
 ;     if match logic! flag [...]
 ;
-; But can still be tested for value? since they are VOID!, and can be used
+; But can still be tested for then? since they are BAD-WORD!, and can be used
 ; with THEN and ELSE.
 [
-    (void? match null null)
-    (void? match blank! blank)
+    ('~falsey~ = @ match null null)
+    ('~falsey~ = @ match blank! blank)
     (true = match logic! true)
-    (void? match logic! false)
+    ('~falsey~ = @ match logic! false)
 ]
 
 [

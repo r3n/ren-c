@@ -149,9 +149,9 @@
     same? :a-value a-value
 )
 (
-    a-value: '~void~
+    a-value: ~void~
     e: trap [a-value]
-    e/id = 'need-non-void
+    e/id = 'bad-word-get
 )
 (
     a-value: 'a

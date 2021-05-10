@@ -15,7 +15,7 @@
 (not null? 1)
 
 ; Early designs for NULL did not let you get or set them from plain WORD!
-; Responsibility for kind of "ornery-ness" this shifted to VOID!, as NULL
+; Responsibility for kind of "ornery-ness" this shifted to BAD-WORD!, as NULL
 ; took on increasing roles as the "true NONE!" and became the value for
 ; unused refinements.
 ;
@@ -61,11 +61,13 @@
 [
     (null-2? if true [null])
     (null-2? if true [null-2])
-    (null-2? if true [])
-    ('~custom~ = if true ['~custom~])
+    ('~void~ = @ if true [])
+    ('~custom~ = @ if true [~custom~])
+    (''~custom~ = @ if true ['~custom~])
 
     (null-1? if true @[null])
     (null-2? if true @[null-2])
-    (null? if true @[])
-    ('~custom~ = if true @['~custom~])
+    ('~void~ = @ if true @[])
+    ('~custom~ = @ if true @[~custom~])
+    (''~custom~ = @ if true @['~custom~])
 ]

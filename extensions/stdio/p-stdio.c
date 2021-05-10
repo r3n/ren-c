@@ -58,7 +58,7 @@ extern REBVAL *Read_Line(STD_TERM *t);
 // Read a line (as a sequence of bytes) from the terminal.  Handles line
 // editing and line history recall.
 //
-// If HALT is encountered (e.g. a Ctrl-C), this routine will return VOID!
+// If HALT is encountered (e.g. a Ctrl-C), this routine will return BAD-WORD!
 // If ESC is pressed, this will return a BLANK!.
 // Otherwise it will return a TEXT! of the read-in string.
 //
@@ -87,8 +87,8 @@ REBVAL *Read_Line(STD_TERM *t)
                 "fail {nullptr interruption of terminal not done yet}"
             );
         }
-        else if (rebDid("void?", rebQ(e))) {
-            line = rebVoid();
+        else if (rebDid("bad-word?", rebQ(e))) {
+            line = rebNone();
         }
         else if (rebDidQ(e, "= newline")) {
             //
@@ -330,9 +330,9 @@ REB_R Console_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
       #if defined(REBOL_SMART_CONSOLE)
         if (Term_IO) {  // e.g. no redirection (Term_IO is null if so)
             REBVAL *result = Read_Line(Term_IO);
-            if (rebDid("void?", rebQ(result))) {  // HALT received
+            if (rebDid("'~halt~ =", rebQ(result))) {  // HALT received
                 rebRelease(result);
-                return rebVoid();
+                return rebNone();
             }
             if (rebDid("blank?", result)) {  // ESCAPE received
                 rebRelease(result);

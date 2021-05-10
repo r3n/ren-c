@@ -408,16 +408,13 @@ null: emulate [
     make char! 0  ; NUL in Ren-C https://en.wikipedia.org/wiki/Null_character
 ]
 
-; Ren-C's VOID! is nearly identical to UNSET!, but the concept is that
-; *variables* are "unset", not *values*.  So the name is different.  An
-; "unset" value is one that holds VOID!.
+; We use the case of Ren-C's "stable" variant of the BAD-WORD! ~unset~ as a
+; parallel of historical Rebol's UNSET!.  It cannot be retrieved via a
+; GET-WORD! (as in R3-Alpha or Red), but only with a special access function
+; (like in Rebol2).
 ;
-; https://forum.rebol.info/t/947
-;
-; VOID! is also a more capable and interesting type, able to hold a symbol.
-;
-unset!: void!
-unset?: emulate [:void?]
+unset!: bad-word!
+unset?: emulate [:bad-word?]
 
 ; Note: Ren-C once reserved NONE for `if none [x = 1, y = 2] [...]`
 ; Currently that is covered by `ALL .NOT [...]`, but a specialization may
@@ -739,13 +736,13 @@ compose: emulate [
             ; The predicate is a function that runs on whatever is generated
             ; in the COMPOSE'd slot.  If you put it in a block, that will
             ; splice but protect its contents from splicing (the default).
-            ; We add the twist that VOID!s ("unset") won't compose in Rebol2.
+            ; We add the twist that ~unset~ won't compose in Rebol2.
             ;
             ;    rebol2> type? either true [] []
             ;    == unset!
             ;
             ;    rebol2> compose [(either true [] [])]
-            ;    == []  ; would be a ~void~ in Ren-C
+            ;    == []  ; would be [~void~] in Ren-C
             ;
             predicate: either only [:enblock-devoid] [:devoid]
         ]

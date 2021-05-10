@@ -321,7 +321,7 @@ REBNATIVE(console)
             // it might have generated (a BLOCK!) asking itself to crash.
 
             if (no_recover)
-                rebJumpsQ("PANIC", trapped);
+                rebJumpsQ("panic", trapped);
 
             code = rebValueQ("[#host-console-error]");
             result = trapped;

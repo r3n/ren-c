@@ -90,7 +90,7 @@
 //
 
 inline static bool ANY_INERT_KIND(REBYTE k) {
-    assert(k >= REB_BLANK);  // can't call on end/null/void
+    assert(k >= REB_BLANK);  // can't call on end/null
     return k <= REB_BLOCK;
 }
 
@@ -107,7 +107,7 @@ inline static bool ANY_INERT_KIND(REBYTE k) {
 // to raise errors.  Rather than saying:
 //
 //     if (IS_END(v)) { fail ("end"); }
-//     if (IS_VOID(v)) { fail ("void"); }
+//     if (IS_BAD_WORD(v)) { fail ("void"); }
 //     if (IS_NULL(v)) { fail ("null"); }
 //     CommonCaseStuff(v);
 //
@@ -115,24 +115,10 @@ inline static bool ANY_INERT_KIND(REBYTE k) {
 //
 //     if (IS_NULLED_OR_VOID_OR_END(v)) {
 //        if (IS_END(v)) { fail ("end"); }
-//        if (IS_VOID(v)) { fail {"void"); }
+//        if (IS_BAD_WORD(v)) { fail {"void"); }
 //        fail ("null");
 //     }
 //     CommonCaseStuff(v);
-
-inline static bool IS_NULLED_OR_VOID_KIND(REBYTE k) {
-    assert(k != REB_0_END);
-    return k <= REB_VOID;
-}
-
-#define IS_NULLED_OR_VOID(v) \
-    IS_NULLED_OR_VOID_KIND(KIND3Q_BYTE(v))
-
-inline static bool IS_NULLED_OR_VOID_OR_END_KIND(REBYTE k)
-    { return k <= REB_VOID; }
-
-#define IS_NULLED_OR_VOID_OR_END(v) \
-    IS_NULLED_OR_VOID_OR_END_KIND(KIND3Q_BYTE_UNCHECKED(v))
 
 inline static bool IS_NULLED_OR_BLANK_KIND(REBYTE k)
     { return k == REB_NULL or k == REB_BLANK; }

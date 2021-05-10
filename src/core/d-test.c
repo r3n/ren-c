@@ -121,7 +121,7 @@ REBNATIVE(diagnose)
 
     Dump_Value_Debug(v);
 
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
   #endif
 }
 
@@ -131,7 +131,7 @@ REBNATIVE(diagnose)
 //
 //  {Introduce periodic or deterministic fuzzing of out of memory errors}
 //
-//      return: [void!]
+//      return: []
 //      factor "Ticks or percentage of time to cause allocation errors"
 //          [integer! percent!]
 //  ]
@@ -156,6 +156,6 @@ REBNATIVE(fuzz)
         assert(IS_PERCENT(ARG(factor)));
         PG_Fuzz_Factor = 10000 * VAL_DECIMAL(ARG(factor));
     }
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
   #endif
 }

@@ -55,19 +55,6 @@ inline static REBVAL *Init_Nulled_Core(RELVAL *out) {
 #define Init_Nulled(out) \
     Init_Nulled_Core(TRACK_CELL_IF_DEBUG(out))
 
-// This helps find callsites that are following the convention for what
-// `do []` should do.  Historically this was the "ornery" value that was the
-// same as unset variables.  It is still chosen as an ornery value, as a
-// "BAD-WORD!" with the label `~void~`.  This helps point you toward the idea
-// that if you use a more labor intensive mechanism you could probably get
-// at the true voidness (unless it's just a stray ~void~ that isn't actually
-// arising from a void function invocation)
-//
-// https://forum.rebol.info/t/what-should-do-do/1426
-//
-#define Init_Reified_Invisible(out) \
-    Init_Void(out, SYM_VOID)
-
 
 //=//// NULL ISOTOPE (NULL-2) /////////////////////////////////////////////=//
 //
@@ -82,11 +69,9 @@ inline static REBVAL *Init_Nulled_Core(RELVAL *out) {
 //
 // The ultimate solution to this was to introduce a slight variant of NULL
 // which would be short-lived (e.g. "decay" to a normal NULL) but carry the
-// additional information that it was an intended branch result.  While this
-// seems sketchy, holistic survey of alternatives made it seem pretty much
-// the best option in the bunch.  Everything else just shifted the same
-// complexity around, in a way that would wind up burdening usages that were
-// not involving ELSE or then whatsoever.
+// additional information that it was an intended branch result.  This
+// seemed sketchy at first, but with @(...) acting as a "detector" for those
+// who need to know the difference, it has become a holisic solution for
 //
 // The "decay" of NULL isotopes occurs on variable retrieval.  Hence:
 //
@@ -102,34 +87,31 @@ inline static REBVAL *Init_Nulled_Core(RELVAL *out) {
 //     >> null-2
 //     ; null-2
 //
-// As with the natural concept of radiation, working with NULL isotopes is
-// risky, and should be avoided by code that doesn't need to do it.
+// As with the natural concept of radiation, working with NULL isotopes can
+// be tricky, and should be avoided by code that doesn't need to do it.  (But
+// it has actually gotten much easier with @(...) behaviors.)
 //
-// In order to avoid taking a relatively precious CELL_FLAG for this purpose,
-// the isotope indication is done by making the HEART_BYTE() of the cell
-// REB_BLANK, while keeping the surface byte REB_NULL.
 
 inline static REBVAL *Init_Heavy_Nulled(RELVAL *out) {
-    RESET_CELL(out, REB_NULL, CELL_MASK_NONE);
-    mutable_HEART_BYTE(out) = REB_BLANK;
+    RESET_CELL(out, REB_NULL, CELL_FLAG_ISOTOPE);
     return cast(REBVAL*, out);
 }
 
 inline static bool Is_Light_Nulled(const RELVAL *v)
-  { return IS_NULLED(v) and HEART_BYTE(v) == REB_NULL; }
+  { return IS_NULLED(v) and NOT_CELL_FLAG(v, ISOTOPE); }
 
 inline static bool Is_Heavy_Nulled(const RELVAL *v)
-  { return IS_NULLED(v) and HEART_BYTE(v) == REB_BLANK; }
+  { return IS_NULLED(v) and GET_CELL_FLAG(v, ISOTOPE); }
 
 inline static RELVAL *Decay_If_Nulled(RELVAL *v) {
-    if (IS_NULLED(v))  // cheaper to overwrite whether already REB_NULL or not
-        mutable_HEART_BYTE(v) = REB_NULL;
+    if (IS_NULLED(v))
+        CLEAR_CELL_FLAG(v, ISOTOPE);  // would Init_Nulled() be faster?
     return v;
 }
 
 inline static RELVAL *Isotopify_If_Nulled(RELVAL *v) {
-    if (IS_NULLED(v))  // cheaper to overwrite whether already REB_NULL or not
-        mutable_HEART_BYTE(v) = REB_BLANK;
+    if (IS_NULLED(v))
+        SET_CELL_FLAG(v, ISOTOPE);  // would Init_Heavy_Nulled() be faster?
     return v;
 }
 

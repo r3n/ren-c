@@ -146,10 +146,10 @@
         "B" func [w] [join "one-" w]
     ]
 )
-
+(
     https://github.com/metaeducation/ren-c/issues/1005
     ("ò" = uparse-reword "ò$a" reduce ['a ""])
-
+)
     ;#2333
 (
     subs: ["1" "foo" "10" "bar"]

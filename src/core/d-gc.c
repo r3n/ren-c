@@ -95,7 +95,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
     switch (heart) {
       case REB_0_END:
       case REB_NULL:
-      case REB_VOID:
+      case REB_BAD_WORD:
       case REB_BLANK:
       case REB_COMMA:
       case REB_LIT:

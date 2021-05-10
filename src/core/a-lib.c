@@ -245,7 +245,7 @@ void RL_rebFree(void *ptr)
     REBBIN *s = *ps;
     if (Is_Node_Cell(s)) {
         rebJumps(
-            "PANIC [",
+            "panic [",
                 "{rebFree() mismatched with allocator!}"
                 "{Did you mean to use free() instead of rebFree()?}",
             "]"
@@ -460,7 +460,18 @@ REBVAL *RL_rebVoid(void)
 {
     ENTER_API;
 
-    return Init_Void(Alloc_Value(), SYM_VOID);
+    return Init_Void(Alloc_Value());
+}
+
+
+//
+//  rebNone: RL_API
+//
+REBVAL *RL_rebNone(void)
+{
+    ENTER_API;
+
+    return Init_None(Alloc_Value());
 }
 
 
@@ -842,7 +853,7 @@ static void Run_Va_May_Fail_Core(
     const void *p,  // first pointer (may be END, nullptr means NULLED)
     va_list *vaptr  // va_end() handled by feed for all cases (throws, fails)
 ){
-    Init_Reified_Invisible(out);
+    Init_Void(out);
 
     REBFLGS flags = EVAL_MASK_DEFAULT | FLAG_QUOTING_BYTE(quotes);
 
@@ -1564,7 +1575,7 @@ REBVAL *RL_rebRescueWith(
         if (Is_Api_Value(result))
             rebRelease(result);
 
-        result = rebVoid();
+        Init_Bad_Word(result, SYM_ERRORED);
         goto proxy_result;
     }
     else {

@@ -33,15 +33,29 @@ probe: func* [
 
     return: "Same as the input value"
         [<opt> any-value!]
-    value [<opt> any-value!]
+    @value' [<opt> any-value!]
+    <local> value
 ][
-    either set? 'value [
-        write-stdout mold get/any 'value
-    ][
-        write-stdout "; null"  ; MOLD won't take nulls
+    ; Remember this is early in the boot so many things not defined
+    write-stdout switch type of value' [
+        null ["; null"]
+        bad-word! [spaced [mold value']]
+    ] else [
+        value: unquote value'
+        switch type of value [
+            null ["; null isotope"]
+            bad-word! [spaced [@value space space "; isotope"]]
+        ] else [
+            mold value
+        ]
     ]
+
     write-stdout newline
-    get/any 'value
+
+    ; We need to wait until the last minute and unquote the original value
+    ; because NULL-2 isotopes decay if assigned to a variable.
+    ;
+    return/isotope unquote value'
 ]
 
 
@@ -150,7 +164,7 @@ nihil: enfixed func* [  ; 0-arg so enfix doesn't matter, but tests issue below
     until [
         equal? '=== take remarks
     ]
-    return/unquote @()  ; return no value (invisible)
+    return/void  ; return no value (invisible)
 ]
 
 ; COMMA! is the new expression barrier.  But `||` is included as a redefine of
@@ -291,7 +305,7 @@ inherit-meta: func* [
             m2/parameter-notes: make frame! :derived
             for-each [key value] m1/parameter-notes [
                 if in m2/parameter-notes key [
-                    m2/parameter-notes/(key): get* 'value  ; !!! VOID!s
+                    m2/parameter-notes/(key): get* 'value  ; !!! BAD-WORD!s
                 ]
             ]
         ]
@@ -299,7 +313,7 @@ inherit-meta: func* [
             m2/parameter-types: make frame! :derived
             for-each [key value] m1/parameter-types [
                 if in m2/parameter-types key [
-                    m2/parameter-types/(key): get* 'value  ; !!! VOID!s
+                    m2/parameter-types/(key): get* 'value  ; !!! BAD-WORD!s
                 ]
             ]
         ]
@@ -386,7 +400,7 @@ pointfree: specialize* (enclose :pointfree* func* [f] [
 
     inherit-meta do f 'action  ; no :action name cache
 ])[
-    action: :panic-value  ; gets overwritten, best to make it something mean
+    action: :panic/value  ; gets overwritten, best to make it something mean
 ]
 
 
@@ -496,6 +510,9 @@ empty?: func* [
 ]
 
 
+null-2?: :null?/isotope  ; particularly useful shorthand in writing tests
+
+
 reeval func* [
     {Make fast type testing functions (variadic to quote "top-level" words)}
     return: <void>
@@ -515,7 +532,7 @@ reeval func* [
         ]
     ]
 ]
-    void?:
+    bad-word?:
     blank?:
     comma?:
     logic?:
@@ -619,8 +636,8 @@ char?: func* [value [<opt> any-value!]] [
 print: func* [
     {Textually output spaced line (evaluating elements if a block)}
 
-    return: "NULL if blank input or effectively empty block, otherwise VOID!"
-        [<opt> void!]
+    return: "NULL if blank input or effectively empty block, else ~none~"
+        [<opt> bad-word!]
     line "Line of text or block, blank or [] has NO output, newline allowed"
         [<blank> char! text! block! quoted!]
 ][
@@ -636,6 +653,15 @@ print: func* [
     ]
 
     (write-stdout try spaced line) then [write-stdout newline]
+]
+
+; In case an early fail happens before FAIL boots, try to give some idea of
+; what the arguments to the fail are by printing them.
+;
+fail: func* [reason] [
+    print "YES THIS IS A FAILURE"
+    print reason
+    fhqwghds
 ]
 
 

@@ -37,8 +37,8 @@
 //
 //=//// NOTES /////////////////////////////////////////////////////////////=//
 //
-// * There's some crossover in situations where you might use an "unreadable
-//   VOID!" with when you would use an END.  But there are fewer places where
+// * There's some crossover in situations where you might use an "unreadable"
+//   with when you would use an END.  But there are fewer places where
 //   ends are tolerated by the GC...such as frame output cells.  You can't put
 //   an END in an array, while an unreadable void can go there.
 //

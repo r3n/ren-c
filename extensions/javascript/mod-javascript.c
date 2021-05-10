@@ -734,8 +734,8 @@ REBNATIVE(js_native)
     // they will produce undefined (e.g. void) by default anyway.  So it's
     // less of an issue.  Punt on it for now.
     //
-    if ((flags & MKF_IS_VOIDER) or (flags & MKF_IS_ELIDER))
-        fail ("<elide> and <void> not supported, use [void!] / [<invisible>]");
+    if ((flags & MKF_IS_BAD_WORDER) or (flags & MKF_IS_ELIDER))
+        fail ("<elide> and <void> not supported, use [] / [<invisible>]");
 
     REBACT *native = Make_Action(
         paramlist,
@@ -888,7 +888,7 @@ REBNATIVE(js_native)
 //  {Evaluate textual JavaScript code}
 //
 //      return: "Note: Only supports types that reb.Box() supports"
-//          [<opt> integer! text! void!]
+//          [<opt> integer! text! bad-word!]
 //      source "JavaScript code as a text string" [text!]
 //      /local "Evaluate in local scope (as opposed to global)"
 //      /value "Return a Rebol value"
@@ -928,12 +928,12 @@ REBNATIVE(js_eval_p)
                 utf8
             );
 
-        return Init_Void(D_OUT, SYM_VOID);
+        return Init_None(D_OUT);
     }
 
-    // Currently, reb.Box() only translates to INTEGER!, TEXT!, VOID!, NULL
+    // Currently, reb.Box() only translates to INTEGER!, TEXT!, BAD-WORD!, NULL
     //
-    // !!! All other types come back as VOID!.  Should they error?
+    // !!! All other types come back as BAD-WORD!.  Should they error?
     //
     heapaddr_t addr;
     if (REF(local)) {
@@ -957,7 +957,7 @@ REBNATIVE(js_eval_p)
 //
 //  {Initialize the JavaScript Extension}
 //
-//      return: [void!]
+//      return: []
 //  ]
 //
 REBNATIVE(init_javascript_extension)
@@ -982,7 +982,7 @@ REBNATIVE(init_javascript_extension)
 
     PG_Native_State = NATIVE_STATE_NONE;
 
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
 }
 
 
@@ -991,7 +991,7 @@ REBNATIVE(init_javascript_extension)
 //
 //  {Internal debug tool for seeing what's going on in JavaScript dispatch}
 //
-//      return: [void!]
+//      return: []
 //      enable [logic!]
 //  ]
 //
@@ -1005,7 +1005,7 @@ REBNATIVE(js_trace)
     fail ("JS-TRACE only if DEBUG_JAVASCRIPT_EXTENSION set in %emscripten.r");
   #endif
 
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
 }
 
 

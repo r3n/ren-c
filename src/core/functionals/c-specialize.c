@@ -160,7 +160,7 @@ REBCTX *Make_Context_For_Action_Push_Partials(
 
           continue_unspecialized:
 
-            Init_Void(arg, SYM_UNSET);  // *not* VAR_MARKED_HIDDEN
+            Init_Unset(arg);  // *not* VAR_MARKED_HIDDEN
             if (binder)
                 Add_Binder_Index(unwrap(binder), symbol, index);
 
@@ -338,7 +338,7 @@ bool Specialize_Action_Throws(
 
         if (TYPE_CHECK(param, REB_TS_REFINEMENT)) {
             if (
-                Is_Void_With_Sym(arg, SYM_UNSET)
+                Is_Unset(arg)
                 and NOT_CELL_FLAG(arg, VAR_MARKED_HIDDEN)
             ){
                 // Undefined refinements not explicitly marked hidden are
@@ -359,7 +359,7 @@ bool Specialize_Action_Throws(
         // It's an argument, either a normal one or a refinement arg.
 
         if (
-            Is_Void_With_Sym(arg, SYM_UNSET)
+            Is_Unset(arg)
             and NOT_CELL_FLAG(arg, VAR_MARKED_HIDDEN)
         ){
             goto unspecialized_arg;
@@ -370,7 +370,7 @@ bool Specialize_Action_Throws(
       unspecialized_arg:
 
         assert(NOT_CELL_FLAG(arg, VAR_MARKED_HIDDEN));
-        assert(Is_Void_With_Sym(arg, SYM_UNSET));
+        assert(Is_Unset(arg));
         assert(IS_TYPESET(param));
         Copy_Cell(arg, param);
         continue;
@@ -389,6 +389,21 @@ bool Specialize_Action_Throws(
        SET_CELL_FLAG(arg, VAR_MARKED_HIDDEN);
 
       specialized_arg_no_typecheck:
+
+        // !!! Technically speaking, if you are trying to implement the @param
+        // convention for literalization, SPECIALIZE does it too late here.
+        // The intent of NULL-2 vs. NULL is lost...at least in theory, because
+        // variables don't store the null isotope state.  The "core" way to
+        // do this is MAKE FRAME! (specialize could be written in usermode
+        // with that).  But as a higher-level tool, specialize can make the
+        // tradeoff to make it easy by doing the literalization for you...which
+        // also means it can keep working if the parameter convention changes.
+        //
+        // !!! As part of the special escaping, might it consider a non
+        // isotope `~null-2~` to be a signal it translates to null-2?
+        //
+        if (VAL_PARAM_CLASS(param) == REB_P_LITERAL)
+            Literalize(arg);
 
         // Specialized-out arguments must still be in the parameter list,
         // for enumeration in the evaluator to line up with the frame values
@@ -766,7 +781,7 @@ REBACT *Alloc_Action_From_Exemplar(
         // https://forum.rebol.info/t/1413
         //
         if (
-            Is_Void_With_Sym(arg, SYM_UNSET)
+            Is_Bad_Word_With_Sym(arg, SYM_UNSET)
             and NOT_CELL_FLAG(arg, VAR_MARKED_HIDDEN)
         ){
             assert(IS_TYPESET(param));

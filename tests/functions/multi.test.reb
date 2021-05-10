@@ -17,11 +17,11 @@
 [
     (test: func [x y: z:] [
         if not null? y [
-            assert [void? get/any y]
+            assert [bad-word? get/any y]
             set y <y-result>
         ]
         if not null? z [
-            assert [void? get/any z]
+            assert [bad-word? get/any z]
             set z <z-result>
         ]
 

@@ -10,7 +10,7 @@
 
 ; return-less return value tests
 (
-    f: does []
+    f: does [null]
     null? f
 )
 (
@@ -186,7 +186,7 @@
 )
 (
     f: does [()]
-    null? f
+    '~void~ = @ f
 )
 (
     f: does ['a]
@@ -476,5 +476,5 @@
         use [x] [return]
         42
     ]
-    void? f
+    '~none~ = @ f
 )]

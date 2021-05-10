@@ -201,7 +201,7 @@ REBNATIVE(get_os_browsers)
 //
 //  "Use system sleep to wait a certain amount of time (doesn't use PORT!s)."
 //
-//      return: [void!]
+//      return: []
 //      duration [integer! decimal! time!]
 //          {Length to sleep (integer and decimal are measuring seconds)}
 //
@@ -229,7 +229,7 @@ REBNATIVE(sleep)
     usleep(msec * 1000);
   #endif
 
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
 }
 
 
@@ -817,7 +817,7 @@ static void kill_process(pid_t pid, int signal)
 //
 //  "Send signal to a process"
 //
-//      return: [void!]  ; !!! might this return pid or signal (?)
+//      return: []  ; !!! might this return pid or signal (?)
 //      pid [integer!]
 //          {The process ID}
 //      signal [integer!]
@@ -836,7 +836,7 @@ REBNATIVE(send_signal)
     //
     kill_process(pid, signal);
 
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
 }
 
 #endif // defined(TO_LINUX) || defined(TO_ANDROID) || defined(TO_POSIX) || defined(TO_OSX)

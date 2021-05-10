@@ -23,14 +23,14 @@
 // The "DO" helpers have names like Do_XXX(), and are a convenience layer
 // over making repeated calls into the Eval_XXX() routines.  DO-ing things
 // always implies running to the end of an input.  It also implies returning
-// a VOID! value if nothing can be synthesized, but letting the last null
+// a BAD-WORD! value if nothing can be synthesized, but letting the last null
 // or value fall out otherwise:
 //
-//     >> type of do []
-//     == void!
+//     >> type of @ do []
+//     == bad-word!
 //
-//     >> type of do [comment "hi"]
-//     == void!
+//     >> type of @ do [comment "hi"]
+//     == bad-word!
 //
 //     >> do [1 comment "hi"]
 //     == 1
@@ -43,7 +43,7 @@
 
 
 // This helper routine is able to take an arbitrary input cell to start with
-// that may not be VOID!.  It is code that DO shares with GROUP! evaluation
+// that may not be END.  It is code that DO shares with GROUP! evaluation
 // in Eval_Core()--where being able to know if a group "completely vaporized"
 // is important as distinct from an expression evaluating to void.
 //
@@ -74,7 +74,7 @@ inline static bool Do_Any_Array_At_Throws(
 
     // ^-- Voidify out *after* feed initialization (if any_array == out)
     //
-    Init_Reified_Invisible(out);
+    Init_Void(out);
 
     bool threw = Do_Feed_To_End_Maybe_Stale_Throws(
         out,
@@ -124,7 +124,7 @@ inline static bool Do_At_Mutable_Throws(
     REBLEN index,
     REBSPC *specifier
 ){
-    Init_Reified_Invisible(out);
+    Init_Void(out);
 
     bool threw = Do_At_Mutable_Maybe_Stale_Throws(
         out,

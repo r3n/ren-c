@@ -44,7 +44,7 @@
 //   use the evaluator for a single step.
 //
 // * See %sys-do.h for wrappers that make it easier to run multiple evaluator
-//   steps in a frame and return the final result, giving VOID! by default.
+//   steps in a frame and return the final result, giving ~void~ by default.
 //
 // * Eval_Maybe_Stale_Throws() is LONG.  That is largely a purposeful choice.
 //   Breaking it into functions would add overhead (in the debug build if not
@@ -263,6 +263,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         EVAL_FLAG_FULFILL_ONLY  // can be requested or <blank> can trigger
         | EVAL_FLAG_RUNNING_ENFIX  // can be requested with REEVALUATE_CELL
         | FLAG_STATE_BYTE(255)  // state is forgettable
+        | EVAL_FLAG_INPUT_WAS_INVISIBLE  // !!! experimental feature lax checks
     );  // should be unchanged on exit
   #endif
 
@@ -514,6 +515,21 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
   give_up_backward_quote_priority:
 
+    // See remarks on EVAL_FLAG_INPUT_WAS_INVISIBLE on why we want to prevent
+    // the situation of `x: (1 + 2 do [comment "hi"])` setting x to ~void~,
+    // and preferring to set it to ~stale~ instead.
+    //
+    /*assert(NOT_EVAL_FLAG(f, INPUT_WAS_INVISIBLE));*/  // !!! recurse set-word
+    if (
+        IS_END(f->out)
+        or (
+            Is_Bad_Word_With_Sym(f->out, SYM_VOID)
+            and GET_CELL_FLAG(f->out, ISOTOPE)
+        )
+    ){
+        SET_EVAL_FLAG(f, INPUT_WAS_INVISIBLE);
+    }
+
   //=//// BEGIN MAIN SWITCH STATEMENT /////////////////////////////////////=//
 
     // This switch is done with a case for all REB_XXX values, in order to
@@ -642,8 +658,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     //
     // A plain word tries to fetch its value through its binding.  It fails
     // if the word is unbound (or if the binding is to a variable which is
-    // set, but VOID!).  Should the word look up to an action, then that
-    // action will be invoked.
+    // set, but to a non-isotope form of bad-word!).  Should the word look up
+    // to an action, then that action will be invoked.
     //
     // NOTE: The usual dispatch of enfix functions is *not* via a REB_WORD in
     // this switch, it's by some code at the `lookahead:` label.  You only see
@@ -655,7 +671,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (not gotten)
             gotten = Lookup_Word_May_Fail(v, v_specifier);
 
-        if (IS_ACTION(unwrap(gotten))) {  // before IS_VOID() is common case
+        if (IS_ACTION(unwrap(gotten))) {  // before IS_BAD_WORD() is common case
             REBACT *act = VAL_ACTION(unwrap(gotten));
 
             if (GET_ACTION_FLAG(act, ENFIXED)) {
@@ -683,8 +699,12 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             goto process_action;
         }
 
-        if (IS_VOID(unwrap(gotten)))  // need GET/ANY if it's void ("undefined")
-            fail (Error_Need_Non_Void_Core(v, v_specifier, unwrap(gotten)));
+        if (
+            IS_BAD_WORD(unwrap(gotten))
+            and NOT_CELL_FLAG(unwrap(gotten), ISOTOPE)
+        ){
+            fail (Error_Bad_Word_Get_Core(v, v_specifier, unwrap(gotten)));
+        }
 
         Copy_Cell(f->out, unwrap(gotten));  // no copy CELL_FLAG_UNEVALUATED
         Decay_If_Nulled(f->out);
@@ -711,12 +731,11 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     //=//// GET-WORD! /////////////////////////////////////////////////////=//
     //
     // A GET-WORD! does no dispatch on functions.  It will fetch other values
-    // as normal, but will error on VOID! and direct you to GET/ANY.
+    // as normal, but will error on unfriendly BAD-WORD!.
     //
-    // This handling of voids matches Rebol2 behavior, choosing to break with
-    // R3-Alpha and Red which will give back "voided" values ("UNSET!").
-    // The choice was made to make typos less likely to bite those whose
-    // intent with GET-WORD! was merely to use ACTION!s inertly:
+    // This handling matches Rebol2 behavior, choosing to break with R3-Alpha
+    // and Red which will give back "UNSET!" if you use a GET-WORD!.  The
+    // mechanics of @word are a completely new approach.
     //
     // https://forum.rebol.info/t/1301
 
@@ -737,19 +756,20 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (not gotten)
             gotten = Lookup_Word_May_Fail(v, v_specifier);
 
-        if (IS_VOID(unwrap(gotten)))
-            fail (Error_Need_Non_Void_Core(v, v_specifier, unwrap(gotten)));
-
         Copy_Cell(f->out, unwrap(gotten));
-        Decay_If_Nulled(f->out);
+        assert(NOT_CELL_FLAG(f->out, UNEVALUATED));
 
-        if (IS_ACTION(unwrap(gotten)))  // cache the word's label in the cell
+        if (IS_ACTION(f->out))  // cache the word's label in the cell
             INIT_VAL_ACTION_LABEL(f->out, VAL_WORD_SYMBOL(v));
 
-        if (STATE_BYTE(f) == ST_EVALUATOR_SYM_WORD) {
-            assert(not Is_Heavy_Nulled(f->out));  // variables should not store
-            if (not IS_NULLED(f->out))  // NULL does not get quoted
-                Quotify(f->out, 1);
+        if (IS_NULLED(f->out))  // !!! Should Lookup_Word() handle this?
+            CLEAR_CELL_FLAG(f->out, ISOTOPE);
+
+        if (STATE_BYTE(f) == ST_EVALUATOR_SYM_WORD)
+            Literalize(f->out);
+        else {
+            if (IS_BAD_WORD(f->out) and NOT_CELL_FLAG(f->out, ISOTOPE))
+                fail (Error_Bad_Word_Get_Core(v, v_specifier, f->out));
         }
 
         STATE_BYTE(f) = ST_EVALUATOR_INITIAL_ENTRY;
@@ -813,8 +833,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
         f_next_gotten = nullptr;  // arbitrary code changes fetched variables
 
-        // The IS_VOID() case here is specifically for REEVAL with invisibles,
-        // because it's desirable for `void? reeval :comment "hi" 1` to be
+        // The IS_BAD_WORD() case here is specifically for REEVAL with invisibles,
+        // because it's desirable for `bad-word? reeval :comment "hi" 1` to be
         // 1 and not #[false].  The problem is that REEVAL is not invisible,
         // and hence it wants to make sure something is written to the output
         // so that standard invisibility doesn't kick in...hence it preloads
@@ -823,7 +843,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         assert(
             IS_END(f->out)
             or GET_CELL_FLAG(f->out, OUT_NOTE_STALE)
-            or IS_VOID(f->out)
+            or IS_BAD_WORD(f->out)
         );
 
         DECLARE_FEED_AT_CORE (subfeed, v, v_specifier);
@@ -840,7 +860,6 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         //
         if (STATE_BYTE(f) == ST_EVALUATOR_SYM_GROUP) {
             SET_END(f->out);  // want to avoid UNDO_NOTE_STALE behavior
-            SET_CELL_FLAG(f->out, OUT_NOTE_STALE);
             CLEAR_FEED_FLAG(f->feed, NO_LOOKAHEAD);  // !!! asserts otherwise?
         }
 
@@ -860,44 +879,39 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             goto return_thrown;
         }
 
-        if (
-            STATE_BYTE(f) == ST_EVALUATOR_SYM_GROUP
-            and GET_CELL_FLAG(f->out, OUT_NOTE_STALE)
-        ){
-            // It's important to know what @(comment "hi") produces in
-            // order to have a way to chain invisibles and recognize the
-            // invisible state.
-            //
-            Init_Reified_Invisible(f->out);
-            STATE_BYTE(f) = ST_EVALUATOR_INITIAL_ENTRY;
-            goto lookahead;
-        }
-
-        // We want `3 = (1 + 2 ()) 4` to not treat the 1 + 2 as "stale", thus
-        // skipping it and trying to compare `3 = 4`.  But `3 = () 1 + 2`
-        // should consider the empty group stale.
-        //
         if (IS_END(f->out)) {
-            if (STATE_BYTE(f) == ST_EVALUATOR_SYM_GROUP)
-                Init_Reified_Invisible(f->out);
+            if (STATE_BYTE(f) == ST_EVALUATOR_SYM_GROUP) {
+                //
+                // The SYM_GROUP! is a contained evaluation that never acts
+                // invisible, e.g. @(comment "hi") is ~void~.  That's the
+                // value...so there's no need to keep feeding for one.
+                //
+                Literalize(f->out);
+            }
+            else {
+                // Plain group is different.  We want `3 = (1 + 2 ()) 4` to not
+                // treat the 1 + 2 as "stale", thus skipping it and trying to
+                // compare `3 = 4`.  But `3 = () 1 + 2` should consider the
+                // empty group stale.
+                //
+                if (IS_END(f_next))
+                    goto finished;  // nothing after to try evaluating
+
+                gotten = f_next_gotten;
+                v = Lookback_While_Fetching_Next(f);
+                goto evaluate;
+            }
 
             STATE_BYTE(f) = ST_EVALUATOR_INITIAL_ENTRY;
 
-            if (IS_END(f_next))
-                goto finished;  // nothing after to try evaluating
-
-            gotten = f_next_gotten;
-            v = Lookback_While_Fetching_Next(f);
             goto lookahead;
         }
 
         CLEAR_CELL_FLAG(f->out, UNEVALUATED);  // `(1)` considered evaluative
         CLEAR_CELL_FLAG(f->out, OUT_NOTE_STALE);  // any [(10 elide "hi")]
 
-        if (STATE_BYTE(f) == ST_EVALUATOR_SYM_GROUP) {
-            if (not Is_Light_Nulled(f->out))  // only NULL-2 gets quoted
-                Quotify(f->out, 1);
-        }
+        if (STATE_BYTE(f) == ST_EVALUATOR_SYM_GROUP)
+            Literalize(f->out);
 
         STATE_BYTE(f) = ST_EVALUATOR_INITIAL_ENTRY;
         break; }
@@ -908,9 +922,9 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // PATH! and GET-PATH! have similar mechanisms, with the difference being
     // that if a PATH! looks up to an action it will execute it.
     //
-    // Paths looking up to VOID! are handled consistently with WORD! and
+    // Paths looking up to BAD-WORD! are handled consistently with WORD! and
     // GET-WORD!, and will error...directing you use GET/ANY if fetching
-    // voids is what you actually intended.
+    // bad words is what you actually intended.
     //
     // PATH!s starting with inert values do not evaluate.  `/foo/bar` has a
     // blank at its head, and it evaluates to itself.
@@ -983,8 +997,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             goto process_action;
         }
 
-        if (IS_VOID(f_spare))  // need `:x/y` if it's void (unset)
-            fail (Error_Need_Non_Void_Core(v, v_specifier, f_spare));
+        if (IS_BAD_WORD(f_spare) and NOT_CELL_FLAG(f_spare, ISOTOPE))
+            fail (Error_Bad_Word_Get_Core(v, v_specifier, f_spare));
 
         Copy_Cell(f->out, f_spare);  // won't move CELL_FLAG_UNEVALUATED
         Decay_If_Nulled(f->out);
@@ -1009,7 +1023,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     //     left
     //     == 20
     //
-    // VOID! and NULL assigns are allowed: https://forum.rebol.info/t/895/4
+    // BAD-WORD! and NULL assigns are allowed: https://forum.rebol.info/t/895/4
 
       case REB_SET_PATH:
       case REB_SET_TUPLE: {
@@ -1050,7 +1064,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     //
     //    :foo/(print "side effect" 1)  ; this is allowed
     //
-   // Consistent with GET-WORD!, a GET-PATH! won't allow VOID! access.
+    // Consistent with GET-WORD!, a GET-PATH! won't allow BAD-WORD! access on
+    // the plain (unfriendly) forms.
 
       case REB_SYM_PATH:
       case REB_SYM_TUPLE:
@@ -1078,21 +1093,22 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (Get_Path_Throws_Core(f->out, v, v_specifier))
             goto return_thrown;
 
-        if (IS_VOID(f->out))  // need GET/ANY if it's void ("undefined")
-            fail (Error_Need_Non_Void_Core(v, v_specifier, f->out));
-
         // !!! This didn't appear to be true for `-- "hi" "hi"`, processing
         // GET-PATH! of a variadic.  Review if it should be true.
         //
         /* assert(NOT_CELL_FLAG(f->out, CELL_FLAG_UNEVALUATED)); */
         CLEAR_CELL_FLAG(f->out, UNEVALUATED);
-        Decay_If_Nulled(f->out);
 
-        if (STATE_BYTE(f) == ST_EVALUATOR_SYM_PATH_OR_SYM_TUPLE) {
-            assert(not Is_Heavy_Nulled(f->out));  // variables should not store
-            if (not IS_NULLED(f->out))  // NULL does not get quoted
-                Quotify(f->out, 1);
+        if (IS_NULLED(f->out))
+            CLEAR_CELL_FLAG(f->out, ISOTOPE);
+
+        if (STATE_BYTE(f) == ST_EVALUATOR_SYM_PATH_OR_SYM_TUPLE)
+            Literalize(f->out);
+        else {
+            if (IS_BAD_WORD(f->out) and NOT_CELL_FLAG(f->out, ISOTOPE))
+                fail (Error_Bad_Word_Get_Core(v, v_specifier, f->out));
         }
+
         STATE_BYTE(f) = ST_EVALUATOR_INITIAL_ENTRY;
         break;
 
@@ -1375,16 +1391,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             goto return_thrown;
         }
 
-        if (literalize) {
-            if (IS_END(f->out)) {
-                // started at end, as can't leak `(1 + 2 [x]: @)` => '3
-                Init_Reified_Invisible(f->out);
-            }
-            else {
-                if (not Is_Light_Nulled(f->out))
-                    Quotify(f->out, 1);
-            }
-        }
+        if (literalize)
+            Literalize(f->out);  // Note: turns END to ~void~ isotope
 
         // Take care of the SET for the main result.
         //
@@ -1445,11 +1453,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (Rightward_Evaluate_Nonvoid_Into_Out_Throws(f, v))  // see notes
             goto return_thrown;
 
-        if (IS_END(f->out)) {  // Rightward_Evaluate allows when v is LIT!
-            Init_Reified_Invisible(f->out);
-        }
-        else if (not Is_Light_Nulled(f->out))
-            Quotify(f->out, 1);
+        Literalize(f->out);  // Note: allows END, e.g. (@) -> ~void~
         break;
 
 
@@ -1484,19 +1488,38 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         goto inert;
 
 
-    //=//// VOID! /////////////////////////////////////////////////////////=//
+    //=//// BAD-WORD! //////////////////////////////////////////////////////=//
     //
-    // To use a VOID! literally in something like an assignment, it should
-    // be quoted:
+    // There are isotope forms of BAD-WORD!s that can be put into variables.
+    // One isotope form can be produced by quoting, and it is safe to fetch via
+    // WORD! access:
     //
-    //     foo: ~unset~  ; will raise an error
-    //     foo: '~unset~  ; will not raise an error
+    //     >> foo: '~unset~  ; quoted
+    //     >> foo
+    //     == ~unset~
     //
-    // It was tried to allow voids as inert to be "prettier", but this is not
-    // worth the loss of the value of the alarm that void is meant to raise.
+    // The other form comes from literal uses.  If a version originating from
+    // such a form makes it to an assignment, it will cause an error:
+    //
+    //     >> bar: ~unset~  ; not quoted
+    //     >> bar
+    //     ** Error
+    //
+    // To bypass the error, use GET/ANY.  For average comparisons or putting
+    // into blocks/etc, this will conflate the forms:
+    //
+    //     >> get/any 'bar
+    //     == ~unset~
 
-      case REB_VOID:
-        fail (Error_Void_Evaluation_Raw());
+      case REB_BAD_WORD:
+        Derelativize(f->out, v, v_specifier);
+
+        // !!! Guaranteed to be the isotope form?  How will this guarantee
+        // be made?  Still under consideration.
+        //
+        assert(GET_CELL_FLAG(f->out, ISOTOPE));
+        CLEAR_CELL_FLAG(f->out, ISOTOPE);
+        break;
 
 
     //=///////////////////////////////////////////////////////////////////=//
@@ -1555,7 +1578,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         Derelativize(f->out, v, v_specifier);
         Unquotify_In_Situ(f->out, 1);  // checks for illegal REB_XXX bytes
 
-        // The evaluator decays a plain quote to "light" null:
+        // The evaluator decays a plain quote to "stable" null:
         //
         //    >> '
         //    ; null
@@ -1563,29 +1586,44 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // This is different from what UNQUOTE does with '
         //
         //    >> unquote just '
-        //    ; null-2
+        //    ; null-2 (isotope)
         //
-        // It's for a reason.  The convention UNQUOTE is based on happens
-        // in code that has more control over its environment...the variable
-        // can be known to be in a quoted-null-or-regular-null state.  But
-        // imagine a function that wants to discern NULL vs. NULL-2 that you
-        // are trying to call from a constrained situation like a COMPOSE:
+        // It's a twist that exists for a reason.  That's because there is no
+        // reified representation for NULL that exists besides '
         //
-        //     >> code: compose [discerner '(expression)]
-        //     >> do code
+        //     >> make object! [n: null, v1: ~void~, v2: '~void~]
+        //     == make object! [
+        //         n: '
+        //         v1: ~void~
+        //         v2: '~void~
+        //     ]
         //
-        // Since NULL vs. NULL-2 is a transient state, it can't be reflected
-        // in the composed block.  So it would have to be done by passing a
-        // quoted parameter, where NULL is plain NULL and NULL-2 is '
+        // There's no way to have ' represent an isotope state and something
+        // else represent the stable state.  There is no "something else".  So
+        // to produce nulls in blocks (like `compose [null? (just ')`]) you
+        // have no other way to do it either.
         //
-        // If ' produces NULL and '' produces ' then you can accomplish this
-        // convention.  But if ' produces NULL-2 you can't get the convention
-        // because there's no way to make NULL!
+        // This is why NULL-2 is solely a transient state, and once you store
+        // an evaluation into a variable it can no longer be detected.  But
+        // with voids, the whole idea is that unquoted turns them into an
+        // isotope form.  Since their quoted forms and unquoted forms can
+        // both appear in blocks, it doesn't run into the same problems.
         //
-        Decay_If_Nulled(f->out);
+        if (IS_NULLED(f->out))
+            CLEAR_CELL_FLAG(f->out, ISOTOPE);
+        else if (IS_BAD_WORD(f->out))
+            SET_CELL_FLAG(f->out, ISOTOPE);
         break;
     }
 
+    if (  // see EVAL_FLAG_INPUT_WAS_INVISIBLE for why f->out is changed
+        Is_Bad_Word_With_Sym(f->out, SYM_VOID)
+        and NOT_CELL_FLAG(f->out, ISOTOPE)
+        and NOT_EVAL_FLAG(f, INPUT_WAS_INVISIBLE)
+    ){
+        Init_Stale(f->out);
+        SET_CELL_FLAG(f->out, OUT_NOTE_STALE);
+    }
 
   //=//// END MAIN SWITCH STATEMENT ///////////////////////////////////////=//
 
@@ -1874,6 +1912,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     //
     CLEAR_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH);
     assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));  // must be consumed
+
+    CLEAR_EVAL_FLAG(f, INPUT_WAS_INVISIBLE);  // good place for this?
 
   #if !defined(NDEBUG)
     Eval_Core_Exit_Checks_Debug(f);  // called unless a fail() longjmps

@@ -187,7 +187,7 @@ do*: func [
                 ;
                 ; https://github.com/rebol/rebol-issues/issues/2373
                 ;
-                result: '~void~  ; console won't show VOID!s named ~void~
+                result: '~void~  ; console won't show BAD-WORD!s named ~void~
             ] then :finalizer/quit
         ][
             do-needs hdr  ; Load the script requirements

@@ -154,7 +154,7 @@ read-line: function [
         system/ports/input: open [scheme: 'console]
     ]
 
-    if void? data: read system/ports/input [
+    if bad-word? data: read system/ports/input [
         ;
         ; !!! Currently VOID is returned from a port when you read it if
         ; there was a Ctrl-C that happened.  The code does not have permission

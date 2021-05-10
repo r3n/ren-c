@@ -131,7 +131,7 @@ inline static RELVAL *Quotify_Core(
         // essentially noise, and only the literal's specifier should be used.
 
         REBVAL *unquoted = Alloc_Pairing();
-        Init_Unreadable_Void(PAIRING_KEY(unquoted));  // Key not used ATM
+        Init_Unreadable(PAIRING_KEY(unquoted));  // Key not used ATM
 
         Copy_Cell_Header(unquoted, v);
         mutable_KIND3Q_BYTE(unquoted) = kind;  // escaping only in literal
@@ -267,6 +267,42 @@ inline static RELVAL *Unquotify_Core(RELVAL *v, REBLEN unquotes) {
     inline static RELVAL *Unquotify(RELVAL *v, REBLEN depth)
         { return Unquotify_Core(v, depth); }
 #endif
+
+
+// This does what the @(...) operations do.  Quote all values except for the
+// stable forms of null and void.
+//
+inline static REBVAL *Literalize(REBVAL *v) {
+    if (IS_END(v)) {
+        return Init_Bad_Word_Core(v, Canon(SYM_VOID), CELL_FLAG_ISOTOPE);
+    }
+    if (IS_NULLED(v) and NOT_CELL_FLAG(v, ISOTOPE)) {
+        return v;  // don't set the isotope flag on a plain null
+    }
+    if ((IS_BAD_WORD(v)) and NOT_CELL_FLAG(v, ISOTOPE)) {
+        SET_CELL_FLAG(v, ISOTOPE);  // make it "friendly" now
+        return v;  // don't quote
+    }
+    return Quotify(v, 1);
+}
+
+
+// This undoes what the @(...) operations do; if the input is a non-quoted
+// void or null, then it's assumed to be "stable" and comes back as a non
+// isotope.  But quoted forms of nulls and voids come back with the isotope.
+//
+// !!! Same code as UNQUOTE, should it be shared?
+//
+inline static REBVAL *Unliteralize(REBVAL *v) {
+    if (IS_BAD_WORD(v) or IS_NULLED(v))
+        CLEAR_CELL_FLAG(v, ISOTOPE);
+    else {
+        Unquotify_Core(v, 1);
+        if (IS_BAD_WORD(v) or IS_NULLED(v))
+            SET_CELL_FLAG(v, ISOTOPE);
+    }
+    return v;
+}
 
 
 inline static REBCEL(const*) VAL_UNESCAPED(const RELVAL *v) {

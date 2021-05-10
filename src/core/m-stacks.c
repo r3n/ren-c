@@ -39,7 +39,7 @@ void Startup_Data_Stack(REBLEN capacity)
     // mean empty, because 0 can)
     //
     DS_Array = Make_Array_Core(1, FLAG_FLAVOR(DATASTACK) | SERIES_FLAGS_NONE);
-    Init_Unreadable_Void(ARR_HEAD(DS_Array));
+    Init_Unreadable(ARR_HEAD(DS_Array));
     SET_CELL_FLAG(ARR_HEAD(DS_Array), PROTECTED);
 
     // The tail marker will signal DS_PUSH() that it has run out of space,
@@ -293,7 +293,7 @@ void Expand_Data_Stack_May_Fail(REBLEN amount)
     REBLEN len_new = len_old + amount;
     REBLEN n;
     for (n = len_old; n < len_new; ++n, ++cell)
-        Init_Unreadable_Void(cell);
+        Init_Unreadable(cell);
 
     // Update the end marker to serve as the indicator for when the next
     // stack push would need to expand.
