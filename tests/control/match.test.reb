@@ -22,21 +22,25 @@
 (null = match blank! false)
 
 
-; Quoting levels are taken into account with the rule, and the number of
-; quotes is summed with whatever is found in the lookup.
+; !!! There was once special accounting for where the quoting level of the
+; test would match the quoting level of the rule:
 ;
-; !!! because MATCH no longer quotes, you must use JUST
+;    (just 'foo = match just 'word! just 'foo)
+;    (null = match just 'word! just foo)
 ;
-(just 'foo = match just 'word! just 'foo)
-(null = match just 'word! just foo)
-
-[
-    (did quoted-word!: quote word!)
-
-    (''foo = match ['quoted-word!] just ''foo)
-    (null = match ['quoted-word!] just '''foo)
-    ('''foo = match just '['quoted-word!] just '''foo)
-]
+;    quoted-word!: quote word!
+;    (''foo = match ['quoted-word!] just ''foo)
+;    (null = match ['quoted-word!] just '''foo)
+;    ('''foo = match just '['quoted-word!] just '''foo)
+;
+;    even-int: 'integer!/[:even?]
+;    (just '304 = match just '[block!/3 even-int] just '304)
+;
+; This idea was killed off in steps; one step made it so that MATCH itself did
+; not take its argument literally so it would not see quotes.  That made it
+; less useful.  But then, also there were problems with quoteds not matching
+; ANY-TYPE! because their quote levels were different than the quote level on
+; the any type typeset.  It was a half-baked experiment that needs rethinking.
 
 
 ; PATH! is AND'ed together, while blocks are OR'd
@@ -53,10 +57,6 @@
 (304 = match [block!/3 integer!/[:even?]] 304)
 (null = match [block!/3 integer!/[:even?]] 303)
 
-(
-    even-int: 'integer!/[:even?]
-    just '304 = match just '[block!/3 even-int] just '304
-)
 
 ; Falsey things are turned to VOID! in order to avoid cases like:
 ;

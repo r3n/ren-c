@@ -481,7 +481,10 @@ REBNATIVE(collect_words)
 }
 
 
-inline static void Get_Var_May_Fail(
+//
+//  Get_Var_May_Fail: C
+//
+void Get_Var_May_Fail(
     REBVAL *out,
     const RELVAL *source,  // ANY-WORD! or ANY-PATH! (maybe quoted)
     REBSPC *specifier,

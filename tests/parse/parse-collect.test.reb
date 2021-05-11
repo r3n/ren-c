@@ -27,12 +27,12 @@
 ; Collecting non-array series fragments
 
 (did all [
-    [_ pos]: parse "aaabbb" [x: collect [keep [some "a"]]]
+    [# pos]: parse "aaabbb" [x: collect [keep [some "a"]]]
     "bbb" = pos
     x = ["aaa"]
 ])
 (did all [
-    [_ pos]: parse "aaabbbccc" [
+    [# pos]: parse "aaabbbccc" [
         x: collect [keep [some "a"] some "b" keep [some "c"]]
     ]
     "" = pos
@@ -42,7 +42,7 @@
 ; Backtracking (more tests needed!)
 
 (did all [
-    [_ pos]: parse [1 2 3] [
+    [# pos]: parse [1 2 3] [
         x: collect [
             keep integer! keep integer! keep text!
             |
@@ -84,10 +84,10 @@
 ; !!! This is extended in UPARSE to the other SYM-XXX! types.
 ;
 (did all [
-    [_ pos]: parse [1 2 3] [
+    [# pos]: parse [1 2 3] [
         x: collect [
             keep integer!
-            keep @(second [A [<pick> <me>] B])
+            keep (second [A [<pick> <me>] B])
             keep integer!
         ]
     ]
@@ -95,10 +95,10 @@
     x = [1 <pick> <me> 2]
 ])
 (did all [
-    [_ pos]: parse [1 2 3] [
+    [# pos]: parse [1 2 3] [
         x: collect [
             keep integer!
-            keep only @(second [A [<pick> <me>] B])
+            keep only (second [A [<pick> <me>] B])
             keep integer!
         ]
     ]
@@ -106,7 +106,7 @@
     x = [1 [<pick> <me>] 2]
 ])
 (did all [
-    parse [1 2 3] [x: collect [keep only @([a b c]) to end]
+    parse [1 2 3] [x: collect [keep only ([a b c]) to end]]
     x = [[a b c]]
 ])
 

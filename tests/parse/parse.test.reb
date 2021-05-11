@@ -1,7 +1,7 @@
 ; Is PARSE working at all?
 
 (did parse "abc" ["abc"])
-(did [_ pos]: parse "abc" ["abc" end])
+(did [# pos]: parse "abc" ["abc" end])
 
 ; Edge case of matching END with TO or THRU
 ;
@@ -65,7 +65,7 @@
 ; https://forum.rebol.info/t/1348
 [
     (did parse [x] ['x null])
-    (did [_ pos]: parse [x] [blank 'x end])
+    (did [# pos]: parse [x] [blank 'x end])
 
     (did parse [] [blank blank blank])
     (not parse [] [_ _ _])
@@ -318,7 +318,7 @@
 
 (
     did all [
-        [_ pos]: parse [... [a b]] [to '[a b]]
+        [# pos]: parse [... [a b]] [to '[a b]]
         pos = [[a b]]
     ]
 )
@@ -328,7 +328,7 @@
 ; Quote level is not retained by captured content
 ;
 (did all [
-    [_ pos]: parse [''[1 + 2]] [into [copy x to end]]
+    [# pos]: parse [''[1 + 2]] [into [copy x to end]]
     [] == pos
     x == [1 + 2]
 ])
@@ -398,19 +398,6 @@
         "C😺T" = to-text x
     ]
 )
-
-
-; With UTF-8 Everywhere, all strings are kept in UTF-8 format all the time.
-; This makes it feasible to invoke the scanner during PARSE of a TEXT!.
-; The feature was added only as a quick demo and needs significant design,
-; testing, and development.  But it was added to show what kinds of things
-; are possible now.
-
-(did all [
-    parse "abc [d e f] {Hello}" ["abc" set b block! set s text!]
-    b = [d e f]
-    s = {Hello}
-])
 
 
 (did all [
@@ -496,15 +483,15 @@
 ; tick marks from everything like ["ab"] to become just ['ab]
 ;
 (did all [
-    [_ pos]: parse "abbbbbc" ['a some ['b]]
+    [# pos]: parse "abbbbbc" ['a some ['b]]
     "c" = pos
 ])
 (did all [
-    [_ pos]: parse "abbbbc" ['ab some ['bc | 'b]]
+    [# pos]: parse "abbbbc" ['ab some ['bc | 'b]]
     "" = pos
 ])
 (did all [
-    [_ pos]: parse "abc10def" ['abc '10]
+    [# pos]: parse "abc10def" ['abc '10]
     "def" = pos
 ])
 

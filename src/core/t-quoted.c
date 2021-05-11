@@ -159,7 +159,7 @@ REBTYPE(Quoted)
 
       default:
         break;
-    } 
+    }
 
     fail ("QUOTED! has no GENERIC operations (use DEQUOTE/REQUOTE)");
 }
@@ -210,6 +210,7 @@ REBNATIVE(just)
 //      optional [<opt> any-value!]
 //      /depth "Number of quoting levels to apply (default 1)"
 //          [integer!]
+//      /isotope "Only quote null if it is the 'heavy isotope'"
 //  ]
 //
 REBNATIVE(quote)
@@ -219,6 +220,9 @@ REBNATIVE(quote)
     REBINT depth = REF(depth) ? VAL_INT32(ARG(depth)) : 1;
     if (depth < 0)
         fail (PAR(depth));
+
+    if (REF(isotope) and Is_Light_Nulled(ARG(optional)))
+        return nullptr;
 
     return Quotify(Copy_Cell(D_OUT, ARG(optional)), depth);
 }
@@ -234,6 +238,7 @@ REBNATIVE(quote)
 //      value [<opt> any-value!]
 //      /depth "Number of quoting levels to remove (default 1)"
 //          [integer!]
+//      /isotope "If input is (just ') then return 'heavy null'"
 //  ]
 //
 REBNATIVE(unquote)
@@ -242,8 +247,13 @@ REBNATIVE(unquote)
 
     REBVAL *v = ARG(value);
 
+    // Some scenarios use nulls when "true NULL" has to be distinguished from
+    // a "meaningful NULL".  Then they dequote later.  To make these cases
+    // easier to use with null isotopes, produce true NULL if UNQUOTE gets
+    // a NULL in...it's just more convenient.
+    //
     if (IS_NULLED(v))
-        return nullptr;  // It's more convenient to allow NULL than not
+        return nullptr;  // (unquote null) => null
 
     REBINT depth = REF(depth) ? VAL_INT32(ARG(depth)) : 1;
     if (depth < 0)
@@ -251,7 +261,10 @@ REBNATIVE(unquote)
     if (cast(REBLEN, depth) > VAL_NUM_QUOTES(v))
         fail ("Value not quoted enough for unquote depth requested");
 
-    return Unquotify(Copy_Cell(D_OUT, v), depth);
+    Unquotify(Copy_Cell(D_OUT, v), depth);
+    if (REF(isotope) and IS_NULLED(D_OUT))
+        Init_Heavy_Nulled(D_OUT);  // (unquote just ') => null-2
+    return D_OUT;
 }
 
 

@@ -451,15 +451,14 @@ REBINT CT_Unhooked(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 //
 REBINT Compare_Modify_Values(RELVAL *a, RELVAL *b, bool strict)
 {
-    // !!! `(first ['a]) = (first [a])` was true in historical Rebol, due
-    // the rules of "lax equality".  These rules are up in the air as they
-    // pertain to the IS and ISN'T transition.  But to avoid having to
-    // worry about changing all the tests right now, this defines quoted
-    // equality as only worryig about the depth in strict equalty.
+    // Note: `(first ['a]) = (first [a])` was true in historical Rebol, due
+    // the rules of "lax equality".  This is a harmful choice, and has been
+    // removed:
     //
-    if (strict)
-        if (VAL_NUM_QUOTES(a) != VAL_NUM_QUOTES(b))
-            return VAL_NUM_QUOTES(a) > VAL_NUM_QUOTES(b) ? 1 : -1;
+    // https://forum.rebol.info/t/1133/7
+    //
+    if (VAL_NUM_QUOTES(a) != VAL_NUM_QUOTES(b))
+        return VAL_NUM_QUOTES(a) > VAL_NUM_QUOTES(b) ? 1 : -1;
 
     // This code wants to modify the value, but we can't modify the
     // embedded values in highly-escaped literals.  Move the data out.

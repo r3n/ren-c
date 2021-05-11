@@ -105,13 +105,12 @@ inline static bool Single_Test_Throws(
     const RELVAL *test,
     REBSPC *test_specifier,
     const RELVAL *arg,
-    REBSPC *arg_specifier,
-    REBLEN sum_quotes
+    REBSPC *arg_specifier
 ){
     // Note the user could write `rule!: [integer! rule!]`, and then try to
     // `match rule! <infinite>`...have to worry about stack overflows here.
     //
-    if (C_STACK_OVERFLOWING(&sum_quotes))
+    if (C_STACK_OVERFLOWING(&arg_specifier))
         Fail_Stack_Overflow();
 
     // !!! The MATCH dialect concept calls functions and needs GC safe space
@@ -133,18 +132,7 @@ inline static bool Single_Test_Throws(
     SET_END(fetched_test);
     PUSH_GC_GUARD(fetched_test);
 
-    // We may need to add in the quotes of the dereference.  e.g.
-    //
-    //     >> quoted-word!: quote word!
-    //     >> match ['quoted-word!] just ''foo
-    //     == ''foo
-    //
-    sum_quotes += VAL_NUM_QUOTES(test);
-
-    REBCEL(const*) test_cell = VAL_UNESCAPED(test);
-    REBCEL(const*) arg_cell = VAL_UNESCAPED(arg);
-
-    enum Reb_Kind test_kind = CELL_KIND(test_cell);
+    enum Reb_Kind test_kind = VAL_TYPE(test);
 
     // If test is a WORD! or PATH! then GET it.  To help keep things clear,
     // require GET-WORD! or GET-PATH! for actions to convey they are not being
@@ -183,14 +171,9 @@ inline static bool Single_Test_Throws(
             } else
                 fail ("ACTION! match rule must be GET-WORD!/GET-PATH!");
         }
-        else {
-            sum_quotes += VAL_NUM_QUOTES(fetched_test);
-            Dequotify(fetched_test);  // use the dequoted version for test
-        }
 
         test = fetched_test;
-        test_cell = VAL_UNESCAPED(fetched_test);
-        test_kind = CELL_KIND(test_cell);
+        test_kind = VAL_TYPE(test);
         test_specifier = SPECIFIED;
     }
 
@@ -199,8 +182,7 @@ inline static bool Single_Test_Throws(
 
     switch (test_kind) {
       case REB_NULL:  // more useful for NON NULL XXX than MATCH NULL XXX
-        matched = (CELL_KIND(arg_cell) == REB_NULL)
-                and (VAL_NUM_QUOTES(arg) == sum_quotes);
+        matched = (VAL_TYPE(arg) == REB_NULL);
         goto return_matched;
 
       case REB_PATH: {  // AND the tests together
@@ -220,8 +202,7 @@ inline static bool Single_Test_Throws(
                 item,
                 specifier,
                 arg,
-                arg_specifier,
-                sum_quotes
+                arg_specifier
             )){
                 DROP_GC_GUARD(temp);
                 goto return_thrown;
@@ -238,7 +219,7 @@ inline static bool Single_Test_Throws(
 
       case REB_BLOCK: {  // OR the tests together
         const RELVAL *item_tail;
-        const RELVAL *item = VAL_ARRAY_AT(&item_tail, test_cell);
+        const RELVAL *item = VAL_ARRAY_AT(&item_tail, test);
         REBSPC *specifier = Derive_Specifier(test_specifier, test);
         for (; item != item_tail; ++item) {
             if (Single_Test_Throws(
@@ -246,8 +227,7 @@ inline static bool Single_Test_Throws(
                 item,
                 specifier,
                 arg,
-                arg_specifier,
-                sum_quotes
+                arg_specifier
             )){
                 goto return_thrown;
             }
@@ -263,8 +243,7 @@ inline static bool Single_Test_Throws(
         // sense if the *test* varies (e.g. true or false from variable).
         // So IS_TRUTHY() is used here instead of IS_CONDITIONAL_TRUE()
         //
-        matched = VAL_LOGIC(test_cell) == IS_TRUTHY(arg)
-                and VAL_NUM_QUOTES(test) == VAL_NUM_QUOTES(arg);
+        matched = VAL_LOGIC(test) == IS_TRUTHY(arg);
         goto return_matched;
 
       case REB_ACTION: {
@@ -292,32 +271,28 @@ inline static bool Single_Test_Throws(
         goto return_matched; }
 
       case REB_DATATYPE:
-        matched = VAL_TYPE_KIND(test_cell) == CELL_KIND(arg_cell)
-                and VAL_NUM_QUOTES(arg) == sum_quotes;
+        matched = VAL_TYPE_KIND(test) == VAL_TYPE(arg);
         goto return_matched;
 
       case REB_TYPESET:
-        matched = TYPE_CHECK(test_cell, CELL_KIND(arg_cell))
-                and VAL_NUM_QUOTES(arg) == sum_quotes;
+        matched = TYPE_CHECK(test, VAL_TYPE(arg));
         break;
 
      case REB_TAG: {  // just support <opt> for now
         bool strict = false;
-        matched = CELL_KIND(arg_cell) == REB_NULL
-                and 0 == CT_String(test_cell, Root_Opt_Tag, strict)
-                and VAL_NUM_QUOTES(test) == VAL_NUM_QUOTES(arg);
+        matched = VAL_TYPE(arg) == REB_NULL
+                and 0 == CT_String(test, Root_Opt_Tag, strict);
         goto return_matched; }
 
       case REB_INTEGER:  // interpret as length
-        matched = ANY_SERIES_KIND(CELL_KIND(arg_cell))
-                and VAL_LEN_AT(arg_cell) == VAL_UINT32(test_cell)
-                and VAL_NUM_QUOTES(test) == VAL_NUM_QUOTES(arg);
+        matched = ANY_SERIES_KIND(VAL_TYPE(arg))
+                and VAL_LEN_AT(arg) == VAL_UINT32(test);
         goto return_matched;
 
       case REB_SYM_WORD: {
         matched = Matches_Fake_Type_Constraint(
             arg,
-            cast(enum Reb_Symbol_Id, VAL_WORD_ID(test_cell))
+            cast(enum Reb_Symbol_Id, VAL_WORD_ID(test))
         );
         goto return_matched; }
 
@@ -382,8 +357,7 @@ bool Match_Core_Throws(
         test,
         test_specifier,
         arg,
-        arg_specifier,
-        0 // number of quotes to add in, start at zero
+        arg_specifier
     )){
         return true;
     }
@@ -524,7 +498,6 @@ REBNATIVE(also)  // see `tweak :also #defer on` in %base-defs.r
 //              logic!  ; tests TO-LOGIC compatibility
 //              tag!  ; just <opt> for now
 //              integer!  ; matches length of series
-//              quoted!  ; same test, but make quote level part of the test
 //          ]
 //      value [<opt> any-value!]
 //      :branch "Branch to run on non-matches, passed VALUE if ACTION!"
