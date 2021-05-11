@@ -113,7 +113,7 @@
 (not (just '[A B C] == quote [a b c]))
 ('''[a b c] !== '''''[a b c])
 ('''[a b c] == '''[a b c])
-('''[a b c] = '''''[a b c])
+('''[a b c] <> '''''[a b c])
 
 ; No quote levels is legal for QUOTE to add also, if /DEPTH is 0
 [

@@ -776,60 +776,6 @@ static REB_R Parse_One_Rule(
 
             return R_UNHANDLED; }
 
-          case REB_TYPESET:
-          case REB_DATATYPE: {
-            const REBSTR *file = ANONYMOUS;
-
-            REBLIN start_line = 1;
-
-            REBSIZ size;
-            const REBYTE *bp = VAL_BYTES_AT(&size, ARG(position));
-
-            SCAN_LEVEL level;
-            SCAN_STATE ss;
-            Init_Scan_Level(&level, &ss, file, start_line, bp, size);
-            level.opts |= SCAN_FLAG_NEXT;  // _ONLY?
-
-            REBDSP dsp_orig = DSP;
-            if (Scan_To_Stack_Relaxed_Failed(&level)) {
-                DS_DROP();
-                return R_UNHANDLED;
-            }
-
-            if (DSP == dsp_orig)
-                return R_UNHANDLED;  // nothing was scanned
-
-            assert(DSP == dsp_orig + 1);  // only adds one value to stack
-
-            enum Reb_Kind kind = VAL_TYPE(DS_TOP);
-            if (IS_DATATYPE(rule)) {
-                if (kind != VAL_TYPE_KIND(rule)) {
-                    DS_DROP();
-                    return R_UNHANDLED;
-                }
-            }
-            else {
-                if (not TYPE_CHECK(rule, kind)) {
-                    DS_DROP();
-                    return R_UNHANDLED;
-                }
-            }
-
-            // !!! We need the caller to know both the updated position in
-            // the text string -and- be able to get the value.  It's already
-            // on the data stack, so use that as the method to pass it back,
-            // but put the position after the match in D_OUT.
-
-            if (P_TYPE == REB_BINARY)
-                Init_Integer(D_OUT, P_POS + (ss.end - bp));
-            else
-                Init_Integer(
-                    D_OUT,
-                    P_POS + Num_Codepoints_For_Bytes(bp, ss.end)
-                );
-
-            return R_IMMEDIATE; }  // produced value in DS_TOP
-
           default:
             fail (Error_Parse_Rule());
         }
@@ -1670,9 +1616,9 @@ REBNATIVE(subparse)
 
                 rule = Get_Parse_Value(P_SAVE, P_RULE, P_RULE_SPECIFIER);
 
-                if (IS_SYM_GROUP(rule)) {
+                if (IS_GROUP(rule)) {
                     //
-                    // !!! SYM-GROUP! means ordinary evaluation of material
+                    // !!! GROUP! means ordinary evaluation of material
                     // that is not matched as a PARSE rule; this is an idea
                     // which is generalized in UPARSE
                     //
@@ -2146,7 +2092,6 @@ REBNATIVE(subparse)
               case SYM_REFINEMENT_X:  // actually a PATH!
               case SYM_PREDICATE_X: {  // actually a TUPLE!
                 REB_R r = Parse_One_Rule(f, P_POS, rule);
-                assert(r != R_IMMEDIATE);
                 if (r == R_THROWN)
                     goto return_thrown;
 
@@ -2332,12 +2277,7 @@ REBNATIVE(subparse)
             if (r == R_UNHANDLED)
                 i = END_FLAG;
             else {
-                assert(r == D_OUT or r == R_IMMEDIATE);
-                if (r == R_IMMEDIATE) {
-                    assert(DSP == f->dsp_orig + 1);
-                    if (not (P_FLAGS & PF_SET))  // only SET handles
-                        DS_DROP();
-                }
+                assert(r == D_OUT);
                 i = VAL_INT32(D_OUT);
             }
             SET_END(D_OUT);  // preserve invariant
@@ -2533,13 +2473,7 @@ REBNATIVE(subparse)
                     );
                     */
 
-                    if (DSP > f->dsp_orig) {
-                        Copy_Cell(var, DS_TOP);
-                        DS_DROP();
-                        if (DSP != f->dsp_orig)
-                            fail (Error_Parse_Multiple_Set_Raw());
-                    }
-                    else if (P_TYPE == REB_BINARY)
+                    if (P_TYPE == REB_BINARY)
                         Init_Integer(var, *BIN_AT(BIN(P_INPUT), begin));
                     else
                         Init_Char_Unchecked(

@@ -58,10 +58,8 @@ ctx-zip: context [
     data-descriptor-sig: #{504B0708}
 
     to-ilong: (<- enbin [LE + 4])  ; Little endian 4-byte positive integer
-    get-ilong: (<- debin [LE + 4])
 
     to-ishort: (<- enbin [LE + 2])  ; Little endian 2-byte positive integer
-    get-ishort: (<- debin [LE + 2])
 
     to-long: (<- enbin [BE + 4])  ; Big endian 4-byte positive integer
 
@@ -86,7 +84,7 @@ ctx-zip: context [
         "Converts from a msdos time."
         value [binary! port!]
     ][
-        value: get-ishort value
+        value: debin [LE + 2] value
         to time! reduce [
             63488 and+ value / 2048
             2016 and+ value / 32
@@ -98,7 +96,7 @@ ctx-zip: context [
         "Converts from a msdos date."
         value [binary! port!]
     ][
-        value: get-ishort value
+        value: debin [LE + 2] value
         to date! reduce [
             65024 and+ value / 512 + 1980
             480 and+ value / 32
@@ -325,7 +323,6 @@ ctx-zip: context [
     ][
         num-errors: 0
         info: all [quiet, not verbose] then [:elide] else [:print]
-
         if not block? where [
             where: my dirize
             if not exists? where [make-dir/deep where]
@@ -334,98 +331,186 @@ ctx-zip: context [
             source: read source
         ]
 
-        num-entries: 0
-        parse source [some [
-            to central-file-sig 4 skip
-            central-header: here
+        ; !!! LET is not implemented in UPARSE yet, which means creating
+        ; utility rules like this have trouble with name overlap in the
+        ; enclosing routine.  To be addressed soon.
+        ;
+        uint16-rule: [tmpbin: across 2 skip, (debin [LE + 2] tmpbin)]
+        uint32-rule: [tmpbin: across 4 skip, (debin [LE + 4] tmpbin)]
+        msdos-date-rule: [tmpbin: across 2 skip, (get-msdos-date tmpbin)]
+        msdos-time-rule: [tmpbin: across 2 skip, (get-msdos-time tmpbin)]
+
+        ; NOTE: The original rebzip.r did decompression based on the local file
+        ; header records in the zip file.  But due to streaming compression
+        ; these can be incomplete and have zeros for the data sizes.  The only
+        ; reliable source of sizes comes from the central file directory at
+        ; the end of the archive.  That might seem redundant to those not aware
+        ; of the streaming ZIP debacle, because a non-streaming zip can be
+        ; decompressed without it...but streaming files definitely exist!
+        ;
+        ; (See %tests/fixtures/test.docx for an example of a file that the
+        ; original rebzip could not unzip.)
+
+        ; Finding the central directory is done empirically by scanning from
+        ; the end of file, looking for the end-of-central-sig.
+        ;
+        if not central-end-pos: find-reverse (tail source) end-of-central-sig [
+            fail "Could not find end of central directory signature"
+        ]
+        uparse central-end-pos [
+            end-of-central-sig  ; by definition (pos matched this)
+
+            2 skip  ; disk_nbr
+            2 skip  ; cd_start_disk
+            2 skip  ; disk_cd_entries
+            num-central-entries: uint16-rule
+            total-central-directory-size: uint32-rule
+            central-directory-offset: uint32-rule
+            archive-comment-len: uint16-rule
+
+            ; We don't care about the archive comment (though we could extract
+            ; it optionally, here).  But we can check that the length would
+            ; reach the end.  This could be thrown off if the comment itself
+            ; contains the end-of-central-sig, which is not formally prohibited
+            ; by the spec (though some suggest it should be).
+            ;
+            archive-comment-len skip end
+        ] else [
+            fail "Malformed end of central directory record"
+        ]
+
+        ; This rule extracts the information out of the central directory and
+        ; into local variables.
+        ;
+        ; !!! Review if this would be better done as a GATHER into an object,
+        ; as SET-WORD! gathering (e.g. FUNCT-ION) is falling from favor.
+        ;
+        central-directory-entry-rule: [
+            [central-file-sig | (fail "CENTRAL-FILE-SIG mismatch")]
+
+            version-created-by: across 2 skip  ; version that made this file
+            version-needed: across 2 skip  ; version needed to extract
+            flags: across 2 skip
+
+            method-number: uint16-rule
+            time: msdos-time-rule
+            date: msdos-date-rule
+            crc: across 4 skip  ; crc32 little endian, maybe 0 in local header
+            compressed-size: uint32-rule  ; maybe 0 in local header
+            uncompressed-size: uint32-rule  ; maybe 0 in local header
+
+            name-length: uint16-rule
+            extra-field-length: uint16-rule
+            file-comment-length: uint16-rule  ; not in local header
+            disk-number-start: uint16-rule  ; not in local header
+            internal-attributes: across 2 skip  ; not in local header
+            external-attributes: across 4 skip  ; not in local header
+            local-header-offset: uint32-rule  ; (for finding local header)
+            name: [temp: across name-length skip, (to-file temp)]
+
+            extra-field-length skip  ; !!! Expose "extra" field?
+            file-comment-length skip  ; !!! Expose file comment?
+        ]
+
+        ; When it was realized that the old rebzip.r method of relying on the
+        ; local directory entries would not work, code was added to check for
+        ; coherence between the central directory and the local entries.  This
+        ; may be overkill, but it's a sanity check that may help security.
+        ;
+        ; However, consider making these checks downgradable to warnings.
+        ;
+        check-local-directory-entry-rule: [
+            [local-file-sig | (fail "LOCAL-FILE-SIG mismatch")]
+
+            x: across 2 skip, (assert [x = version-needed])
+            x: across 2 skip, (assert [x = flags])
+            x: uint16-rule, (assert [x = method-number])
+            x: msdos-time-rule, (assert [x = time])
+            x: msdos-date-rule, (assert [x = date])
+
             [
-                ; check coerence between central file header
-                ; and local file header
-                24 skip
-                copy name-length: 2 skip
-                (name-length: get-ishort name-length)
-                12 skip
-                copy local-header-offset: 4 skip
-                (flag: (0 <= local-header-offset: get-ilong local-header-offset))
-                flag
-                (local-header: at source local-header-offset + 1)
-                seek local-header
-                copy tmp: 4 skip
-                (flag: (tmp = local-file-sig))
-                flag
-                22 skip
-                copy tmp: 2 skip
-                (tmp: get-ishort tmp)
-                (flag: (tmp = name-length))
-                flag
-                2 skip
-                copy name: name-length skip
-                seek central-header 42 skip
-                copy tmp: name-length skip
-                (flag: (name = tmp))
-                flag
-                ; check successfull
+                :(not zero? flags/1 and+ 8)  ; "bit 3" -> has data descriptor
+                ;
+                ; "If this bit is set, the fields crc-32, compressed size, and
+                ; uncompressed size are set to zero in the local header.  The
+                ; correct values are put in the data descriptor immediately
+                ; following the compressed data."
+                ;
+                ; Note: Since deflate is self-terminating, you could streaming
+                ; unzip the data and then verify its size.  Most decompressors
+                ; don't do this, they use the central directory instead.  So
+                ; we go with that approach as well, given that there are file
+                ; attributes there not available in the local header anyway.
+                ;
+                x: across 4 skip, (assert [x = #{00000000}])  ; crc
+                x: uint32-rule, (assert [x = 0])  ; compressed size
+                x: uint32-rule, (assert [x = 0])  ; uncompressed size
+            |
+                x: across 4 skip, (assert [x = crc])
+                x: uint32-rule, (assert [x = compressed-size])
+                x: uint32-rule, (assert [x = uncompressed-size])
+            ]
+
+            x: uint16-rule, (assert [x = name-length])
+            x: uint16-rule, (assert [x = extra-field-length])
+            x: across name-length skip, (assert [(to-file x) = name])
+
+            extra-field-length skip
+        ]
+
+        ; While this is by no means broken up perfectly into subrules, it is
+        ; clearer than it was.
+        ;
+        uparse (skip source central-directory-offset) [
+            num-central-entries [  ; we expect to repeat this loop num times
+                ;
+                ; Process one central directory entry, extracting its fields
+                ; into local variables for this function.
+                ;
+                central-directory-entry-rule
+                central-file-end: here
+
+                (info [name])
+
+                ; Jump to the local file header location to check coherence
+                ; (it's also where the compressed data actually is stored).
+                ; We'll seek back to CENTRAL-FILE-END to process the next
+                ; entry after the decompression.
+                ;
+                seek (skip source local-header-offset)
+                check-local-directory-entry-rule
+
+                ; !!! Note: the date and time information are currently not
+                ; used by the extraction.  But this code was blending them
+                ; into a "datetime".  Best to do that after the validation
+                ; against the information in the local directory entry.
                 (
-                    name: to-file name
-                    info [name]
-                )
-                seek central-header
-                (num-entries: me + 1)
-                2 skip ; version made by
-                copy version: 2 skip ; version to extract
-                copy flags: 2 skip
-                (if not zero? flags/1 and+ 1 [return false])
-                copy method-number: 2 skip (
-                    method-number: get-ishort method-number
-                    method: select [0 store 8 deflate] method-number else [
-                        method-number
-                    ]
-                )
-                copy time: 2 skip (time: get-msdos-time time)
-                copy date: 2 skip (
-                    date: get-msdos-date date
                     date/time: time
                     date: date - lib/now/zone  ; see notes RE: LIB/NOW above
                 )
-                copy crc: 4 skip ; crc-32
-                    ; already little endian; int form is `crc: get-ilong crc`
-                copy compressed-size: 4 skip
-                    (compressed-size: get-ilong compressed-size)
-                copy uncompressed-size-raw: 4 skip
-                    (uncompressed-size: get-ilong uncompressed-size-raw)
-                seek local-header
-                local-file-sig
-                2 skip ; version
-                copy tmp: 2 skip
-                (assert [tmp = flags])
-                copy tmp: 2 skip
-                (assert [method-number = get-ishort tmp])
-                copy tmp: 2 skip
-                (assert [time = get-msdos-time tmp])
-                2 skip ; date
-                4 skip ; crc-32
-                4 skip ; compressed-size
-                4 skip ; uncompressed-size
-                copy tmp: 2 skip
-                (assert [name-length = get-ishort tmp])
-                copy extrafield-length: 2 skip
-                    (extrafield-length: get-ishort extrafield-length)
-                copy tmp: name-length skip
-                (assert [name = to-file tmp])
-                extrafield-length skip
-                data: here, compressed-size skip
+
+                ; !!! TBD: Improve handling of flags.
+                ;
+                (if not zero? flags/1 and+ 1 [
+                    fail "Encryption not supported by unzip.reb (yet)"
+                ])
+
+                ; We're now right past the local directory entry, where the
+                ; compressed data is stored.
+                ;
+                data: here
                 (
                     uncompressed-data: catch [
 
                         ; STORE(0) and DEFLATE(8) are the only widespread
                         ; methods used for .ZIP compression in the wild today
 
-                        if method = 'store [
+                        if method-number = 0 [  ; STORE
                             throw copy/part data compressed-size
                         ]
 
-                        if method <> 'deflate [
-                            info ["-> failed" #"[" "method" method #"]"]
+                        if method-number <> 8 [  ; DEFLATE
+                            info ["-> failed [method" method-number "]"]
                             throw blank
                         ]
                         data: copy/part data compressed-size
@@ -455,7 +540,7 @@ ctx-zip: context [
                     ]
 
                     either uncompressed-data [
-                        info ["-> ok" _ #"[" method #"]"]
+                        info ["-> ok [deflate]"]
                     ][
                         num-errors: me + 1
                     ]
@@ -490,10 +575,26 @@ ctx-zip: context [
                         ]
                     ]
                 )
-            |   (?? "FAILED")
+
+                ; Jump back to the central directory point where we left off...
+                ;
+                seek (central-file-end)
             ]
-            seek central-header
-        ]]
+
+            [
+                ahead end-of-central-sig  ; after entries should be end sig
+                | (fail "Bad central directory termination")  ; else fail
+            ]
+
+            ; We shouldn't just be at *an* end-of-central signature, we should
+            ; be at the end record we started the search from.
+            ;
+            pos: here, (assert [pos = central-end-pos])
+
+            to end  ; skip to end so parse succeeds (could RETURN TRUE)
+        ] else [
+            fail "Malformed Zip Archive"
+        ]
 
         if block? where [return where]
         return

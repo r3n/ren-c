@@ -37,7 +37,7 @@ make object! [
 
             ["{" | {"}] (  ; handle string using TRANSCODE
                 success-rule: trap [
-                    [_ position]: transcode position
+                    [# position]: transcode position
                 ] then [
                     [end skip]
                 ] else [

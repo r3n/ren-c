@@ -178,12 +178,12 @@
 (
     value: <overwritten>
     did all [
-        null? [_ value]: evaluate []
+        null? [# value]: evaluate []
         null? value
     ]
 )
 (
-    [_ value]: evaluate [trap [1 / 0]]
+    [# value]: evaluate [trap [1 / 0]]
     error? value
 )
 (
