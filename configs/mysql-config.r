@@ -28,7 +28,6 @@ extensions: make map! [
     DNS +
     Event +
     Filesystem +
-    FFI -
     GIF +
     Gob +
     JavaScript -
@@ -40,8 +39,6 @@ extensions: make map! [
     ODBC +
     PNG +
     Process +
-    Secure +
-    Serial +
     Signal -
     TCC -
     Time +
@@ -49,7 +46,6 @@ extensions: make map! [
     UTF +
     Vector +
     View +
-    ZeroMQ -
 ]
 
 rebol-tool: _ ; fallback value if system/options/boot fails
