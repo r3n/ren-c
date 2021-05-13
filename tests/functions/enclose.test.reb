@@ -30,21 +30,21 @@
     ]
     outer: enclose :inner func [f] [
         assert [1020 = do f]
-        return/void ~void~
+        return
     ]
     did all [
         304 = (304 outer)
-        '~void~ = @(outer)
+        '~void~ = @ @(outer)
         var = 1020
     ]
 )(
     var: #before
     inner: func [] [
         var: 1020
-        return/void
+        return
     ]
     outer: enclose :inner func [f] [
-        return @(do/void f)  ; don't unquote it here
+        return @(devoid do f)  ; don't unquote it here
     ]
     did all [
         '~void~ = @ outer
@@ -54,10 +54,10 @@
     var: #before
     inner: func [] [
         var: 1020
-        return/void '~void~
+        return
     ]
     outer: enclose :inner func [f] [
-        return/void unquote @(do/void f)  ; now try unquoting
+        return unquote @(devoid do f)  ; now try unquoting
     ]
     did all [
         '~void~ = @(outer)

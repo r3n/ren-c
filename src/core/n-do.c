@@ -320,7 +320,6 @@ bool Do_Frame_Maybe_Stale_Throws(REBVAL *out, REBVAL *frame) {
 //      /args "Sets system/script/args if doing a script (usually a TEXT!)"
 //          [any-value!]
 //      /only "Don't catch QUIT (default behavior for BLOCK!)"
-//      /void "Allow overall DO operation to vanish if product is void"
 //  ]
 //
 REBNATIVE(do)
@@ -336,8 +335,7 @@ REBNATIVE(do)
     // in this case (stale vs. invisible) requires making a note and starting
     // from end.
     //
-    if (not REF(void))
-        SET_END(D_OUT);  // !!! need to defeat enfix invisibles, review
+    SET_END(D_OUT);  // !!! need to defeat enfix invisibles, review
 
     // If `source` is not const, tweak it to be explicitly mutable--because
     // otherwise, it would wind up inheriting the FEED_MASK_CONST of our
@@ -490,12 +488,8 @@ REBNATIVE(do)
 
   handle_void:
 
-    if (
-        not REF(void)  // the default
-        and IS_END(D_OUT)  // didn't make new result (non-/VOID forced END)
-    ){
+    if (IS_END(D_OUT))  // didn't make new result (non-/VOID forced END)
         Init_Void(D_OUT);  // may be overridden by Init_Stale()
-    }
 
     return D_OUT;
 }

@@ -274,12 +274,12 @@ inline static RELVAL *Unquotify_Core(RELVAL *v, REBLEN unquotes) {
 //
 inline static REBVAL *Literalize(REBVAL *v) {
     if (IS_END(v)) {
-        return Init_Bad_Word_Core(v, Canon(SYM_VOID), CELL_FLAG_ISOTOPE);
+        return Init_Void(v);  // *unfriendly*
     }
     if (IS_NULLED(v) and NOT_CELL_FLAG(v, ISOTOPE)) {
         return v;  // don't set the isotope flag on a plain null
     }
-    if ((IS_BAD_WORD(v)) and NOT_CELL_FLAG(v, ISOTOPE)) {
+    if (IS_BAD_WORD(v) and NOT_CELL_FLAG(v, ISOTOPE)) {
         SET_CELL_FLAG(v, ISOTOPE);  // make it "friendly" now
         return v;  // don't quote
     }

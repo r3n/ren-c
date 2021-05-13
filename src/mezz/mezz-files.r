@@ -310,7 +310,7 @@ confirm: function [
 list-dir: function [
     "Print contents of a directory (ls)."
 
-    return: <void>
+    return: <none>
     'path [<end> file! word! path! text!]
         "Accepts %file, :variables, and just words (as dirs)"
     /l "Line of info format"
@@ -447,7 +447,7 @@ to-relative-file: function [
 detab-file: function [
     "detabs a disk file"
 
-    return: <void>
+    return: <none>
     filename [file!]
 ][
     write filename detab to text! read filename
@@ -457,7 +457,7 @@ detab-file: function [
 set-net: function [
     {sets the system/user/identity email smtp pop3 esmtp-usr esmtp-pass fqdn}
 
-    return: <void>
+    return: <none>
     bl [block!]
 ][
     if 6 <> length of bl [fail "Needs all 6 parameters for set-net"]

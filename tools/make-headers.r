@@ -37,7 +37,7 @@ print "------ Building headers"
 prototypes: make block! 10000 ; MAP! is buggy in R3-Alpha
 
 emit-proto: func [
-    return: <void>
+    return: <none>
     proto
 ][
     any [
@@ -98,7 +98,7 @@ emit-proto: func [
 ]
 
 process-conditional: function [
-    return: <void>
+    return: <none>
     directive
     dir-position
     emitter [object!]
@@ -119,7 +119,7 @@ process-conditional: function [
     ]
 ]
 
-emit-directive: function [return: <void> directive] [
+emit-directive: function [return: <none> directive] [
     process-conditional directive proto-parser/parse-position e-funcs
 ]
 
@@ -239,7 +239,7 @@ sys-globals-parser: context [
     parse-position: _
     id: _
 
-    process: func [return: <void> text] [
+    process: func [return: <none> text] [
         parse text grammar/rule  ; Review: no END (return result unused?)
     ]
 

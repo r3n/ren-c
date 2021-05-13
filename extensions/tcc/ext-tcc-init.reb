@@ -43,7 +43,7 @@ REBOL [
 compile: func [
     {Compiles one or more native functions at the same time, with options.}
 
-    return: <void>
+    return: <none>
     compilables "Functions from MAKE-NATIVE, TEXT! strings of code, ..."
     /settings [block!] {
         The block supports the following dialect:

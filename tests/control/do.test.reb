@@ -5,34 +5,34 @@
 ; picture.  Returning NULL might seem "friendlier" but it is misleading.
 [
     ('~stale~ = @ (10 + 20 do []))
-    ('~stale~ = @ (10 + 20 do [nihil]))
+    ('~stale~ = @ (10 + 20 do [void]))
     ('~stale~ = @ (10 + 20 do [comment "hi"]))
-    ('~stale~ = @ (10 + 20 do make frame! :nihil))
+    ('~stale~ = @ (10 + 20 do make frame! :void))
     (else? do [null])
-    (null-2? do [if true [null]])
+    (heavy-null? do [if true [null]])
 
     ('~void~ = @ comment "HI" do [comment "HI"])
 
     ('~void~ = (10 + 20 @(do [])))
     ('~void~ = (10 + 20 @(do [comment "hi"])))
-    ('~void~ = (10 + 20 @(do make frame! :nihil)))
+    ('~void~ = (10 + 20 @(do make frame! :void)))
     (else? @(do [null]))
     ('' = @(do [if true [null]]))
 
-    (30 = (10 + 20 do/void []))
-    (30 = (10 + 20 do/void [comment "hi"]))
-    (30 = (10 + 20 do/void make frame! :nihil))
-    (else? @(do/void [null]))
-    ('' = @(do/void [null-2]))
-    ('' = @(do/void [if true [null]]))
+    (30 = (10 + 20 devoid do []))
+    (30 = (10 + 20 devoid do [comment "hi"]))
+    (30 = (10 + 20 devoid do make frame! :void))
+    (else? @(devoid do [null]))
+    ('' = @(devoid do [heavy null]))
+    ('' = @(devoid do [if true [null]]))
 
     ; Try standalone @ operator so long as we're at it.
-    ('~void~ = @ do/void [])
-    ('~void~ = @ do/void [comment "hi"])
-    ('~void~ = @ do/void make frame! :nihil)
-    (else? @ do/void [null])
-    ((just ') = @ do/void [null-2])
-    ((just ') = @ do/void [if true [null]])
+    ('~void~ = @ @ devoid do [])
+    ('~void~ = @ @ devoid do [comment "hi"])
+    ('~void~ = @ @ devoid do make frame! :void)
+    (else? @ devoid do [null])
+    ((just ') = @ devoid do [heavy null])
+    ((just ') = @ devoid do [if true [null]])
 ]
 
 

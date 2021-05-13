@@ -2,9 +2,18 @@
 
 (sym-group! = type of '@(a b c))
 
-('~void~ = @())
-('~void~ = @(comment "hi"))
-('~void~ = @(nihil))
+; ENDs make unfriendly voids when literalized, that if you further literalize
+; will make friendly ones.
+[
+    ('~void~ = @ @())
+    ('~void~ = @ @(comment "hi"))
+    ('~void~ = @ @(void))
+
+    ('~void~ = friendly @())
+    ('~void~ = friendly @(comment "hi"))
+    ('~void~ = friendly @(void))
+]
+
 ((just '10) = @(10 comment "hi"))
 
 (null = @(null))

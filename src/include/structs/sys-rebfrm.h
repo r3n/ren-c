@@ -192,7 +192,7 @@ STATIC_ASSERT(EVAL_FLAG_7_IS_TRUE == NODE_FLAG_CELL);
 //     == ~stale~  ; ...but y and z are ~void~
 //
 // The reasoning behind this is to improve the communicative value of ~void~,
-// to help know if adding DO/VOID or another operation is the only thing
+// to help know if adding DEVOID or another operation is the only thing
 // missing from pure invisibility.
 //
 #define EVAL_FLAG_INPUT_WAS_INVISIBLE \

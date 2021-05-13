@@ -204,7 +204,7 @@ debug: (comment [:print] blank)
 emit: func [
     {Emits binary data, optionally marking positions with SET-WORD!}
 
-    return: <void>
+    return: <none>
     ctx [object!]
     code [block! binary!]
 ][
@@ -398,7 +398,7 @@ parse-asn: func [
 ;
 
 update-state: func [
-    return: <void>
+    return: <none>
     ctx [object!]
     new [tag! issue!] "new state, ISSUE! is a (potentially) terminal state"
     direction [word!] "READ or WRITE"
@@ -450,7 +450,7 @@ update-write-state: specialize :update-state [
 ;
 
 client-hello: func [
-    return: <void>
+    return: <none>
     ctx [object!]
     /version "TLS version to request (block is [lowest highest] allowed)"
         [decimal! block!]
@@ -657,7 +657,7 @@ client-hello: func [
 
 
 client-key-exchange: func [
-    return: <void>
+    return: <none>
     ctx [object!]
 ][
     let [key-data key-len]
@@ -766,7 +766,7 @@ client-key-exchange: func [
 
 
 change-cipher-spec: func [
-    return: <void>
+    return: <none>
     ctx [object!]
 ][
     emit ctx [
@@ -779,7 +779,7 @@ change-cipher-spec: func [
 
 
 encrypted-handshake-msg: func [
-    return: <void>
+    return: <none>
     ctx [object!]
     unencrypted [binary!]
 ][
@@ -795,7 +795,7 @@ encrypted-handshake-msg: func [
 
 
 application-data: func [
-    return: <void>
+    return: <none>
     ctx [object!]
     unencrypted [binary! text!]
 ][
@@ -1604,7 +1604,7 @@ make-master-secret: func [
 
 
 do-commands: func [
-    return: <void>
+    return: <none>
     ctx [object!]
     commands [block!]
     /no-wait
@@ -1663,7 +1663,7 @@ do-commands: func [
 
 
 tls-init: func [
-    return: <void>
+    return: <none>
     ctx [object!]
 ][
     ctx/seq-num-r: 0

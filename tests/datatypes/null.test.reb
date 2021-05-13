@@ -44,29 +44,29 @@
 ; that branches may be purposefully NULL.
 [
     (null? null)
-    (null? null-2)
+    (null? heavy null)
     (null-1? null)
-    (null-2? null-2)
+    (heavy-null? heavy null)
 
-    (x: null-2, null-1? x)
-    (x: null-2, null-1? :x)
+    (x: heavy null, null-1? x)
+    (x: heavy null, null-1? :x)
 
     (304 = (null then [1020] else [304]))
-    (1020 = (null-2 then [1020] else [304]))
+    (1020 = (heavy null then [1020] else [304]))
 ]
 
 ; Conditionals return NULL-1 on failure, and NULL-2 on a branch that executes
 ; and evaluates to either NULL-1 or NULL-2.  If the branch wishes to pass
 ; the null "as-is" it should use the @ forms.
 [
-    (null-2? if true [null])
-    (null-2? if true [null-2])
+    (heavy-null? if true [null])
+    (heavy-null? if true [heavy null])
     ('~void~ = @ if true [])
     ('~custom~ = @ if true [~custom~])
     (''~custom~ = @ if true ['~custom~])
 
     (null-1? if true @[null])
-    (null-2? if true @[null-2])
+    (heavy-null? if true @[heavy null])
     ('~void~ = @ if true @[])
     ('~custom~ = @ if true @[~custom~])
     (''~custom~ = @ if true @['~custom~])

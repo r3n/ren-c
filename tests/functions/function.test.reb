@@ -472,7 +472,7 @@
 )
 
 [#539 https://github.com/metaeducation/ren-c/issues/755 (
-    f: func [return: <void>] [
+    f: func [return: <none>] [
         use [x] [return]
         42
     ]

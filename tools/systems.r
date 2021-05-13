@@ -431,7 +431,7 @@ system-libraries: make object! [
 for-each-system: func [
     {Use PARSE to enumerate the systems, and set 'var to a record object}
 
-    return: <void>
+    return: <none>
     'var [word!]
     body [block! action!]
         {Body of code to run for each system}

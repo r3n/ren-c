@@ -106,7 +106,7 @@ rebsource: context [
     log-emit: function [
         {Append a COMPOSE'd block to a log block, clearing any new-line flags}
 
-        return: <void>
+        return: <none>
         log [block!]
         label [tag!]
         body [block!]
@@ -188,7 +188,7 @@ rebsource: context [
                     emit <eof-eol-missing> [(file)]
                 ]
 
-                emit-proto: function [return: <void> proto] [
+                emit-proto: function [return: <none> proto] [
                     if not block? proto-parser/data [return]
 
                     do in c-parser-extension [

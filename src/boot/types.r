@@ -298,7 +298,7 @@ sym-word    "symbolic form of word! that does not evaluate"
 ; LIT! is just the lone @ symbol, which acts like QUOTE, but with the ability
 ; to pick up on the NULL-2 and invisible distinctions.
 
-lit         "quoting operator which can distinguish NULL and NULL-2"
+lit         "quoting operator which distinguishes NULL and BAD-WORD! isotopes"
             lit         -       -       +       [unit]
 
 

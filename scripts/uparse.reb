@@ -93,11 +93,11 @@ combinator: func [
             let state: f.state
             let remainder: f.remainder
 
-            let result': @(do/void f)
+            let result': @(devoid do f)
             if state.verbose [
-                print ["RESULT:" result' else ["; null"]]
+                print ["RESULT:" (friendly get/any 'result') else ["; null"]]
             ]
-            return/isotope/void unquote (result' also [
+            return/isotope unquote (get/any 'result' also [
                 all [  ; if success, mark state.furthest
                     state.furthest
                     (index? remainder: get remainder) > (index? get state.furthest)
@@ -142,7 +142,10 @@ combinator: func [
         ; return invisibly get the /void interpretation of returns
         ; automatically?
         ;
-        return: :return/isotope/void
+        ; !!! chain [:devoid | :return/isotope] produces ~unset~.  Review
+        ; why that is, and if it would be a better answer.
+        ;
+        return: :return/isotope
 
         (as group! body)
     ]
@@ -175,7 +178,7 @@ default-combinators: make map! reduce [
             return unquote result'  ; return successful parser result
         ]
         set remainder input  ; on parser failure, make OPT remainder input
-        return null-2  ; succeed on parser failure, "null-2" result
+        return heavy null  ; succeed on parser failure, "heavy null" result
     ]
 
     'end combinator [
@@ -911,9 +914,9 @@ default-combinators: make map! reduce [
         ; If a GROUP! evaluates to NULL, we want the overall rule to evaluate
         ; to NULL-2...because for instance `keep (null)` should not fail the
         ; KEEP, but should pass null to keep and continue.  In the null case
-        ; thus make a `'` before unquoting
+        ; thus make a heavy null.
         ;
-        return unquote @(do/void value) else [null-2]
+        return heavy do value
     ]
 
     get-block! combinator [
@@ -1188,7 +1191,7 @@ default-combinators: make map! reduce [
         ([# (remainder)]: @ parser input) else [
             return null
         ]
-        return ~void~
+        return
     ]
 
     'comment combinator [
@@ -1205,7 +1208,6 @@ default-combinators: make map! reduce [
         ; quoting material, and `comment thru some "a"` knowing the shape of
         ; the rule may not be desirable, even though it ignores it.
         ;
-        return ~void~
     ]
 
     === BLOCK! COMBINATOR ===
@@ -1304,7 +1306,7 @@ default-combinators: make map! reduce [
             f.input: pos
             f.remainder: 'pos
 
-            @(do/void f) then temp -> [
+            @(do f) then temp -> [
                 if '~void~ != temp  [  ; overwrite if was visible
                     result': temp
                 ]
@@ -1454,7 +1456,7 @@ identity-combinator: combinator [
         [<opt>]
 ][
     set remainder input
-    return null-2  ; want to return null but not signal failure, use isotope
+    return heavy null  ; return null but not signal failure, use isotope
 ]
 
 
@@ -1600,7 +1602,7 @@ uparse*: func [
     f.value: rules
     f.remainder: let pos
 
-    let synthesized': @(do/void f) else [
+    let synthesized': @(devoid do f) else [
         return null  ; match failure (as opposed to success, w/null result)
     ]
 
@@ -1608,7 +1610,7 @@ uparse*: func [
         return null  ; full parse was requested but tail was not reached
     ]
 
-    return/isotope unquote synthesized'
+    return/isotope unquote get/any 'synthesized'
 ]
 
 uparse: comment [redescribe [  ; redescribe not working at te moment (?)
@@ -1645,7 +1647,7 @@ uparse: comment [redescribe [  ; redescribe not working at te moment (?)
             for-each key try unquote result' [
                 return/isotope unquote result'  ; return object if not empty
             ]
-            return/isotope unquote synthesized'  ; return capture if obj empty
+            return/isotope unquote get/any 'synthesized'  ; capture if obj empty
         ]
 
         return/isotope unquote result'  ; don't return void isotope

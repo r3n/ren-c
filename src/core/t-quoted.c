@@ -299,7 +299,7 @@ REBNATIVE(unquote)
     // form comes back as an isotope.
     //
     if (IS_NULLED(D_OUT) or IS_BAD_WORD(D_OUT))
-        SET_CELL_FLAG(D_OUT, ISOTOPE);  // (unquote just ') => null-2
+        SET_CELL_FLAG(D_OUT, ISOTOPE);  // (unquote just ') => heavy null
 
     return D_OUT;
 }

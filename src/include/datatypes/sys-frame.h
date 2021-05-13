@@ -964,6 +964,9 @@ inline static void FAIL_IF_NO_INVISIBLE_RETURN(REBFRM *f) {
     const REBPAR *param = ACT_PARAMS_HEAD(phase);
     assert(KEY_SYM(ACT_KEYS_HEAD(phase)) == SYM_RETURN);
 
+    if (ACT_DISPATCHER(phase) == &Opaque_Dispatcher)
+        return;  // allow plain RETURN in <none> functions
+
     if (not TYPE_CHECK(param, REB_TS_INVISIBLE))
         fail (Error_Bad_Invisible(f));
 }

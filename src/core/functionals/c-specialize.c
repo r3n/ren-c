@@ -400,7 +400,7 @@ bool Specialize_Action_Throws(
         // also means it can keep working if the parameter convention changes.
         //
         // !!! As part of the special escaping, might it consider a non
-        // isotope `~null-2~` to be a signal it translates to null-2?
+        // isotope `~null-2~` to be a signal it translates to heavy-null?
         //
         if (VAL_PARAM_CLASS(param) == REB_P_LITERAL)
             Literalize(arg);

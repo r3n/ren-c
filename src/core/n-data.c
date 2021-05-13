@@ -520,7 +520,6 @@ void Get_Var_May_Fail(
         if (NOT_CELL_FLAG(out, ISOTOPE)) {
             if (not any)
                 fail (Error_Bad_Word_Get_Core(source, specifier, out));
-            SET_CELL_FLAG(out, ISOTOPE);
         }
     }
 
@@ -1692,18 +1691,34 @@ REBNATIVE(undefined_q)
 //  "Tells you if the argument is not a value"
 //
 //      return: [logic!]
-//      optional [<opt> <literal> any-value!]
-//      /isotope "Check if it's special variant of null that can trigger ELSE"
+//      optional [<opt> any-value!]
 //  ]
 //
-REBNATIVE(null_q)  // NULL/ISOTOPE is specialized as NULL-2?
+REBNATIVE(null_q)
+{
+    INCLUDE_PARAMS_OF_NULL_Q;
+
+    return Init_Logic(D_OUT, IS_NULLED(ARG(optional)));
+}
+
+
+//
+//  heavy-null?: native [
+//
+//  "Tells you if the argument is a heavy null"
+//
+//      return: [logic!]
+//      optional [<opt> <literal> any-value!]
+//  ]
+//
+REBNATIVE(heavy_null_q)
 //
 // Note: We could tell whether something is null-2 or null without the @literal
 // convention in native code, by looking at CELL_FLAG_ISOTOPE on a normal
 // parameter.  But we try not to make it more aboveboard by having the same
 // function spec a usermode function would need to detect the condition.
 {
-    INCLUDE_PARAMS_OF_NULL_Q;
+    INCLUDE_PARAMS_OF_HEAVY_NULL_Q;
 
     REBVAL *v = ARG(optional);
 
@@ -1713,28 +1728,138 @@ REBNATIVE(null_q)  // NULL/ISOTOPE is specialized as NULL-2?
     if (IS_BAD_WORD(v))  // @param gives non-quoted void if stable void was input
         fail (PAR(optional));
 
-    if (REF(isotope))  // isotope form @literalizes as quoted null, (just ')
-        return Init_Logic(D_OUT, KIND3Q_BYTE(v) == REB_NULL + REB_64);
-
-    return Init_Logic(
-        D_OUT,
-        KIND3Q_BYTE(v) == REB_NULL or KIND3Q_BYTE(v) == REB_NULL + REB_64
-    );
+    // isotope form @literalizes as quoted null, (just ')
+    return Init_Logic(D_OUT, KIND3Q_BYTE(v) == REB_NULL + REB_64);
 }
 
 
 //
-//  null-2: native [
+//  light-null?: native [
 //
-//  {Make the heavy form of NULL (can't be WORD!-fetched, must be ACTION!)}
+//  "Tells you if the argument is a light null"
 //
-//      return: [<opt>]
+//      return: [logic!]
+//      optional [<opt> <literal> any-value!]
 //  ]
 //
-REBNATIVE(null_2) {
-    INCLUDE_PARAMS_OF_NULL_2;
+REBNATIVE(light_null_q)
+//
+// Note: We could tell whether something is null-2 or null without the @literal
+// convention in native code, by looking at CELL_FLAG_ISOTOPE on a normal
+// parameter.  But we try not to make it more aboveboard by having the same
+// function spec a usermode function would need to detect the condition.
+{
+    INCLUDE_PARAMS_OF_LIGHT_NULL_Q;
 
-    return Init_Heavy_Nulled(D_OUT);
+    REBVAL *v = ARG(optional);
+
+    // Be consistent with other typecheckers and error if given a non-isotope
+    // form of a BAD-WORD!.  (@params should be used sparingly/carefully.)
+    //
+    if (IS_BAD_WORD(v))  // @param gives non-quoted void if stable void was input
+        fail (PAR(optional));
+
+    return Init_Logic(D_OUT, KIND3Q_BYTE(v) == REB_NULL);
+}
+
+//
+//  heavy: native [
+//
+//  {Make the heavy form of NULL (passes through all other values)}
+//
+//      return: [<opt> any-value!]
+//      optional [<opt> <literal> any-value!]
+//  ]
+//
+REBNATIVE(heavy) {
+    INCLUDE_PARAMS_OF_HEAVY;
+
+    Move_Cell(D_OUT, Unliteralize(ARG(optional)));
+
+    if (IS_NULLED(D_OUT))
+        SET_CELL_FLAG(D_OUT, ISOTOPE);
+
+    return D_OUT;
+}
+
+
+//
+//  light: native [
+//
+//  {Make the light form of NULL (passes through all other values)}
+//
+//      return: [<opt> any-value!]
+//      optional [<opt> <literal> any-value!]
+//  ]
+//
+REBNATIVE(light) {
+    INCLUDE_PARAMS_OF_LIGHT;
+
+    Move_Cell(D_OUT, Unliteralize(ARG(optional)));
+
+    if (IS_NULLED(D_OUT))
+        CLEAR_CELL_FLAG(D_OUT, ISOTOPE);
+
+    return D_OUT;
+}
+
+
+//
+//  none: native [
+//
+//  {Make the "unfriendly" ~none~ value}
+//
+//      return: [bad-word!]
+//  ]
+//
+REBNATIVE(none) {
+    INCLUDE_PARAMS_OF_NONE;
+
+    return Init_None(D_OUT);
+}
+
+
+//
+//  friendly: native [
+//
+//  "Make BAD-WORD!s friendly, passing through all other values"
+//
+//      return: [<opt> any-value!]
+//      optional [<opt> <literal> any-value!]
+//  ]
+//
+REBNATIVE(friendly)
+{
+    INCLUDE_PARAMS_OF_FRIENDLY;
+
+    Move_Cell(D_OUT, Unliteralize(ARG(optional)));
+
+    if (IS_BAD_WORD(D_OUT))
+        SET_CELL_FLAG(D_OUT, ISOTOPE);
+
+    return D_OUT;
+}
+
+
+//
+//  unfriendly: native [
+//
+//  "Make BAD-WORD!s unfriendly, passing through all other values"
+//
+//      return: [<opt> any-value!]
+//      optional [<opt> <literal> any-value!]
+//  ]
+//
+REBNATIVE(unfriendly)
+{
+    INCLUDE_PARAMS_OF_UNFRIENDLY;
+
+    Move_Cell(D_OUT, Unliteralize(ARG(optional)));
+
+    if (IS_BAD_WORD(D_OUT))
+        CLEAR_CELL_FLAG(D_OUT, ISOTOPE);
+
+    return D_OUT;
 }
 
 
@@ -1758,23 +1883,26 @@ REBNATIVE(voidify)
 }
 
 
+
 //
 //  devoid: native [
 //
-//  "Turn voids into nulls, passing through all other values"
+//  "Make non-isotope ~void~ vanish, passing through all other values"
 //
-//      return: [<opt> any-value!]
-//      optional [<opt> any-value!]
+//      return: [<opt> <invisible> any-value!]
+//      optional [<opt> <literal> any-value!]
 //  ]
 //
 REBNATIVE(devoid)
 {
     INCLUDE_PARAMS_OF_DEVOID;
 
-    if (IS_BAD_WORD(ARG(optional)))
-        return Init_Nulled(D_OUT);
+    REBVAL *v = ARG(optional);
 
-    RETURN (ARG(optional));
+    if (Is_Bad_Word_With_Sym(v, SYM_VOID))  // not quoted, so wasn't isotope
+        return D_OUT;
+
+    RETURN (Unliteralize(v));
 }
 
 

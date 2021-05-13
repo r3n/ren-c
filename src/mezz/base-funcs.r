@@ -20,7 +20,7 @@ REBOL [
 assert: func* [
     {Ensure conditions are conditionally true if hooked by debugging}
 
-    return: <elide>
+    return: <void>
     conditions [block!]
         {Block of conditions to evaluate and test for logical truth}
 ][
@@ -135,9 +135,9 @@ func: func* [
     with-return: _
 
     parse spec [while [
-        <void> (append new-spec <void>)
+        <none> (append new-spec <none>)
     |
-        <elide> (append new-spec <elide>)
+        <void> (append new-spec <void>)
     |
         :(if var '[  ; so long as we haven't reached any <local> or <with> etc.
             set var: [any-word! | any-path! | quoted!] (
@@ -765,7 +765,7 @@ lock-of: redescribe [
 eval-all: func [
     {Evaluate any number of expressions and discard them}
 
-    return: <elide>
+    return: <void>
     expressions [<opt> any-value! <variadic>]
         {Any number of expressions on the right.}
 ][
@@ -776,7 +776,7 @@ eval-all: func [
 ; These constructs used to be enfix to complete their left hand side.  Yet
 ; that form of completion was only one expression's worth, when they wanted
 ; to allow longer runs of evaluation.  "Invisible functions" (those which
-; `return: <elide>`) permit a more flexible version of the mechanic.
+; `return: <void>`) permit a more flexible version of the mechanic.
 
 <|: tweak copy :eval-all 'postpone on
 |>: tweak enfixed :shove 'postpone on

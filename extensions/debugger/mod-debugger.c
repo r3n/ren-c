@@ -229,7 +229,7 @@ REBNATIVE(resume)
 //
 //  "Perform a step in the debugger"
 //
-//      return: [<void>]
+//      return: []
 //      amount [<end> word! integer!]
 //          "Number of steps to take (default is 1) or IN, OUT, OVER"
 //  ]

@@ -63,14 +63,6 @@ eval: function [] [
     ]
 ]
 
-void: func [] [
-    fail @return [
-        "VOID is not a function, so that `action! <> type of get/any 'void`"
-        "You can now choose freely ~ for unlabeled void, or labeled as ~xxx~"
-        https://forum.rebol.info/t/another-lingering-idea-named-void-s/1383
-        "(Note that `void: ~void~` would cause errors on referencing VOID.)"
-    ]
-]
 
 ; The pattern `foo: enfix function [...] [...]` is probably more common than
 ; enfixing an existing function, e.g. `foo: enfix :add`.  Hence making a
@@ -201,7 +193,7 @@ comment [
 prin: function [
     "Print without implicit line break, blocks are SPACED."
 
-    return: <void>
+    return: <none>
     value [<opt> any-value!]
 ][
     write-stdout switch type of :value [

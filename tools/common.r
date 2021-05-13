@@ -346,7 +346,7 @@ propercase-of: func [
 ]
 
 write-if-changed: function [
-    return: <void>
+    return: <none>
     dest [file!]
     content [text! block!]
 ][

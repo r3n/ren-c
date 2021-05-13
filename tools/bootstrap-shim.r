@@ -261,6 +261,18 @@ modernize-action: function [
                     keep/only spec/1
                 ]
 
+                if spec/1 = <none> [  ; new semantics: <none> -> ~none~
+                    keep/only <void>  ; old cue for returning garbage
+                    spec: my next
+                    continue
+                ]
+
+                if spec/1 = <void> [
+                    keep/only []  ; old cue for invisibility
+                    spec: my next
+                    continue
+                ]
+
                 ; Substitute BLANK! for any <blank> found, and save some code
                 ; to inject for that parameter to return null if it's blank
                 ;

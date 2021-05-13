@@ -30,7 +30,7 @@
 //
 // * If a branch *does* run--and that branch evaluation produces a NULL--then
 //   conditionals designed to be used with branching (like IF or CASE) will
-//   return a special variant of NULL (tentatively called "NULL-2").  It acts
+//   return a special "heavy" isotope variant of NULL (aka "NULL-2").  It acts
 //   just like NULL in most cases, but for the purposes of ELSE and THEN it
 //   is considered a signal that a branch ran.
 //

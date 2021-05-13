@@ -1026,7 +1026,7 @@ if launched-from-root [
 ]
 
 set-exec-path: func [
-    return: <void>
+    return: <none>
     tool [object!]
     path
 ][
@@ -1447,7 +1447,7 @@ for-each [label list] reduce [
 all-extensions: join builtin-extensions dynamic-extensions
 
 add-project-flags: func [
-    return: <void>
+    return: <none>
     project [object!]
     /I "includes" [block!]
     /D "definitions" [block!]
@@ -1726,7 +1726,7 @@ prep: make rebmake/entry-class [
 ; this will make sure `%objs/generic/` is in there.
 
 add-new-obj-folders: function [
-    return: <void>
+    return: <none>
     objs
     folders
     <local>

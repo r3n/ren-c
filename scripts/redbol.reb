@@ -50,7 +50,7 @@ export: lib/func [
 ]
 
 helper: enfixed lib/func [
-    return: <void>
+    return: <none>
     :set-word [set-word!]
     code [block!]
 ] lib/in lib [
@@ -448,7 +448,7 @@ false?: emulate [:not]  ; better name https://trello.com/c/Cz0qs5d7
 
 comment: emulate [
     func [
-        return: <void> {Not invisible: https://trello.com/c/dWQnsspG}
+        return: <none> {Not invisible: https://trello.com/c/dWQnsspG}
         :discarded [block! any-string! binary! any-scalar!]
     ][
     ]
@@ -892,7 +892,7 @@ redbol-form: form: emulate [
 
 print: emulate [
     func [
-        return: <void>
+        return: <none>
         value [any-value!]  ; Ren-C only takes TEXT!, BLOCK!, BLANK!, CHAR!
     ][
         write-stdout case [

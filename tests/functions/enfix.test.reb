@@ -274,7 +274,7 @@
     )
 
     (
-        bar: func [return: <elide>] [bar: _]
+        bar: func [return: <void>] [bar: _]
         did all [
             [bar 304] == evaluate/result [1020 bar 304] 'var
             var == 1020
@@ -282,7 +282,7 @@
         ]
         comment {Invisible normal arity-0 function should run on next eval}
     )(
-        enbar: enfixed func [return: <elide>] [enbar: _]
+        enbar: enfixed func [return: <void>] [enbar: _]
         did all [
             [304] == evaluate/result [1020 enbar 304] 'var
             var == 1020
@@ -306,7 +306,7 @@
             comment {skip irrelevant (tests right on *next* step)}
         ]
     )(
-        enibar: enfixed func [return: <elide> 'i [<skip> integer!]] [
+        enibar: enfixed func [return: <void> 'i [<skip> integer!]] [
             fail {
                 When arguments are skipped, this defers the enfix until the
                 next evaluator step.  Doing otherwise would mean that
@@ -326,7 +326,7 @@
             ]
         ]
     )(
-        enibar: enfixed func [return: <elide> 'i [<skip> integer!]] [
+        enibar: enfixed func [return: <void> 'i [<skip> integer!]] [
             enibar: _
         ]
         did all [

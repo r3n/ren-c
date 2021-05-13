@@ -213,7 +213,7 @@ make-http-request: func [
 do-request: function [
     {Queue an HTTP request to a port (response must be waited for)}
 
-    return: <void>
+    return: <none>
     port [port!]
 ][
     spec: port/spec
@@ -245,7 +245,7 @@ do-request: function [
 parse-write-dialect: function [
     {Sets PORT/SPEC fields: DEBUG, FOLLOW, METHOD, PATH, HEADERS, CONTENT}
 
-    return: <void>
+    return: <none>
     port [port!]
     block [block!]
 ][

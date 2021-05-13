@@ -104,7 +104,7 @@ boot-banner: [
 
 about: func [
     "Information about REBOL"
-    return: <void>
+    return: <none>
 ][
     print make-banner boot-banner
 ]
@@ -120,7 +120,7 @@ about: func [
 ;
 usage: func [
     "Prints command-line arguments."
-    return: <void>
+    return: <none>
 ][
 ;       --cgi (-c)       Load CGI utiliy module and modes
 ;       --version tuple  Script must be this version or greater
@@ -169,14 +169,14 @@ usage: func [
 
 license: func [
     "Prints the REBOL/core license agreement."
-    return: <void>
+    return: <none>
 ][
     print system/license
 ]
 
 host-script-pre-load: func [
     {Code registered as a hook when a module or script are loaded}
-    return: <void>
+    return: <none>
     is-module [logic!]
     hdr [blank! object!]
         {Header object (will be blank for DO of BINARY! with no header)}

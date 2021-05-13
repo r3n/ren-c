@@ -60,7 +60,7 @@ REBNATIVE(quit)
 
     if (IS_ENDISH_NULLED(ARG(value))) {
         //
-        // This returns a BAD-WROD! if there is no arg, in sync with RETURN that
+        // This returns a BAD-WORD! if there is no arg, in sync with RETURN that
         // has no arg.  But labels it ~quit~.
         //
         Init_Bad_Word(ARG(value), SYM_QUIT);

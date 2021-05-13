@@ -6,10 +6,10 @@
 (
     v: make bad-word! 'labeled
     did all [
-        bad-word? get/any 'v
+        bad-word? friendly get/any 'v
         undefined? 'v
-        '~labeled~ = get/any 'v
-        'labeled = label of get/any 'v
+        '~labeled~ = friendly get/any 'v
+        'labeled = label of friendly get/any 'v
     ]
 )
 
@@ -28,29 +28,18 @@
 ('~void~ = @ do [])
 (
     foo: func [] []
-    '~void~ = @ foo
+    '~void~ = @ @ foo
 )
 ('~void~ = @ applique :foo [])
 ('~void~ = @ do :foo)
 
-; ~void~ is the convention for what you get by RETURN/VOID with no argument, or
-; if the spec says <void> any result.
+; ~void~ is the convention for what you get by RETURN with no argument, or
+; if the spec says to <void> any result.
 [(
-    foo: func [] [return/void]
-    '~void~ = @ foo
+    foo: func [] [return]
+    '~void~ = @ @ foo
 )(
-    foo: func [] [return/void ~void~]
-    '~void~ = @ foo
-)(
-    foo: func [] [return/void ~void~]  ; /VOID only invisible if arg is void
-    '~void~ = @ foo
-)(
-    foo: func [] [return]  ; if you don't specify /VOID
-    '~void~ = @ foo
-)]
-
-[(
-    foo: func [] [return/void]
+    foo: func [] [return ~void~]  ; /VOID only invisible if arg is void
     '~void~ = @ foo
 )(
     '~void~ = @ applique :foo []
@@ -59,17 +48,17 @@
 )]
 
 [(
-    foo: func [return: <void>] []
+    foo: func [return: <none>] []
     '~none~ = @ foo
 )(
     data: [a b c]
-    f: func [return: <void>] [append data [1 2 3]]
+    f: func [return: <none>] [append data [1 2 3]]
     '~none~ = @ f
 )]
 
 ; ~unset~ is the type of locals before they are assigned
 (
-    f: func [<local> loc] [get/any 'loc]
+    f: func [<local> loc] [friendly get/any 'loc]
     f = '~unset~
 )(
     f: func [<local> loc] [@loc]
@@ -79,7 +68,7 @@
 
 ; ~unset~ is also the type of things that just were never declared
 (
-    '~unset~ = get/any 'asiieiajiaosdfbjakbsjxbjkchasdf
+    '~unset~ = friendly get/any 'asiieiajiaosdfbjakbsjxbjkchasdf
 )
 
 ; MATCH will match a bad-word! as-is, but falsey inputs produce ~falsey~
@@ -91,7 +80,7 @@
 ; CYCLE once differentiated a STOP result from BREAK with ~stopped~, but now
 ; it uses NULL-2 for similar purposes.
 [
-    (null-2 = cycle [stop])
+    (heavy-null? cycle [stop])
     (null = cycle [break])
 ]
 
@@ -100,7 +89,7 @@
 [
     (1 = do "quit 1")
     ('~quit~ =  @ do "quit")
-    ('~unmodified~ = @ do "quit '~unmodified~")
+    (''~unmodified~ = @ do "quit '~unmodified~")
 ]
 
 ; Isotopes make it easier to write generic routines that handle BAD-WORD!

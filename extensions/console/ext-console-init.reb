@@ -90,7 +90,7 @@ console!: make object! [
   ABOUT   - Information about your Rebol}
 
     print-greeting: meth [
-        return: <void>
+        return: <none>
         {Adds live elements to static greeting content (build #, version)}
     ][
         boot-print [
@@ -102,7 +102,7 @@ console!: make object! [
         boot-print greeting
     ]
 
-    print-prompt: meth [return: <void>] [
+    print-prompt: meth [return: <none>] [
         ;
         ; Note: See example override in skin in the Debugger extension, which
         ; adds the stack "level" number and "current" function name.
@@ -115,7 +115,7 @@ console!: make object! [
     ]
 
     print-result: meth [
-        return: <void>
+        return: <none>
         @v "Value (done with literal parameter to discern isotope status)"
             [<opt> any-value!]
     ] [
@@ -171,19 +171,19 @@ console!: make object! [
             ; All other non-isotope bads are printed as normal output values.
             ; They can be LOAD-ed naturally, so this seems consistent:
             ;
-            ;     >> x: ~something~  ; the stable form is the "natural" form
-            ;     == ~something~
+            ;     >> x: ~something~
+            ;     == ~something~  ; unfriendly
             ;
             ; The "unnatural" aspect only happens when you access them without
             ; using GET/ANY or literalize them with @x:
             ;
             ;     >> x
-            ;     ** Error: x is non-isotope form of ~something~
+            ;     ** Error: x is the unfriendly form of ~something~
             ;
             ; But the console seems like it's giving you the right feedback to
             ; show it undecorated.
             ;
-            print [result mold v]
+            print [result mold v space space "; unfriendly"]
             return
         ]
 
@@ -215,7 +215,8 @@ console!: make object! [
             ; a literal parameter's quoting allows us to see.  But it's good
             ; for console users to be aware of the distinction.
             ;
-            print ["; null isotope"]  ; no representation, use comment
+            print ["; heavy null"]  ; no representation, use comment
+            return
         ]
 
         === ORDNARY RETURN VALUES (@ parameter convention passes as quoted) ===
@@ -230,7 +231,7 @@ console!: make object! [
                 ; words and can be accessed without triggering an error.  To
                 ; help build the intuition about the difference, label them.
                 ;
-                print [result mold v space space "; isotope"]
+                print [result mold v]
             ]
 
             free? :v [
@@ -329,7 +330,7 @@ console!: make object! [
 
     add-shortcut: meth [
         {Add/Change console shortcut}
-        return: <void>
+        return: <none>
         name [any-word!] "Shortcut name"
         block [block!] "Command(s) expanded to"
     ][
@@ -341,7 +342,7 @@ console!: make object! [
 start-console: func [
     "Called when a REPL is desired after command-line processing, vs quitting"
 
-    return: <void>
+    return: <none>
     /skin "Custom skin (e.g. derived from MAKE CONSOLE!) or file"
         [file! object!]
     <static>
@@ -852,7 +853,7 @@ ext-console-impl: func [
 
 why: func [
     "Explain the last error in more detail."
-    return: <void>
+    return: <none>
     'err [<end> word! path! error!] "Optional error value"
 ][
     let err: default [system/state/last-error]
@@ -872,7 +873,7 @@ why: func [
 
 upgrade: func [
     "Check for newer versions."
-    return: <void>
+    return: <none>
 ][
     ; Should this be a console-detected command, like Q, or is it meaningful
     ; to define this as a function you could call from code?

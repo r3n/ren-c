@@ -62,7 +62,7 @@ REBNATIVE(register_gob_hooks)
         &MF_Gob
     );
 
-    return Init_Void(D_OUT);
+    return Init_None(D_OUT);
 }
 
 

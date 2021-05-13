@@ -108,7 +108,7 @@ PVAR REBVAL PG_R_Thrown;  // has "pseudotype" REB_R_THROWN
 PVAR REBVAL *Root_System;
 PVAR REBVAL *Root_Typesets;
 
-PVAR REBVAL *Root_Void_Tag; // used with RETURN: <void> to suppress results
+PVAR REBVAL *Root_None_Tag; // used with RETURN: <none> to suppress results
 PVAR REBVAL *Root_With_Tag; // overrides locals gathering (can disable RETURN)
 PVAR REBVAL *Root_Variadic_Tag; // marks variadic argument <variadic>
 PVAR REBVAL *Root_Opt_Tag; // marks optional argument (can be NULL)
@@ -118,7 +118,7 @@ PVAR REBVAL *Root_Local_Tag; // marks beginning of a list of "pure locals"
 PVAR REBVAL *Root_Skip_Tag; // marks a hard quote as "skippable" if wrong type
 PVAR REBVAL *Root_Const_Tag; // pass a CONST version of the input argument
 PVAR REBVAL *Root_Invisible_Tag;  // return value can be invisible
-PVAR REBVAL *Root_Elide_Tag;  // will make any return result act invisibly
+PVAR REBVAL *Root_Void_Tag;  // will make any return result act invisibly
 PVAR REBVAL *Root_Literal_Tag;  // !!! needed for bootstrap, vs @arg literal
 
 PVAR REBVAL *Root_Empty_Text; // read-only ""

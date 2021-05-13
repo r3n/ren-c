@@ -182,15 +182,15 @@ void Push_Paramlist_Triads_May_Fail(
                 mode = SPEC_MODE_LOCAL;
                 continue;
             }
-            else if (0 == CT_String(item, Root_Void_Tag, strict)) {
-                *flags |= MKF_IS_BAD_WORDER;  // use Opaque_Dispatcher()
+            else if (0 == CT_String(item, Root_None_Tag, strict)) {
+                *flags |= MKF_HAS_OPAQUE_RETURN;  // use Opaque_Dispatcher()
 
                 // Fake as if they said []  !!! use EMPTY_BLOCK?
                 //
                 item = Get_System(SYS_STANDARD, STD_PROC_RETURN_TYPE);
                 goto process_typeset_block;
             }
-            else if (0 == CT_String(item, Root_Elide_Tag, strict)) {
+            else if (0 == CT_String(item, Root_Void_Tag, strict)) {
                 *flags |= MKF_IS_ELIDER;
 
                 // Fake as if they said [<invisible>] !!! make more efficient

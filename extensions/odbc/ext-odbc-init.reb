@@ -101,7 +101,7 @@ sys/make-scheme [
 
         close: function [
             {Closes a statement port only or a database port w/all statements}
-            return: <void>
+            return: <none>
             port [port!]
         ][
             if get try in (statement: port/locals) 'hstmt [

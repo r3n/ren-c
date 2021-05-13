@@ -73,7 +73,7 @@ description-of: function [
 browse: function [
     "stub function for browse* in extensions/process/ext-process-init.reb"
 
-    return: <void>
+    return: <none>
     location [<blank> url! file!]
 ][
     print "Browse needs redefining"
@@ -93,7 +93,7 @@ help: function [
         ; of specific void usages.
         ;
         print [mold get/any 'topic "is an error-inducing BAD-WORD! value"]
-        return
+        return none
     ]
 
     if null? :topic [
@@ -153,7 +153,7 @@ help: function [
                 upgrade - check for newer versions
                 usage - program cmd line options
         }
-        return
+        return none
     ]
 
     ; !!! R3-Alpha permitted "multiple inheritance" in objects, in the sense
@@ -180,7 +180,7 @@ help: function [
 
             browse join-all [https://r3n.github.io/topics/ as text! topic]
             print newline
-            return
+            return none
         ]
 
         text! [
@@ -194,7 +194,7 @@ help: function [
             ] else [
                 print ["No information on" topic]
             ]
-            return
+            return none
         ]
 
         path! word! [
@@ -205,10 +205,10 @@ help: function [
                 null? binding of topic
             ] then [
                 print [topic "is an unbound WORD!"]
-                return
+                return none
             ]
 
-            switch type of value: get/any topic [
+            switch type of value: friendly get/any topic [
                 null [
                     print [topic "is null"]
                 ]
@@ -216,7 +216,7 @@ help: function [
                     print [topic "is not defined (e.g. has a BAD-WORD! value)"]
                 ]
             ] then [
-                return
+                return none
             ]
             enfixed: did all [action? :value, enfixed? :value]
         ]
@@ -231,7 +231,7 @@ help: function [
         ] else [
             print [mold topic "is" an mold type of :topic]
         ]
-        return
+        return none
     ]
 
     ; Open the web page for it?
@@ -282,7 +282,7 @@ help: function [
         ] else [
             print [topic {is a datatype}]
         ]
-        return
+        return none
     ]
 
     if not action? :value [
@@ -303,7 +303,7 @@ help: function [
                 ]
             ]
         ]
-        return
+        return none
     ]
 
     ; The HELP mechanics for ACTION! are more complex in Ren-C due to the
@@ -386,14 +386,14 @@ help: function [
         print-args/indent-words refinements
     ]
 
-    return  ; use overridden return vs. fallout so void is unlabeled
+    return none  ; use overridden return vs. fallout so void is unlabeled
 ]
 
 
 source: function [
     "Prints the source code for an ACTION! (if available)"
 
-    return: <void>
+    return: <none>
     'arg [word! path! action! tag!]
 ][
     switch type of :arg [
@@ -508,7 +508,7 @@ pending: does [
 ]
 
 
-bugs: func [return: <void>] [
+bugs: func [return: <none>] [
     "View bug database."
 ][
     browse https://github.com/metaeducation/ren-c/issues
@@ -517,7 +517,7 @@ bugs: func [return: <void>] [
 
 chat: func [
     "Open REBOL/ren-c developers chat forum"
-    return: <void>
+    return: <none>
 ][
     browse http://chat.stackoverflow.com/rooms/291/rebol
 ]
@@ -527,7 +527,7 @@ chat: func [
 require-commit: function [
     "checks current commit against required commit"
 
-    return: <void>
+    return: <none>
     commit [text!]
 ][
     c: select system/script/header 'commit else [return]

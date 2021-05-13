@@ -583,7 +583,7 @@ format: function [
 
 printf: func [
     "Formatted print."
-    return: <void>
+    return: <none>
     fmt "Format"
     val "Value or block of values"
 ][

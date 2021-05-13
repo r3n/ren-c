@@ -577,7 +577,7 @@ REBNATIVE(get_udp_actor_handle)
 //
 //  {Join (or leave) an IPv4 multicast group}
 //
-//      return: [<void>]
+//      return: []
 //      port [port!]
 //          {An open UDP port}
 //      group [tuple!]
@@ -621,7 +621,7 @@ REBNATIVE(set_udp_multicast)
     if (result < 0)
         rebFail_OS (result);
 
-    return nullptr;
+    return rebVoid();
 }
 
 
@@ -630,7 +630,7 @@ REBNATIVE(set_udp_multicast)
 //
 //  {Set the TTL of a UDP port}
 //
-//      return: [<void>]
+//      return: []
 //      port [port!]
 //          {An open UDP port}
 //      ttl [integer!]
@@ -661,5 +661,5 @@ REBNATIVE(set_udp_ttl)
     if (result < 0)
         rebFail_OS (result);
 
-    return nullptr;
+    return rebVoid();
 }

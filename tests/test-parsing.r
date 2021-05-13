@@ -78,7 +78,7 @@ make object! [
     ]
 
     set 'collect-tests function [
-        return: <void>
+        return: <none>
         collected-tests [block!]
             {collect the tests here (modified)}
         test-file [file!]

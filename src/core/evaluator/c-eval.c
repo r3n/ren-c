@@ -212,8 +212,16 @@ inline static bool Rightward_Evaluate_Nonvoid_Into_Out_Throws(
             //
             STATE_BYTE(f) = ST_EVALUATOR_INITIAL_ENTRY;
 
+            bool was_invisible = GET_EVAL_FLAG(f, INPUT_WAS_INVISIBLE);
+            SET_EVAL_FLAG(f, INPUT_WAS_INVISIBLE);
+
             if (Eval_Maybe_Stale_Throws(f))  // reuse `f`
                 return true;
+
+            if (not was_invisible)  // cleared by Eval when reusing frames
+                CLEAR_EVAL_FLAG(f, INPUT_WAS_INVISIBLE);
+            else
+                SET_EVAL_FLAG(f, INPUT_WAS_INVISIBLE);
 
             // Keep evaluating as long as evaluations vanish, e.g.
             // `x: comment "hi" 2` shouldn't fail.
@@ -524,7 +532,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         IS_END(f->out)
         or (
             Is_Bad_Word_With_Sym(f->out, SYM_VOID)
-            and GET_CELL_FLAG(f->out, ISOTOPE)
+            and NOT_CELL_FLAG(f->out, ISOTOPE)
         )
     ){
         SET_EVAL_FLAG(f, INPUT_WAS_INVISIBLE);
@@ -1517,7 +1525,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // !!! Guaranteed to be the isotope form?  How will this guarantee
         // be made?  Still under consideration.
         //
-        assert(GET_CELL_FLAG(f->out, ISOTOPE));
+        /*assert(GET_CELL_FLAG(f->out, ISOTOPE));*/
         CLEAR_CELL_FLAG(f->out, ISOTOPE);
         break;
 

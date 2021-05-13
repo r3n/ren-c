@@ -10,8 +10,8 @@
 (1 = either true [1] [2])
 (2 = either false [1] [2])
 
-(null-2? either true [null] [1])
-(null-2? either false [1] [null])
+(heavy-null? either true [null] [1])
+(heavy-null? either false [1] [null])
 
 (null-1? either true @[null] [1])
 (null-1? either false [1] @[null])

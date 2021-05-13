@@ -344,7 +344,7 @@ application-class: make project-class [
     searches: _
     ldflags: _
 
-    link: meth [return: <void>] [
+    link: meth [return: <none>] [
         linker/link output depends ldflags
     ]
 
@@ -371,7 +371,7 @@ dynamic-library-class: make project-class [
 
     searches: _
     ldflags: _
-    link: meth [return: <void>] [
+    link: meth [return: <none>] [
         linker/link output depends ldflags
     ]
 
@@ -409,7 +409,7 @@ compiler-class: make object! [
     version: _
     exec-file: _
     compile: meth [
-        return: <void>
+        return: <none>
         output [file!]
         source [file!]
         include [file! block!]
@@ -666,7 +666,7 @@ linker-class: make object! [
     id: _ ;flag prefix
     version: _
     link: meth [
-        return: <void>
+        return: <none>
     ][
         ...  ; overridden
     ]
@@ -1025,7 +1025,7 @@ object-file-class: make object! [
     generated?: false
     depends: _
 
-    compile: meth [return: <void>] [
+    compile: meth [return: <none>] [
         compiler/compile
     ]
 
@@ -1225,7 +1225,7 @@ generator-class: make object! [
     ]
 
     prepare: meth [
-        return: <void>
+        return: <none>
         solution [object!]
     ][
         if find words-of solution 'output [
@@ -1249,7 +1249,7 @@ generator-class: make object! [
     ]
 
     flip-flag: meth [
-        return: <void>
+        return: <none>
         project [object!]
         to [logic!]
     ][
@@ -1267,7 +1267,7 @@ generator-class: make object! [
     ]
 
     setup-output: meth [
-        return: <void>
+        return: <none>
         project [object!]
     ][
         if not let suffix: find reduce [
@@ -1317,7 +1317,7 @@ generator-class: make object! [
 
     setup-outputs: meth [
         {Set the output/implib for the project tree}
-        return: <void>
+        return: <none>
         project [object!]
     ][
         ;print ["Setting outputs for:"]
@@ -1428,7 +1428,7 @@ makefile: make generator-class [
     ]
 
     emit: meth [
-        return: <void>
+        return: <none>
         buf [binary!]
         project [object!]
         /parent [object!]  ; !!! Not heeded?
@@ -1502,7 +1502,7 @@ makefile: make generator-class [
     ]
 
     generate: meth [
-        return: <void>
+        return: <none>
         output [file!]
         solution [object!]
     ][
@@ -1553,7 +1553,7 @@ Execution: make generator-class [
     gen-cmd-strip: :host/gen-cmd-strip
 
     run-target: meth [
-        return: <void>
+        return: <none>
         target [object!]
         /cwd "change working directory"  ; !!! Not heeded (?)
             [file!]
@@ -1586,7 +1586,7 @@ Execution: make generator-class [
     ]
 
     run: meth [
-        return: <void>
+        return: <none>
         project [object!]
         /parent "parent project"
             [object!]

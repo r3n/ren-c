@@ -16,7 +16,7 @@ REBOL [
 
 emit-native-proto: func [
     "Emit native prototypes to @unsorted-buffer"
-    return: <void>
+    return: <none>
     proto
     <with> proto-count
 ][
@@ -71,7 +71,7 @@ emit-native-proto: func [
 emit-include-params-macro: function [
     "Emit macros for a native's parameters"
 
-    return: <void>
+    return: <none>
     e [object!] "where to emit (see %common-emitters.r)"
     word [word!] "name of the native"
     paramlist [block!] "paramlist of the native"

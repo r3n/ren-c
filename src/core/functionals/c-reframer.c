@@ -83,15 +83,13 @@ bool Make_Invokable_From_Feed_Throws(REBVAL *out, REBFED *feed)
 {
     // !!! The case of `([x]: @)` wants to make something which when it
     // evaluates becomes invisible.  There's no QUOTED! value that can do
-    // that, so if the feature is to be supported it needs to be NIHIL.
+    // that, so if the feature is to be supported it needs to be VOID.
     //
     // Not all callers necessarily want to tolerate an end condition, so this
     // needs review.
     //
     if (IS_END(feed->value)) {
-        REBVAL *nihil = rebValue("make frame! :nihil");
-        Move_Cell(out, nihil);
-        rebRelease(nihil);
+        rebInto(out, "make frame! :void");
         return false;
     }
 

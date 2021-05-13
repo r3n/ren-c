@@ -529,7 +529,7 @@ change/only at-value platform reduce [
 ; If debugging something code in %sysobj.r, the C-DEBUG-BREAK should only
 ; apply in the non-bootstrap case.
 ;
-c-debug-break: :nihil
+c-debug-break: :void
 
 ob: make object! boot-sysobj
 
@@ -538,7 +538,7 @@ c-debug-break: :lib/c-debug-break
 make-obj-defs: function [
     {Given a Rebol OBJECT!, write C structs that can access its raw variables}
 
-    return: <void>
+    return: <none>
     e [object!]
        {The emitter to write definitions to}
     obj

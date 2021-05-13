@@ -47,4 +47,4 @@
     ]
 )
 
-(null-2? every x [] [<unused>])
+(heavy-null? every x [] [<unused>])

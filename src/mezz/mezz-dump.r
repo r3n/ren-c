@@ -15,7 +15,7 @@ REBOL [
 dump: function [
     {Show the name of a value or expressions with the value (See Also: --)}
 
-    return: <elide>
+    return: <void>
         "Doesn't return anything, not even void (so like a COMMENT)"
     :value [any-value!]
     'extra "Optional variadic data for SET-WORD!, e.g. `dump x: 1 + 2`"
@@ -45,7 +45,7 @@ dump: function [
         ]
     ]
 
-    dump-one: function [return: <void> item] [
+    dump-one: function [return: <none> item] [
         switch type of item [
             refinement!  ; treat as label, /a no shift and shorter than "a"
             text! [  ; good for longer labeling when you need spaces/etc.
@@ -168,7 +168,7 @@ dumps: enfixed function [
         ; have a way to be called--in spirit they are like enfix functions,
         ; so SHOVE (>-) would be used, but it doesn't work yet...review.)
         ;
-        d: function [return: <elide> /on /off <static> d'] compose/deep [
+        d: function [return: <void> /on /off <static> d'] compose/deep [
             d': default [
                 d'': specialize :dump [prefix: (as text! name)]
                 d'' #on
@@ -226,7 +226,7 @@ summarize-obj: function [
         for-each [word val] obj [
             if not set? 'val [continue]  ; don't consider unset fields
 
-            type: type of get/any 'val
+            type: type of friendly get/any 'val
 
             str: if match [object!] type [
                 spaced [word, words of :val]
@@ -251,7 +251,7 @@ summarize-obj: function [
                 fail @pattern
             ]
 
-            if desc: description-of try get/any 'val [
+            if desc: description-of try friendly get/any 'val [
                 if 48 < length of desc [
                     desc: append copy/part desc 45 "..."
                 ]
@@ -280,7 +280,7 @@ summarize-obj: function [
 **: enfixed function [
     {Comment until end of line, or end of current BLOCK!/GROUP!}
 
-    return: <elide>
+    return: <void>
     left "Enfix required for 'fully invisible' enfix behavior (ignored)"
         [<opt> <end> any-value!]
     :args [any-value! <variadic>]
@@ -292,7 +292,7 @@ summarize-obj: function [
         all [
             any-array? :value
             contains-newline value
-            return/void
+            return
         ]
     ]
 ]

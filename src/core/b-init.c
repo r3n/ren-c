@@ -216,7 +216,7 @@ static REBVAL *Make_Locked_Tag(const char *utf8) { // helper
 //
 static void Init_Action_Spec_Tags(void)
 {
-    Root_Void_Tag = Make_Locked_Tag("void");
+    Root_None_Tag = Make_Locked_Tag("none");
     Root_With_Tag = Make_Locked_Tag("with");
     Root_Variadic_Tag = Make_Locked_Tag("variadic");
     Root_Opt_Tag = Make_Locked_Tag("opt");
@@ -226,7 +226,7 @@ static void Init_Action_Spec_Tags(void)
     Root_Skip_Tag = Make_Locked_Tag("skip");
     Root_Const_Tag = Make_Locked_Tag("const");
     Root_Invisible_Tag = Make_Locked_Tag("invisible");
-    Root_Elide_Tag = Make_Locked_Tag("elide");
+    Root_Void_Tag = Make_Locked_Tag("void");
 
     // !!! Needed for bootstrap, as `@arg` won't LOAD in old r3
     //
@@ -235,7 +235,7 @@ static void Init_Action_Spec_Tags(void)
 
 static void Shutdown_Action_Spec_Tags(void)
 {
-    rebRelease(Root_Void_Tag);
+    rebRelease(Root_None_Tag);
     rebRelease(Root_With_Tag);
     rebRelease(Root_Variadic_Tag);
     rebRelease(Root_Opt_Tag);
@@ -245,7 +245,7 @@ static void Shutdown_Action_Spec_Tags(void)
     rebRelease(Root_Skip_Tag);
     rebRelease(Root_Const_Tag);
     rebRelease(Root_Invisible_Tag);
-    rebRelease(Root_Elide_Tag);
+    rebRelease(Root_Void_Tag);
 
     rebRelease(Root_Literal_Tag);  // !!! only needed for bootstrap with old r3
 }

@@ -213,7 +213,7 @@ notable?: function [
 
 make-changes-file: function [
     {Make CHANGES.md file using Changes-block and template-CHANGES.md}
-    return: <void>
+    return: <none>
     changes-file  [file!]  {CHANGES file to create/overwrite}
     credits-file  [file!]  {CREDITS file to lookup github usernames}
     changes-block [block!] {Changes-block of release/category objects}
@@ -236,7 +236,7 @@ make-changes-file: function [
         ]
     ]
 
-    write-line: func [return: <void> s] [
+    write-line: func [return: <none> s] [
         write changes join-all s
         write changes to-text newline
     ]
@@ -297,7 +297,7 @@ make-changes-file: function [
         ]
     ]
 
-    write-example: function [return: <void> co] [
+    write-example: function [return: <none> co] [
         if eg: select co 'example [
             write-line [{```rebol}]
             write-line [eg]
@@ -305,7 +305,7 @@ make-changes-file: function [
         ]
     ]
 
-    write-change-text: func [return: <void> co] [
+    write-change-text: func [return: <none> co] [
         write-line [{- } make-summary-text co]
         write-example co
     ]

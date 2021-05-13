@@ -27,26 +27,24 @@ REBOL [
 
 c-break-debug: :c-debug-break  ; easy to mix up
 
-??:  ; shorthand form to use in debug sessions, not intended to be committed
 probe: func* [
     {Debug print a molded value and returns that same value.}
 
     return: "Same as the input value"
         [<opt> any-value!]
     @value' [<opt> any-value!]
-    <local> value
 ][
     ; Remember this is early in the boot so many things not defined
     write-stdout switch type of value' [
         null ["; null"]
-        bad-word! [spaced [mold value']]
+        bad-word! [unspaced [@value' space space "; unfriendly"]]
     ] else [
-        value: unquote value'
-        switch type of value [
-            null ["; null isotope"]
-            bad-word! [spaced [@value space space "; isotope"]]
+        let value: unquote value'
+        switch type of :value [
+            null ["; heavy null"]
+            bad-word! [mold value]  ; friendly
         ] else [
-            mold value
+            mold :value
         ]
     ]
 
@@ -57,6 +55,8 @@ probe: func* [
     ;
     return/isotope unquote value'
 ]
+
+??: :probe  ; shorthand to use in debug sessions, not intended to be committed
 
 
 ; Give special operations their special properties
@@ -130,7 +130,7 @@ lesser-or-equal?: :equal-or-lesser?
 comment: enfixed func* [
     {Ignores the argument value, but does no evaluation (see also ELIDE).}
 
-    return: <elide>
+    return: <void>
         {The evaluator will skip over the result (not seen, not even void)}
     returned [<opt> <end> any-value!]
         {The returned value.}  ; by protocol of enfixed `return: <invisible>`
@@ -142,16 +142,16 @@ comment: enfixed func* [
 elide: func* [
     {Argument is evaluative, but discarded (see also COMMENT).}
 
-    return: <elide>
+    return: <void>
         {The evaluator will skip over the result (not seen, not even void)}
-    discarded [<opt> any-value!]
+    @discarded [<opt> any-value!]
         {Evaluated value to be ignored.}
 ][
 ]
 
-nihil: enfixed func* [  ; 0-arg so enfix doesn't matter, but tests issue below
+void: enfixed func* [  ; 0-arg so enfix doesn't matter, but tests issue below
     {Arity-0 COMMENT (use to replace an arity-0 function with side effects)}
-    return: <elide> {Evaluator will skip result}
+    return: <void> {Evaluator will skip result}
 ][
     ; https://github.com/metaeducation/ren-c/issues/581#issuecomment-562875470
 ]
@@ -160,11 +160,14 @@ nihil: enfixed func* [  ; 0-arg so enfix doesn't matter, but tests issue below
 ; it could dump those remarks out...perhaps based on how many == there are.
 ; (This is a good reason for retaking ==, as that looks like a divider.)
 ;
-===: func* ['remarks [any-value! <variadic>]] [
+===: func* [
+    return: <void>
+    'remarks [any-value! <variadic>]
+] [
     until [
         equal? '=== take remarks
     ]
-    return/void  ; return no value (invisible)
+    return  ; return no value (invisible)
 ]
 
 ; COMMA! is the new expression barrier.  But `||` is included as a redefine of
@@ -173,7 +176,7 @@ nihil: enfixed func* [  ; 0-arg so enfix doesn't matter, but tests issue below
 ;
 ||: func* [
     "Expression barrier - invisible so it vanishes, but blocks evaluation"
-    return: <elide>
+    return: <void>
 ][
     ; Note: actually *faster* than a native, due to Commenter_Dispatcher()
 ]
@@ -183,7 +186,7 @@ tweak :|| 'barrier on
 |||: func* [
     {Inertly consumes all subsequent data, evaluating to previous result.}
 
-    return: <elide>
+    return: <void>
     :omit [any-value! <variadic>]
 ][
     until [null? take omit]
@@ -510,12 +513,9 @@ empty?: func* [
 ]
 
 
-null-2?: :null?/isotope  ; particularly useful shorthand in writing tests
-
-
 reeval func* [
     {Make fast type testing functions (variadic to quote "top-level" words)}
-    return: <void>
+    return: <none>
     'set-words [<variadic> set-word! tag!]
     <local>
         set-word type-name tester meta

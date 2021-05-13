@@ -31,7 +31,7 @@ export: lib/func [
 ]
 
 checked: enfixed lib/func [
-    return: <void>
+    return: <none>
     :set-word [set-word!]
     code [block!]
 ] lib/in lib [
