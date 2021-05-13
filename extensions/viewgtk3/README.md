@@ -58,6 +58,12 @@ gtk_button_clicked ()
 gtk_button_get_label ()
 gtk_button_set_label ()
 
+And do not forget 
+gtk_widget_show_all ()
+gtk_widget_show ()
+gtk_widget_hide ()
+gtk_widget_show_now ()
+
 
 ## Typical use of RENC in combination with GTK3
 
