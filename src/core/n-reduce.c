@@ -345,8 +345,8 @@ REB_R Compose_To_Stack_Core(
             if (insert != out)
                 rebRelease(insert);
 
-          #ifdef DEBUG_UNREADABLE_VOIDS
-            Init_Unreadable(out);  // shouldn't leak temp eval to caller
+          #ifdef DEBUG_UNREADABLE_TRASH
+            Init_Trash(out);  // shouldn't leak temp eval to caller
           #endif
 
             changed = true;

@@ -256,7 +256,7 @@ inline static REBVAL *Try_Init_Any_Sequence_All_Integers(
     REBLEN len
 ){
   #if !defined(NDEBUG)
-    Init_Unreadable(out);  // not used for "blaming" a non-integer
+    Init_Trash(out);  // not used for "blaming" a non-integer
   #endif
 
     if (len > sizeof(PAYLOAD(Bytes, out)).at_least_8)
@@ -510,7 +510,7 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
 ){
   #if !defined(NDEBUG)
     if (store != sequence)
-        Init_Unreadable(store);  // catch use in case we don't write it
+        Init_Trash(store);  // catch use in case we don't write it
   #endif
 
     assert(ANY_SEQUENCE_KIND(CELL_KIND(sequence)));

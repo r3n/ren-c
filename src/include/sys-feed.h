@@ -433,7 +433,7 @@ inline static void Fetch_Next_In_Feed(REBFED *feed) {
 inline static const RELVAL *Lookback_While_Fetching_Next(REBFRM *f) {
   #ifdef DEBUG_EXPIRED_LOOKBACK
     if (feed->stress) {
-        TRASH_CELL_IF_DEBUG(feed->stress);
+        REFORMAT_CELL_IF_DEBUG(feed->stress);
         free(feed->stress);
         feed->stress = nullptr;
     }
@@ -515,8 +515,8 @@ inline static REBFED* Alloc_Feed(void) {
     feed->tick = TG_Tick;
   #endif
 
-    Init_Unreadable(Prep_Cell(&feed->fetched));
-    Init_Unreadable(Prep_Cell(&feed->lookback));
+    Init_Trash(Prep_Cell(&feed->fetched));
+    Init_Trash(Prep_Cell(&feed->lookback));
 
     REBSER *s = &feed->singular;  // SER() not yet valid
     s->leader.bits = NODE_FLAG_NODE | FLAG_FLAVOR(FEED);

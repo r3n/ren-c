@@ -131,7 +131,7 @@ inline static RELVAL *Quotify_Core(
         // essentially noise, and only the literal's specifier should be used.
 
         REBVAL *unquoted = Alloc_Pairing();
-        Init_Unreadable(PAIRING_KEY(unquoted));  // Key not used ATM
+        Init_Trash(PAIRING_KEY(unquoted));  // Key not used ATM
 
         Copy_Cell_Header(unquoted, v);
         mutable_KIND3Q_BYTE(unquoted) = kind;  // escaping only in literal

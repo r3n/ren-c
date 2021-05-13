@@ -450,7 +450,7 @@ inline static void Abort_Frame(REBFRM *f) {
     while (n != f) {
         REBARR *a = ARR(n);
         n = LINK(ApiNext, a);
-        TRASH_CELL_IF_DEBUG(ARR_SINGLE(a));
+        REFORMAT_CELL_IF_DEBUG(ARR_SINGLE(a));
         GC_Kill_Series(a);
     }
     TRASH_POINTER_IF_DEBUG(f->alloc_value_list);
@@ -531,7 +531,7 @@ inline static void Prep_Frame_Core(
 
     f->feed = feed;
     Prep_Cell(&f->spare);
-    Init_Unreadable(&f->spare);
+    Init_Trash(&f->spare);
     f->dsp_orig = DS_Index;
     TRASH_POINTER_IF_DEBUG(f->out);
 
@@ -714,8 +714,8 @@ inline static void Push_Action(
     for (; prep >= tail; --prep) {
         USED(TRACK_CELL_IF_DEBUG(prep));
         prep->header.bits =
-            FLAG_KIND3Q_BYTE(REB_T_TRASH)  // notice no NODE_FLAG_CELL
-            | FLAG_HEART_BYTE(REB_T_TRASH);  // so unreadable and unwritable
+            FLAG_KIND3Q_BYTE(REB_T_UNSAFE)
+            | FLAG_HEART_BYTE(REB_T_UNSAFE); // unreadable
     }
   }
   #endif

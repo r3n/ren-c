@@ -739,7 +739,7 @@ inline static REBVAL *Sink_Word_May_Fail(
     REBSPC *specifier
 ){
     REBVAL *var = Lookup_Mutable_Word_May_Fail(any_word, specifier);
-    TRASH_CELL_IF_DEBUG(var);
+    REFORMAT_CELL_IF_DEBUG(var);
     return var;
 }
 

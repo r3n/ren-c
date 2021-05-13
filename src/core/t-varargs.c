@@ -140,7 +140,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
     const RELVAL *vararg,
     enum Reb_Param_Class pclass  // REB_P_DETECT to use what's in the vararg
 ){
-    TRASH_CELL_IF_DEBUG(out);
+    REFORMAT_CELL_IF_DEBUG(out);
 
     const REBKEY *key;
     const REBPAR *param = Param_For_Varargs_Maybe_Null(&key, vararg);

@@ -122,9 +122,9 @@ inline static bool Is_Bad_Word_With_Sym(const RELVAL *v, SYMID sym) {
 }
 
 
-#if !defined(DEBUG_UNREADABLE_VOIDS)  // release behavior, just ~unreadable~
-    #define Init_Unreadable(v) \
-        Init_Bad_Word_Core((v), PG_Unreadable_Canon, CELL_MASK_NONE)
+#if !defined(DEBUG_UNREADABLE_TRASH)  // release behavior, just ~unreadable~
+    #define Init_Trash(v) \
+        Init_Bad_Word_Core((v), PG_Trash_Canon, CELL_MASK_NONE)
 
     #define IS_BAD_WORD_RAW(v) \
         IS_BAD_WORD(v)
@@ -137,7 +137,7 @@ inline static bool Is_Bad_Word_With_Sym(const RELVAL *v, SYMID sym) {
     #define ASSERT_READABLE_IF_DEBUG(v) \
         NOOP
 #else
-    inline static REBVAL *Init_Unreadable_Debug(RELVAL *out) {
+    inline static REBVAL *Init_Trash_Debug(RELVAL *out) {
         RESET_VAL_HEADER(out, REB_BAD_WORD, CELL_FLAG_FIRST_IS_NODE);
         mutable_BINDING(out) = nullptr;
 
@@ -150,23 +150,17 @@ inline static bool Is_Bad_Word_With_Sym(const RELVAL *v, SYMID sym) {
         return cast(REBVAL*, out);
     }
 
-    #define Init_Unreadable(out) \
-        Init_Unreadable_Debug(TRACK_CELL_IF_DEBUG(out))
+    #define Init_Trash(out) \
+        Init_Trash_Debug(TRACK_CELL_IF_DEBUG(out))
 
     #define IS_BAD_WORD_RAW(v) \
         (KIND3Q_BYTE_UNCHECKED(v) == REB_BAD_WORD)
 
-    inline static bool IS_UNREADABLE_DEBUG(const RELVAL *v) {
+    inline static bool IS_TRASH(const RELVAL *v) {
         if (KIND3Q_BYTE_UNCHECKED(v) != REB_BAD_WORD)
             return false;
         return VAL_NODE1(v) == nullptr;
     }
-
-    #define ASSERT_UNREADABLE_IF_DEBUG(v) \
-        assert(IS_UNREADABLE_DEBUG(v))
-
-    #define ASSERT_READABLE_IF_DEBUG(v) \
-        assert(not IS_UNREADABLE_DEBUG(v))
 #endif
 
 
@@ -197,7 +191,7 @@ inline static REBVAL *Move_Cell_Untracked(
 ){
     Copy_Cell_Core(out, v, copy_mask);
   #if defined(NDEBUG)
-    Init_Unreadable(v);  // no advantage in release build (yet!)
+    Init_Trash(v);  // no advantage in release build (yet!)
   #endif
     return cast(REBVAL*, out);
 }

@@ -65,7 +65,7 @@ REB_R MAKE_Library(
         fail (arg);
 
     REBLIB *lib = Alloc_Singular(FLAG_FLAVOR(LIBRARY) | NODE_FLAG_MANAGED);
-    Init_Unreadable(ARR_SINGLE(lib));  // !!! save name? other data?
+    Init_Trash(ARR_SINGLE(lib));  // !!! save name? other data?
 
     lib->link.fd = fd;  // seen as shared by all instances
     node_MISC(Meta, lib) = nullptr;  // !!! build from spec, e.g. arg?

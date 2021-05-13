@@ -475,43 +475,41 @@ inline static RELVAL *Prep_Cell_Core(RELVAL *c) {
     Prep_Cell_Core(TRACK_CELL_IF_DEBUG(c))
 
 
-//=//// TRASH CELLS ///////////////////////////////////////////////////////=//
+//=//// REFORMATTING CELLS ////////////////////////////////////////////////=//
 //
-// Trash is a cell (marked by NODE_FLAG_CELL) with NODE_FLAG_FREE set.  To
-// prevent it from being inspected while it's in an invalid state, VAL_TYPE
-// used on a trash cell will assert in the debug build.
+// Sometimes it's desirable in the debug build to mark a cell as being
+// garbage...because it's intended to be overwritten later, and you want to
+// make certain that it is (and that whatever value it was holding previously
+// isn't exposed to code that should just be writing the cell).  But you don't
+// want to pay the cost of that marking in the release build.
 //
-// The garbage collector is not tolerant of trash.
+// The garbage collector is not tolerant of cells that have been reformatted.
+// Because if debug-build-only operations like REFORMAT_CELL_IF_DEBUG() could
+// transition a cell from being GC-unsafe to GC-safe, that could lead to
+// a debug build running fine when a release build might not.
+//
+// (For a different version of contaminating cells that is GC safe, see the
+// Init_Trash() function.  But that operation has cost in both the debug and
+// release builds, and shouldn't be used conditionally.)
 //
 
-#if defined(DEBUG_TRASH_MEMORY)
-
-    #define TRASH_VALUE \
-        cast(const REBVAL*, &PG_Trash_Value_Debug)
-
-    inline static REBVAL *Init_Trash_Debug(RELVAL *v) {
+#if defined(DEBUG_REFORMAT_CELLS)
+    inline static REBVAL *Init_Unsafe_Debug(RELVAL *v) {
         ASSERT_CELL_WRITABLE_EVIL_MACRO(v);
         v->header.bits &= CELL_MASK_PERSIST;
         v->header.bits |=
-            FLAG_KIND3Q_BYTE(REB_T_TRASH)
-                | FLAG_HEART_BYTE(REB_T_TRASH);
+            FLAG_KIND3Q_BYTE(REB_T_UNSAFE)
+                | FLAG_HEART_BYTE(REB_T_UNSAFE);
         return cast(REBVAL*, v);
     }
 
-    #define TRASH_CELL_IF_DEBUG(v) \
-        Init_Trash_Debug(TRACK_CELL_IF_DEBUG(v))
-
-    inline static bool IS_TRASH_DEBUG(const RELVAL *v) {
-        assert(v->header.bits & NODE_FLAG_CELL);
-        return KIND3Q_BYTE_UNCHECKED(v) == REB_T_TRASH;
-    }
+    #define REFORMAT_CELL_IF_DEBUG(v) \
+        Init_Unsafe_Debug(TRACK_CELL_IF_DEBUG(v))
 #else
-    inline static REBVAL *TRASH_CELL_IF_DEBUG(RELVAL *v) {
+    inline static REBVAL *REFORMAT_CELL_IF_DEBUG(RELVAL *v) {
         return cast(REBVAL*, v); // #define of (v) gives compiler warnings
     } // https://stackoverflow.com/q/29565161/
 #endif
-
-
 
 
 //=////////////////////////////////////////////////////////////////////////=//

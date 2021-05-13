@@ -45,7 +45,8 @@ nulled
 blanked
 falsey
 errored  ; when rebRescue() has no handler and evaluates to non-fail ERROR!
-unreadable  ; only release build uses, debug build uses NULL as the label
+trash  ; only release build uses (debug build uses null as label to assert)
+rootvar  ; used as placeholder in rootvar cells
 
 
 ; ...note that the words for types are created programmatically before

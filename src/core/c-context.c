@@ -1073,7 +1073,7 @@ void Assert_Context_Core(REBCTX *c)
             panic (*key);
 
       #ifdef DEBUG_TERM_ARRAYS
-        if (IS_TRASH_DEBUG(var)) {
+        if (IS_TRASH(var)) {
             printf("** Early var end at index: %d\n", cast(int, n));
             panic (c);
         }
@@ -1081,7 +1081,7 @@ void Assert_Context_Core(REBCTX *c)
     }
 
   #ifdef DEBUG_TERM_ARRAYS
-    if (not IS_TRASH_DEBUG(var)) {
+    if (not IS_TRASH(var)) {
         printf("** Missing var end at index: %d\n", cast(int, n));
         panic (var);
     }

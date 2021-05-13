@@ -160,7 +160,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
       skip_fulfilling_arg_for_now:  // the GC marks args up through f->arg...
 
-        Init_Unreadable(f->arg);  // ...so cell must have valid bits
+        Init_Trash(f->arg);  // ...so cell must have valid bits
         continue;
 
   //=//// ACTUAL LOOP BODY ////////////////////////////////////////////////=//
@@ -661,7 +661,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     }
 
   #ifdef DEBUG_TERM_ARRAYS
-    assert(IS_TRASH_DEBUG(f->arg));  // arg can otherwise point to any arg cell
+    assert(IS_TRASH(f->arg));  // arg can otherwise point to any arg cell
   #endif
 
     // There may have been refinements that were skipped because the
@@ -705,7 +705,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             goto fulfill_and_any_pickups_done;
         }
 
-        assert(IS_UNREADABLE_DEBUG(f->arg) or IS_NULLED(f->arg));
+        assert(IS_TRASH(f->arg) or IS_NULLED(f->arg));
         SET_EVAL_FLAG(f, DOING_PICKUPS);
         goto fulfill_arg;
     }

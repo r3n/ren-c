@@ -337,7 +337,7 @@ enum {
     Copy_Values_Len_Extra_Shallow_Core((v), (s), (l), 0, (f))
 
 #define Copy_Values_Len_Extra_Shallow(v,s,l,e) \
-    Copy_Values_Len_Extra_Shallow_Core((v), (s), (l), (e), 0) 
+    Copy_Values_Len_Extra_Shallow_Core((v), (s), (l), (e), 0)
 
 
 #define Copy_Array_Shallow(a,s) \

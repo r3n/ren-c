@@ -514,7 +514,7 @@ inline static void SET_SERIES_USED(REBSER *s, REBLEN used) {
         //
       #ifdef DEBUG_TERM_ARRAYS
         if (IS_SER_ARRAY(s))
-            TRASH_CELL_IF_DEBUG(SER_AT(RELVAL, s, used));
+            Init_Trash_Debug(SER_AT(RELVAL, s, used));
       #endif
     }
     else {

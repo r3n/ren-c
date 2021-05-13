@@ -66,7 +66,7 @@
         //
         // !!! Review relevance of this now that Endlike_Header() is gone.
         //
-        mutable_HEART_BYTE(v) = REB_T_TRASH;
+        mutable_HEART_BYTE(v) = REB_T_UNSAFE;
         return cast(REBVAL*, v);
     }
 
@@ -107,4 +107,3 @@
 
 #define NOT_END(v) \
     (not IS_END(v))
-

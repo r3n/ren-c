@@ -442,9 +442,9 @@ void Mold_Or_Form_Value(REB_MOLD *mo, const RELVAL *v, bool form)
     // Mold hooks take a REBCEL* and not a RELVAL*, so they expect any quotes
     // applied to have already been done.
 
-  #if !defined(NDEBUG)
-    if (IS_UNREADABLE_DEBUG(v)) {  // keylists and paramlists have unreadables
-        Append_Ascii(mo->series, "~unreadable~");
+  #if defined(DEBUG_UNREADABLE_TRASH)
+    if (IS_TRASH(v)) {  // would assert otherwise
+        Append_Ascii(mo->series, "~trash~");
         return;
     }
   #endif

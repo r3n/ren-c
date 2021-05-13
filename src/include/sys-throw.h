@@ -74,7 +74,7 @@
     inline static const REBVAL *VAL_THROWN_LABEL(const REBVAL *thrown) {
         if (IS_END(&TG_Thrown_Label_Debug))
             return thrown;
-        assert(IS_UNREADABLE_DEBUG(thrown));
+        assert(IS_TRASH(thrown));
         return &TG_Thrown_Label_Debug;
     }
 #endif
@@ -98,7 +98,7 @@ inline static REB_R Init_Thrown_With_Label(
     //
     if (SPORADICALLY(2)) {
         Copy_Cell(&TG_Thrown_Label_Debug, label);
-        Init_Unreadable(out);
+        Init_Trash(out);
     }
     else {
         if (out != label)

@@ -338,7 +338,7 @@
     ~cast(REBFLGS, 0)
 
 #define CELL_MASK_POISON \
-    cast(REBFLGS, 0)
+    (FLAG_KIND3Q_BYTE(REB_T_UNSAFE) | FLAG_HEART_BYTE(REB_T_UNSAFE))
 
 
 //=//// CELL's `EXTRA` FIELD DEFINITION ///////////////////////////////////=//

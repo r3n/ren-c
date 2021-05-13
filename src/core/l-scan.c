@@ -2309,7 +2309,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
             // data stack could go bad on any DS_PUSH() or DS_DROP().
             //
             DECLARE_LOCAL (cell);
-            Init_Unreadable(cell);
+            Init_Trash(cell);
             PUSH_GC_GUARD(cell);
 
             PUSH_GC_GUARD(array);

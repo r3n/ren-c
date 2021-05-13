@@ -641,7 +641,7 @@ static void Mark_Root_Series(void)
 static void Mark_Data_Stack(void)
 {
     const RELVAL *head = ARR_HEAD(DS_Array);
-    ASSERT_UNREADABLE_IF_DEBUG(head);  // DS_AT(0) is deliberately invalid
+    assert(IS_TRASH(head));  // DS_AT(0) is deliberately invalid
 
     REBVAL *stackval = DS_Movable_Top;
     for (; stackval != head; --stackval)  // stop before DS_AT(0)

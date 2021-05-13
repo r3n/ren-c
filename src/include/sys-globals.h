@@ -43,7 +43,7 @@ PVAR REBU64 PG_Mem_Limit;   // Memory limit set by SECURE
 //
 PVAR const REBSYM *PG_Slash_1_Canon;  // Preallocated "fake" word for `/`
 PVAR const REBSYM *PG_Dot_1_Canon;  // Preallocated "fake" word for `.`
-PVAR const REBSYM *PG_Unreadable_Canon;  // Preallocated ~unreadable~ void
+PVAR const REBSYM *PG_Trash_Canon;  // Preallocated ~trash~ bad word
 
 PVAR REBSER *PG_Symbol_Canons; // Canon symbol pointers for words in %words.r
 PVAR REBSER *PG_Symbols_By_Hash; // Symbol REBSTR pointers indexed by hash
@@ -88,10 +88,6 @@ PVAR REBVAL PG_Blank_Value;
 PVAR REBVAL PG_False_Value;
 PVAR REBVAL PG_True_Value;
 PVAR REBVAL PG_Unset_Value;
-
-#ifdef DEBUG_TRASH_MEMORY
-    PVAR REBVAL PG_Trash_Value_Debug;
-#endif
 
 PVAR REBVAL PG_R_Invisible;  // has "pseudotype" REB_R_INVISIBLE
 PVAR REBVAL PG_R_Immediate;  // has "pseudotype" REB_R_IMMEDIATE

@@ -324,10 +324,6 @@ static void Init_Root_Vars(void)
     Init_False(Prep_Cell(&PG_False_Value));
     Init_True(Prep_Cell(&PG_True_Value));
 
-  #ifdef DEBUG_TRASH_MEMORY
-    TRASH_CELL_IF_DEBUG(Prep_Cell(&PG_Trash_Value_Debug));
-  #endif
-
     RESET_CELL(Prep_Cell(&PG_R_Thrown), REB_R_THROWN, CELL_MASK_NONE);
     RESET_CELL(Prep_Cell(&PG_R_Invisible), REB_R_INVISIBLE, CELL_MASK_NONE);
     RESET_CELL(Prep_Cell(&PG_R_Immediate), REB_R_IMMEDIATE, CELL_MASK_NONE);

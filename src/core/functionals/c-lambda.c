@@ -156,9 +156,9 @@ REBNATIVE(lambda)
 
     // Start with pushing nothings for the [0] slot
     //
-    Init_Void(DS_PUSH());  // key slot (signal for no pushes)
-    Init_Unreadable(DS_PUSH());  // unused
-    Init_Unreadable(DS_PUSH());  // unused
+    Init_None(DS_PUSH());  // key slot (signal for no pushes)
+    Init_Trash(DS_PUSH());  // unused
+    Init_Trash(DS_PUSH());  // unused
     Init_Nulled(DS_PUSH());  // description slot
 
     for (; word != word_tail; ++word) {

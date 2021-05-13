@@ -244,10 +244,10 @@ void* Probe_Core_Debug(
       case DETECTED_AS_CELL: {
         const REBVAL *v = cast(const REBVAL*, p);
 
-      #if !defined(NDEBUG)  // IS_NULLED() asserts on unreadable void
-        if (IS_UNREADABLE_DEBUG(v)) {
+      #if defined(DEBUG_UNREADABLE_TRASH)
+        if (IS_TRASH(v)) {  // IS_NULLED() asserts on trash
             Probe_Print_Helper(p, expr, "Value", file, line);
-            Append_Ascii(mo->series, "\\\\Unreadable Cell\\\\");
+            Append_Ascii(mo->series, "~trash~");
             break;
         }
       #endif

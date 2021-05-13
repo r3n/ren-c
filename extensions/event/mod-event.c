@@ -352,7 +352,7 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
     }
     else {
       #if !defined(NDEBUG)
-        Init_Unreadable(D_SPARE);
+        Init_Trash(D_SPARE);
       #endif
     }
 

@@ -119,12 +119,11 @@ inline static void Unlink_Api_Handle_From_Frame(REBARR *a)
 }
 
 
-// !!! The return cell from this allocation is a trash cell which has had some
-// additional bits set.  This means it is not "canonized" trash that can be
-// detected as distinct from UTF-8 strings, so don't call IS_TRASH_DEBUG() or
-// Detect_Rebol_Pointer() on it until it has been further initialized.
-//
-// Ren-C manages by default.
+// We are introducing the containing node for this cell to the GC and can't
+// leave it trash.  If a pattern like `Do_Evaluation_Into(Alloc_Value(), ...)`
+// is used, then there might be a recycle during the evaluation that sees it.
+// Low-level allocation already pulled off making it END with just three
+// assignments, see Alloc_Series_Node() for that magic.
 //
 inline static REBVAL *Alloc_Value(void)
 {
@@ -137,13 +136,7 @@ inline static REBVAL *Alloc_Value(void)
     //
     REBVAL *v = SPECIFIC(ARR_SINGLE(a));
 
-    // We are introducing this series to the GC and can't leave it trash.
-    // If a pattern like `Do_Evaluation_Into(Alloc_Value(), ...)` is used,
-    // then there might be a recycle during the evaluation that sees it.
-    // Low-level allocation already pulled off making it END with just three
-    // assignments, see Alloc_Series_Node() for that magic.
-    //
-    assert(IS_END(v));
+    assert(IS_END(v));  // see remarks above, trash could trip up Recycle()
     v->header.bits |= NODE_FLAG_ROOT;  // it's END (can't use SET_CELL_FLAGS)
 
     // We link the API handle into a doubly linked list maintained by the
@@ -161,7 +154,7 @@ inline static void Free_Value(REBVAL *v)
     assert(Is_Api_Value(v));
 
     REBARR *a = Singular_From_Cell(v);
-    TRASH_CELL_IF_DEBUG(ARR_SINGLE(a));
+    REFORMAT_CELL_IF_DEBUG(ARR_SINGLE(a));
 
     if (GET_SERIES_FLAG(a, MANAGED))
         Unlink_Api_Handle_From_Frame(a);

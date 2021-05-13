@@ -276,7 +276,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
   #endif
 
     assert(DSP >= f->dsp_orig);  // REDUCE accrues, APPLY adds refinements
-    assert(not IS_TRASH_DEBUG(f->out));  // all invisible will preserve output
+    assert(WRITABLE(f->out));  // all invisible will preserve output
     assert(f->out != f_spare);  // overwritten by temporary calculations
 
     // A barrier shouldn't cause an error in evaluation if code would be
