@@ -1,6 +1,6 @@
 //
 //  File: %mod-viewgtk3.c
-//  Summary: "GTK3 interface extension"
+//  Summary: "ViewGTK3 interface extension"
 //  Section: Extension
 //  Project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
 //  Homepage: https://github.com/metaeducation/ren-c/
