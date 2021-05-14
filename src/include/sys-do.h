@@ -243,7 +243,9 @@ inline static bool Do_Branch_Core_Throws(
             out,
             false, // !fully, e.g. arity-0 functions can ignore condition
             rebU(branch),
-            is_unfriendly_bad_word ? rebU(condition) : condition,
+            is_unfriendly_bad_word
+                ? rebU(condition)
+                : cast(const REBNOD*, condition),  // can't use NOD() on REBVAL*
             rebEND
         );
         DROP_GC_GUARD(branch);

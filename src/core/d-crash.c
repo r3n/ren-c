@@ -213,7 +213,6 @@ REBNATIVE(panic)
     INCLUDE_PARAMS_OF_PANIC;
 
     REBVAL *v = Unliteralize(ARG(reason));  // remove quote level from @reason
-    const void *p;
 
     // Use frame tick (if available) instead of TG_Tick, so tick count dumped
     // is the exact moment before the PANIC ACTION! was invoked.
@@ -226,7 +225,9 @@ REBNATIVE(panic)
     // panic() on the string value itself will report information about the
     // string cell...but panic() on UTF-8 character data assumes you mean to
     // report the contained message.  PANIC/VALUE for the latter intent.
-    //
+
+    const void *p;
+
     if (REF(value)) {  // interpret reason as value to diagnose
         p = v;
     }
@@ -246,5 +247,5 @@ REBNATIVE(panic)
         }
     }
 
-    Panic_Core(v, tick, FRM_FILE_UTF8(frame_), FRM_LINE(frame_));
+    Panic_Core(p, tick, FRM_FILE_UTF8(frame_), FRM_LINE(frame_));
 }
