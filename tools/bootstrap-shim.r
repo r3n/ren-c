@@ -71,6 +71,28 @@ trap [
     ;
     if undefined? 'just [
         just: :literal
+
+        ; Workaround the <void> => <none> spec change, for same version
+
+        func: adapt :func [
+            if find spec <none> [
+                spec: replace (copy spec) <none> <void>
+            ]
+        ]
+
+        meth: enfixed adapt :meth [
+            if find spec <none> [
+                spec: replace (copy spec) <none> <void>
+            ]
+        ]
+
+        function: adapt :function [
+            if find spec <none> [
+                spec: replace (copy spec) <none> <void>
+            ]
+        ]
+
+        parse?: chain [:lib/parse | :did]
     ]
 
     ; LOAD changed to have no /ALL so enforcing getting a block is weird
