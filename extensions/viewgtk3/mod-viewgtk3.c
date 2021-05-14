@@ -38,6 +38,63 @@
 
 // "warning: implicit declaration of function"
 
+// General functions
+
+//
+//  export gtk-init: native [
+//
+//      {Call this function before using any other GTK+ functions in your GUI applications. 
+// It will initialize everything needed to operate the toolkit and parses some standard command line options.}
+//
+//      return: [void!]
+//  ]
+//
+REBNATIVE(gtk_init)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_INIT;
+
+    int argc = 0;
+    if (not gtk_init_check(&argc, nullptr))
+        fail ("gtk_init_check() failed");
+
+    return rebVoid();
+}
+
+//
+//  export gtk-main: native [
+//
+//      {Runs the main loop until gtk_main_quit() is called.
+// You can nest calls to gtk_main(). In that case gtk_main_quit() will make the innermost invocation of the main loop return.}
+//
+//      return: [void!]
+//  ]
+//
+REBNATIVE(gtk_main)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_INIT;
+
+    gtk_main();
+
+    return rebVoid();
+}
+
+//
+//  export gtk-main-quit: native [
+//
+//      {Makes the innermost invocation of the main loop return when it regains control.}
+//
+//      return: [void!]
+//  ]
+//
+REBNATIVE(gtk_main_quit)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_MAIN_QUIT;
+
+    gtk_main_quit();
+
+    return rebVoid();
+}
+
 // Window functions
 
 //
@@ -61,6 +118,34 @@ REBNATIVE(gtk_window_new)
     GtkWidget *window = gtk_window_new(type);
 
     return rebHandle(window, 0, nullptr);
+}
+
+//
+//  export gtk-window-set-title: native [
+//
+//      {Sets the title of the GtkWindow. 
+// The title of a window will be displayed in its title bar; on the X Window System, 
+// the title bar is rendered by the window manager, so exactly how the title appears 
+// to users may vary according to a user’s exact configuration. 
+// The title should help a user distinguish this window from other windows they may have open. 
+// A good title might include the application name and current document filename, for example.}
+//
+//      return: [void!]
+//      window [handle!]
+//      title [text!]
+//  ]
+//
+REBNATIVE(gtk_window_set_title)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WINDOW_SET_TITLE;
+
+    GtkWindow *window = VAL_HANDLE_POINTER(GtkWindow, ARG(window));
+
+    const char * title = cast(char*, VAL_STRING_AT(ARG(title)));
+     
+    gtk_window_set_title(window, title);
+
+    return rebVoid();
 }
 
 // Other Widget functions
@@ -558,6 +643,54 @@ REBNATIVE(gtk_drawing_area_new)
     GtkWidget *canvas = gtk_drawing_area_new();
 
     return rebHandle(canvas, 0, nullptr);
+}
+
+// Widget Interface functions
+
+// Editable
+
+//
+//  export gtk-editable-set-editable: native [
+//
+//      {Determines if the user can edit the text in the editable widget or not.}
+//
+//      return: [void!]
+//      field [handle!]
+//      editable [logic!]
+//  ]
+//
+REBNATIVE(gtk_editable_set_editable)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_EDITABLE_SET_EDITABLE;
+
+    GtkEditable *field = VAL_HANDLE_POINTER(GtkEditable, ARG(field));
+
+    bool editable = rebDid(ARG(editable));
+ 
+    gtk_editable_set_editable(field, editable);
+
+    return rebVoid();
+}
+
+//
+//  export gtk-editable-get-editable: native [
+//
+//      {Retrieves whether the text in entry is visible.}
+//
+//      return: [logic!]
+//      field [handle!]
+//  ]
+//
+REBNATIVE(gtk_editable_get_editable)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_EDITABLE_GET_EDITABLE;
+
+    GtkEditable *field = VAL_HANDLE_POINTER(GtkEditable, ARG(field));
+     
+    bool result = gtk_editable_get_editable(field);
+    REBVAL *logic = rebValue("TO LOGIC!", result);
+
+    return rebValue(logic);
 }
 
 // Widget Layout functions
