@@ -94,10 +94,9 @@ emit-proto: func [return: <none> proto] [
                         pos: back pos
                     ]
                     keep trim/tail copy/part param next pos  ; TEXT! of type
-                    keep to word! next pos  ; WORD! of the parameter name
+                    keep/only to word! next pos  ; WORD! of the parameter name
                 )
             ]]
-            end
         ] else [
             fail ["Couldn't extract API schema from prototype:" proto]
         ]

@@ -474,16 +474,16 @@ for-each-system: func [
                     build-label: to-word build-label
                 )
             ]
-            copy definitions [any issue!] (
+            copy definitions [while issue!] (
                 definitions: map-each x definitions [to-word x]
             )
-            copy cflags [any tag!] (
+            copy cflags [while tag!] (
                 cflags: map-each x cflags [to-word to-text x]
             )
-            copy ldflags [any refinement!] (
+            copy ldflags [while refinement!] (
                 ldflags: map-each x ldflags [to-word x]
             )
-            copy libraries [any file!] (
+            copy libraries [while file!] (
                 libraries: map-each x libraries [to-word to-text x]
             )
 
@@ -494,7 +494,7 @@ for-each-system: func [
                 ]
             )
         ]
-    ] end ] else [
+    ]] else [
         fail "Couldn't parse systems.r table"
     ]
 ]

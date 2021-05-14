@@ -172,7 +172,7 @@ proto-parser: context [
         format-func-section: copy/deep [
             doubleslashed-lines
             and is-intro
-            function-proto any white-space
+            function-proto while white-space
             function-body
             (
                 ; EMIT-PROTO doesn't want to see extra whitespace (such as
@@ -270,7 +270,7 @@ proto-parser: context [
                     ]
                 ]
                 "("
-                any white-space
+                while white-space
                 opt [
                     not typemacro-parentheses
                     not ")"

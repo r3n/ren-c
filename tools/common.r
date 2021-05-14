@@ -494,7 +494,7 @@ stripload: function [
                     not find str {"}
                     not find str "/"
                 ] then [
-                    keep as word! str
+                    keep/only as word! str
                 ]
                 t: newline-pos
             ]
