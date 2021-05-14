@@ -282,6 +282,17 @@ let os_id = use_asyncify ? "0.16.1" : "0.16.2"
 config.info("Use Asyncify => " + use_asyncify)
 
 
+//=//// HELPER FOR USE WITH FETCH() ////////////////////////////////////////=//
+//
+// https://www.tjvantoll.com/2015/09/13/fetch-and-errors/
+
+function checkStatus(response) {
+    if (!response.ok)
+        throw new Error(`HTTP ${response.status} - ${response.statusText}`);
+    return response;
+}
+
+
 //=//// PARSE SCRIPT LOCATION FOR LOADER OPTIONS //////////////////////////=//
 //
 // The script can read arguments out of the "location", which is the part of
@@ -430,9 +441,7 @@ let assign_git_commit_promiser = (os_id) => {  // assigns, but no return value
     return fetch(base_dir + os_id + "/last-deploy.short-hash")
       .then((response) => {
 
-        // https://www.tjvantoll.com/2015/09/13/fetch-and-errors/
-        if (!response.ok)
-            throw Error(response.statusText)  // handled by .catch() below
+        checkStatus(response)
         return response.text()  // text() returns a "UVString" Promise
 
       }).then((text) => {
@@ -542,9 +551,7 @@ let prefetch_worker_js_promiser = () => new Promise(
         var pthreadMainJs = libRebolComponentURL('.worker.js');
         fetch(pthreadMainJs)
           .then(function (response) {
-            // https://www.tjvantoll.com/2015/09/13/fetch-and-errors/
-            if (!response.ok)
-                throw Error(response.statusText)
+            checkStatus(response)
             return response.blob()
           })
           .then(function (blob) {
@@ -596,18 +603,21 @@ let load_rebol_scripts = function(defer) {
             promise = promise.then(function() {
                 config.log('fetch()-ing <script src="' + url + '">')
                 return fetch(url).then(function(response) {
-                    // https://www.tjvantoll.com/2015/09/13/fetch-and-errors/
-                    if (!response.ok)
-                        throw Error(response.statusText)
-
-                    return response.text()  // returns promise ("USVString")
-                  })
+                    //
+                    // We want to get the script as binary to avoid UTF-8
+                    // encoded in the JS interpreter's string format ever.
+                    //
+                    checkStatus(response)
+                    return response.arrayBuffer()
+                  }).then(function(buffer) {
+                    return reb.Value("as text!", reb.R(reb.Binary(buffer)))
+                  }) 
                 })
 
         let code = scripts[i].innerText.trim()  // literally in <script> tag
         if (code)
             promise = promise.then(function () {
-                return code
+                return reb.Text(code)
             })
 
         if (code || url)  // promise was augmented to return source code
@@ -617,14 +627,14 @@ let load_rebol_scripts = function(defer) {
                 // The Promise() is necessary here because the odds are that
                 // Rebol code will want to use awaiters like READ of a URL.
                 //
-                // !!! The do { } is necessary here in case the code is a
+                // !!! The do is necessary here in case the code is a
                 // Module or otherwise needs special processing.  Otherwise,
                 // `Rebol [Type: Module ...] <your code>` will just evaluate
                 // Rebol to an object and throw it away, and evaluate the spec
                 // block to itself and throw that away.  The mechanics for
                 // recognizing that special pattern are in DO.
                 //
-                return reb.Promise("do {" + text + "}")
+                return reb.Promise("do", reb.R(text))
               }).then(function (result) {  // !!! how might we process result?
                 config.log("Finished <script> code @ tick " + reb.Tick())
                 config.log("defer = " + scripts[i].defer)
