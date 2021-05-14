@@ -1493,13 +1493,13 @@ load: emulate [
 ]
 
 
-=== LEAVE VOID AS LAST LINE ===
+=== LEAVE NONE AS LAST LINE ===
 ;
 ; So that `do <redbol>` doesn't show any output.  While the console displays
-; most voids, by default it won't display ones specifically labeled ~void~
+; most voids, by default it won't display ones specifically labeled ~none~
 ;
 ; !!! This may not be the last word on what signals the console's silence.
 ;
 ; https://forum.rebol.info/t/1413
 
-'~void~
+~none~

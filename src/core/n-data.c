@@ -680,7 +680,7 @@ void Set_Var_May_Fail(
 //          {Will be the values set to, or void if any set values are void}
 //      target [blackhole! any-word! any-path! block! quoted!]
 //          {Word or path, or block of words and paths}
-//      value [<opt> any-value!]
+//      value [<opt> <literal> any-value!]
 //          "Value or block of values (NULL means unset)"
 //      /hard "Do not evaluate GROUP!s in PATH! (assume pre-COMPOSE'd)"
 //      /single "If target and value are blocks, set each to the same value"
@@ -706,7 +706,7 @@ REBNATIVE(set)
     INCLUDE_PARAMS_OF_SET;
 
     REBVAL *target = ARG(target);
-    REBVAL *value = ARG(value);
+    REBVAL *value = Unliteralize(ARG(value));
 
     if (not IS_BLOCK(target)) {
         Set_Var_May_Fail(
