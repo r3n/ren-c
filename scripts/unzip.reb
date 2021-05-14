@@ -597,7 +597,7 @@ ctx-zip: context [
         ]
 
         if block? where [return where]
-        return
+        return none
     ]
 ]
 
