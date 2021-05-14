@@ -438,20 +438,19 @@
         let rules: collect [
             for-each t things [
                 counts/(t): 0
-                keep t
-                keep/only compose/deep '(counts/(t): me + 1)
-                keep/line '|
+                keep @t
+                keep @ compose/deep '(counts/(t): me + 1)
+                keep/line [|]
             ]
-            keep/only 'fail
+            keep [fail]
         ]
         parse data (compose/deep [
-            while [((rules))]
-            end
+            while [((rules))]  ; could be just `while [rules]`, but it's a test
         ]) then [
             collect [
                 for-each [key value] counts [
-                    keep key
-                    keep value
+                    keep @key
+                    keep @value
                 ]
             ]
         ] else [

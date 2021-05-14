@@ -970,17 +970,27 @@ REBTYPE(Array)
 
         REBFLGS flags = 0;
 
-        if (IS_QUOTED(ARG(value)))
-            Unquotify(ARG(value), 1);
-        else if (not REF(only) and Splices_Without_Only(ARG(value)))
-            flags |= AM_SPLICE;
+        Copy_Cell(D_OUT, array);
+
+        if (not REF(only)) {
+            if (IS_NULLED(ARG(value)))
+                fail ("Cannot APPEND/INSERT/CHANGE null (use BLANK!, see TRY)");
+            if (IS_BLANK(ARG(value)))
+                return D_OUT;  // no-op
+
+            if (IS_QUOTED(ARG(value)))
+                Unquotify(ARG(value), 1);
+            else if (not ANY_INERT(ARG(value)))
+                fail ("Cannot APPEND/INSERT/CHANGE evaluative values w/o QUOTE");
+            else if (Splices_Without_Only(ARG(value)))
+                flags |= AM_SPLICE;
+        }
 
         if (REF(part))
             flags |= AM_PART;
         if (REF(line))
             flags |= AM_LINE;
 
-        Copy_Cell(D_OUT, array);
         VAL_INDEX_RAW(D_OUT) = Modify_Array(
             arr,
             index,

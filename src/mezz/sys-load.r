@@ -681,7 +681,7 @@ load-module: func [
         line: 1
     ]
     if no-share [
-        hdr/options: append any [hdr/options make block! 1] 'isolate
+        hdr/options: append (any [hdr/options, make block! 1]) [isolate]
     ]
 
     ; Unify hdr/name and /AS name
@@ -701,7 +701,7 @@ load-module: func [
         ; But make it a mixin and it will be imported directly later
 
         if not find hdr/options 'private [
-            hdr/options: append any [hdr/options make block! 1] 'private
+            hdr/options: append any [hdr/options, make block! 1] [private]
         ]
     ]
     if not tuple? let modver: :hdr/version [
@@ -788,7 +788,7 @@ load-module: func [
             set [hdr: code:] load-ext-module code
             hdr/name: name ; in case of delayed rename
             if all [no-share not find hdr/options 'isolate] [
-                hdr/options: append any [hdr/options make block! 1] 'isolate
+                hdr/options: append any [hdr/options, make block! 1] [isolate]
             ]
         ]
 

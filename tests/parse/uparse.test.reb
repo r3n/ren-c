@@ -247,9 +247,9 @@
     x: <before>
     did all [
         uparse? "aaa" [x: collect [some [
-            keep (if false [<not kept>])
+            keep (try if false [<not kept>])
             keep skip
-            keep (if true [<kept>])
+            keep (try if true [<kept>])
         ]]]
         x = [#a <kept> #a <kept> #a <kept>]
     ]
@@ -364,7 +364,7 @@
     did all [
         uparse? [| | while while while | | |] [
             content: between some '| some '|
-            into (content) [x: collect [some keep 'while]]
+            into (content) [x: collect [some keep @['while]]]
         ]
         x = [while while while]
     ]

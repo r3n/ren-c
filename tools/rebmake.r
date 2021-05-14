@@ -1465,7 +1465,7 @@ makefile: make generator-class [
                         depends: join objs map-each ddep dep/depends [
                             if ddep/class <> #object-library [ddep]
                         ]
-                        commands: append reduce [dep/command] opt dep/post-build-commands
+                        commands: append reduce [dep/command] try dep/post-build-commands
                     ]
                     emit buf dep
                 ]

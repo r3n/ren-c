@@ -749,8 +749,8 @@ default-combinators: make map! reduce [
         ; emit null fields.
         ;
         assert [quoted? result']  ; should be light null if and only if failed
-        append state.gathering target
-        append state.gathering result'
+        append state.gathering @target
+        append state.gathering @result'
         return unquote result'
     ]
 

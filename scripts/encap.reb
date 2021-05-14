@@ -581,7 +581,7 @@ pe-format: context [
             any [
                 find words to word! word
                 find def to set-word! word
-                append def to set-word! word
+                append def @ to set-word! word
             ]
         ]
 
@@ -615,7 +615,7 @@ pe-format: context [
         parse rule [while block-rule end]
 
         ;dump def
-        set name make object! append def _
+        set name make object! append def @ _
         bind rule get name
     ]
 

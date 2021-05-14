@@ -92,6 +92,38 @@ trap [
             ]
         ]
 
+        any-inert!: make typeset! [text! tag! issue! binary! char! object! file!]
+
+        append: adapt :append [
+            value: case [
+                only [:value]
+                blank? :value [null]
+                block? :value [:value]
+                match any-inert! :value [:value]
+                fail 'value ["APPEND takes block, blank, ANY-INERT!"]
+            ]
+        ]
+
+        insert: adapt :insert [
+            value: case [
+                only [:value]
+                blank? :value [null]
+                block? :value [:value]
+                match any-inert! :value [:value]
+                fail 'value ["INSERT takes block, blank, ANY-INERT!"]
+            ]
+        ]
+
+        change: adapt :change [
+            value: case [
+                only [:value]
+                blank? :value [null]
+                block? :value [:value]
+                match any-inert! :value [:value]
+                fail 'value ["CHANGE takes block, blank, ANY-INERT!"]
+            ]
+        ]
+
         parse?: chain [:lib/parse | :did]
     ]
 
@@ -111,6 +143,42 @@ trap [
 ;
 load-value: :load
 load-all: :load/all
+
+
+any-inert!: make typeset! [text! tag! issue! binary! char! object! file!]
+
+append: adapt :append [
+    if not only [
+        value: opt case [
+            blank? :value [_]
+            block? :value [:value]
+            match any-inert! :value [:value]
+            fail/where ["APPEND takes block, blank, ANY-INERT!"] 'value
+        ]
+    ]
+]
+
+insert: adapt :insert [
+    if not only [
+        value: opt case [
+            blank? :value [_]
+            block? :value [:value]
+            match any-inert! :value [:value]
+            fail/where ["INSERT takes block, blank, ANY-INERT!"] 'value
+        ]
+    ]
+]
+
+change: adapt :change [
+    if not only [
+        value: opt case [
+            blank? :value [_]
+            block? :value [:value]
+            match any-inert! :value [:value]
+            fail/where ["CHANGE takes block, blank, ANY-INERT!"] 'value
+        ]
+    ]
+]
 
 
 ; Lambda was redefined to `->` to match Haskell/Elm vs. `=>` for JavaScript.
@@ -188,11 +256,11 @@ collect-lets: func [
             item/1 = 'let [
                 item: next item
                 if match [set-word! word! block!] item/1 [
-                    append lets item/1
+                    lib/append lets item/1
                 ]
             ]
             value? match [block! group!] item/1 [
-                append lets collect-lets item/1
+                lib/append lets collect-lets item/1
             ]
         ]
     ]

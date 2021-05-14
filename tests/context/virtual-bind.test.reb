@@ -72,7 +72,7 @@
 
 [
     (
-        group: append '() use [x y] [x: 10, y: 20, '((x + y))]
+        group: append '() use [x y] [x: 10, y: 20, [((x + y))]]
         group = '(((x + y)))
     )
 

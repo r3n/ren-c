@@ -79,9 +79,9 @@
                 (keyword-match: '(<*> keyword))
             ]
 
-            keep/line '|
+            keep/line [|]
         ]
-        keep 'false  ; add failure if no match, instead of removing last |
+        keep [false]  ; add failure if no match, instead of removing last |
     ]
 
     rule: [
@@ -154,6 +154,6 @@
 (
     subs: ["1" "foo" "10" "bar"]
     text: "$<10>"
-    "bar" = reword/escape text subs ["$<" ">"]
+    "bar" = uparse-reword/escape text subs ["$<" ">"]
 )]
 

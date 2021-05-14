@@ -242,7 +242,7 @@ for-each-record: function [
 
         spec: collect [
             for-each column-name headings [
-                keep column-name
+                keep/only column-name
                 keep compose/only [just (table/1)]
                 table: next table
             ]
@@ -314,12 +314,12 @@ parse-args: function [
         either name [
             append ret reduce [name value]
         ][; standalone-arg
-            append standalone value
+            append/only standalone value
         ]
     ]
     if empty? standalone [return ret]
-    append ret '|
-    append ret standalone
+    append/only ret '|
+    append/only ret standalone
 ]
 
 uppercase-of: func [

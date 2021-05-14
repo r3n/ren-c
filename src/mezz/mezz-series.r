@@ -312,9 +312,9 @@ reword: function [
                 (keyword-match: '(<*> keyword))
             ]
 
-            keep/line '|
+            keep/line [|]
         ]
-        keep 'false  ; add failure if no match, instead of removing last |
+        keep [false]  ; add failure if no match, instead of removing last |
     ]
 
     rule: [

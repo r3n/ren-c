@@ -67,7 +67,7 @@ REBNATIVE(test_librebol)
     Init_Logic(DS_PUSH(), rebDidQ("{Hello} =", getter_node));
 
     SET_CELL_FLAG(Init_Integer(DS_PUSH(), 3), NEWLINE_BEFORE);
-    REBVAL *macro = rebValue("macro [x] [[append x first]]");
+    REBVAL *macro = rebValue("macro [x] [[append x @ first]]");
     REBVAL *mtest1 = rebValue(macro, "[1 2 3]", "[d e f]");
     Copy_Cell(DS_PUSH(), mtest1);
     rebRelease(mtest1);

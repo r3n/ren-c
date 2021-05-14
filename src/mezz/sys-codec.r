@@ -48,12 +48,12 @@ register-codec*: func [
         encode: '(:encode)
     ]
 
-    append system/codecs reduce [(to set-word! name) codec]
+    append system.codecs reduce [(to set-word! name) codec]
 
     ; Media-types block format: [.abc .def type ...]
     ; !!! Should be a map, with blocks of codecs on collisions
     ;
-    append append system/options/file-types suffixes (bind name system/codecs)
+    append append system.options.file-types suffixes @ (bind name system/codecs)
 
     return codec
 ]

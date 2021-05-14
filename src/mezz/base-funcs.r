@@ -127,12 +127,12 @@ func: func* [
     ;
     new-spec: clear copy spec
 
-    new-body: _
-    statics: _
-    defaulters: _
+    new-body: null
+    statics: null
+    defaulters: null
     var: <dummy>  ; enter PARSE with truthy state (gets overwritten)
-    loc: _
-    with-return: _
+    loc: null
+    with-return: null
 
     parse spec [while [
         <none> (append new-spec <none>)
@@ -163,19 +163,19 @@ func: func* [
             )
             |
             set other: block! (
-                append/only new-spec other  ; data type blocks
+                append new-spec @other  ; data type blocks
             )
             |
             copy other some text! (
-                append/only new-spec spaced other  ; spec notes
+                append new-spec spaced other  ; spec notes
             )
         ] else [
             [false]
         ])
     |
         set loc: tuple! (  ; locals legal anywhere
-            append exclusions to word! loc
-            append new-spec loc
+            append exclusions @ to word! loc
+            append new-spec @loc
         )
     |
         other: here
@@ -184,12 +184,12 @@ func: func* [
                 fail [
                     ; <where> spec
                     ; <near> other
-                    "Default value not paired with argument:" (mold other/1)
+                    "Default value not paired with argument:" (mold other.1)
                 ]
             ]
             defaulters: default [copy []]
             append defaulters compose [
-                (var): default '(do other/1)
+                (var): default '(do other.1)
             ]
         )
     |
@@ -198,8 +198,8 @@ func: func* [
     |
         <local>
         while [set var: word! set other: opt group! (
-            append new-spec to tuple! var
-            append exclusions var
+            append new-spec @ to tuple! var
+            append exclusions @var
             if other [
                 defaulters: default [copy []]
                 append defaulters compose [  ; always sets
@@ -219,14 +219,14 @@ func: func* [
                 if not object? other [other: ensure any-context! get other]
                 bind new-body other
                 for-each [key val] other [
-                    append exclusions key
+                    append exclusions @key
                 ]
             )
         ]
     |
         <with> while [
             set other: [word! | path!] (
-                append exclusions other
+                append exclusions @other
 
                 ; Definitional returns need to be signaled even if FUNC, so
                 ; the FUNC* doesn't automatically generate one.
@@ -245,7 +245,7 @@ func: func* [
         )
         while [
             set var: word! (other: _) opt set other: group! (
-                append exclusions var
+                append exclusions @var
                 append statics compose [
                     (as set-word! var) ((other))
                 ]
@@ -260,11 +260,11 @@ func: func* [
             fail [
                 ; <where> spec
                 ; <near> other
-                "Invalid spec item:" (mold @other/1)
+                "Invalid spec item:" (mold @other.1)
                 "in spec" @spec
             ]
         )
-    ] end]
+    ]]
 
     ; Gather the SET-WORD!s in the body, excluding the collected ANY-WORD!s
     ; that should not be considered.  Note that COLLECT is not defined by
@@ -282,10 +282,10 @@ func: func* [
     ; COLLECT-WORDS interface to efficiently give this result.
     ;
     for-each loc locals [
-        append new-spec to tuple! loc
+        append new-spec @ to tuple! loc
     ]
 
-    append new-spec opt with-return  ; if FUNC* suppresses return generation
+    append new-spec try with-return  ; if FUNC* suppresses return generation
 
     ; The constness of the body parameter influences whether FUNC* will allow
     ; mutations of the created function body or not.  It's disallowed by
@@ -295,7 +295,7 @@ func: func* [
     if const? body [new-body: const new-body]
 
     func* new-spec either defaulters [
-        append/only defaulters as group! any [new-body body]
+        append defaulters @ as group! any [new-body body]
     ][
         any [new-body body]
     ]
