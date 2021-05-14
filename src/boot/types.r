@@ -295,7 +295,7 @@ sym-word    "symbolic form of word! that does not evaluate"
 ; <ANY-SYM> (order matters, see UNSETIFY_ANY_XXX_KIND())
 
 
-; LIT! is just the lone @ symbol, which acts like QUOTE, but with the ability
+; LIT! is just the lone ^ symbol, which acts like QUOTE, but with the ability
 ; to pick up on the NULL-2 and invisible distinctions.
 
 lit         "quoting operator which distinguishes NULL and BAD-WORD! isotopes"

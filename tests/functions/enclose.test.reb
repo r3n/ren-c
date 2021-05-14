@@ -34,7 +34,7 @@
     ]
     did all [
         304 = (304 outer)
-        '~void~ = @ @(outer)
+        '~void~ = ^ ^(outer)
         var = 1020
     ]
 )(
@@ -44,10 +44,10 @@
         return
     ]
     outer: enclose :inner func [f] [
-        return @(devoid do f)  ; don't unquote it here
+        return ^(devoid do f)  ; don't unquote it here
     ]
     did all [
-        '~void~ = @ outer
+        '~void~ = ^ outer
         var = 1020
     ]
 )(
@@ -57,10 +57,10 @@
         return
     ]
     outer: enclose :inner func [f] [
-        return unquote @(devoid do f)  ; now try unquoting
+        return unquote ^(devoid do f)  ; now try unquoting
     ]
     did all [
-        '~void~ = @(outer)
+        '~void~ = ^(outer)
         var = 1020
     ]
 )]

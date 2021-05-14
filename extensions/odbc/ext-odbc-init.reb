@@ -139,7 +139,7 @@ odbc-execute: func [
     {Run a query in the ODBC extension using the Rebol SQL query dialect}
 
     statement [port!]
-    query "SQL text, or block that runs SPACED with @(...) as parameters"
+    query "SQL text, or block that runs SPACED with ^^(...) as parameters"
         [text! block!]
     /parameters "Explicit parameters (used if SQL string contains `?`)"
         [block!]
@@ -149,7 +149,7 @@ odbc-execute: func [
 
     if block? query [
         ;
-        ; REDUCE first, in case code portions took @xxx as function args
+        ; REDUCE first, in case code portions took ^xxx as function args
         ;
         query: spaced map-each item reduce query [
             switch type of item [

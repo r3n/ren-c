@@ -32,12 +32,12 @@ probe: func* [
 
     return: "Same as the input value"
         [<opt> any-value!]
-    @value' [<opt> any-value!]
+    ^value' [<opt> any-value!]
 ][
     ; Remember this is early in the boot so many things not defined
     write-stdout switch type of value' [
         null ["; null"]
-        bad-word! [unspaced [@value' space space "; unfriendly"]]
+        bad-word! [unspaced [^value' space space "; unfriendly"]]
     ] else [
         let value: unquote value'
         switch type of :value [
@@ -144,7 +144,7 @@ elide: func* [
 
     return: <void>
         {The evaluator will skip over the result (not seen, not even void)}
-    @discarded [<opt> any-value!]
+    ^discarded [<opt> any-value!]
         {Evaluated value to be ignored.}
 ][
 ]
@@ -262,7 +262,7 @@ pointfree*: func* [
     ]
 
     if :block/1 [
-        fail @block ["Unused argument data at end of POINTFREE block"]
+        fail ^block ["Unused argument data at end of POINTFREE block"]
     ]
 
     ; We now create an action out of the frame.  NULL parameters are taken as
@@ -462,7 +462,7 @@ spaced-text: chain [:spaced | specialize :else [branch: [copy ""]]]
 newlined: chain [
     adapt specialize :delimit [delimiter: newline] [
         if text? :line [
-            fail @line "NEWLINED on TEXT! semantics being debated"
+            fail ^line "NEWLINED on TEXT! semantics being debated"
         ]
     ]
         |

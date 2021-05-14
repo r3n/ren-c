@@ -9,7 +9,7 @@
     1 = do [1 comment "a"]
 )
 (
-    '~void~ = @ do [comment "a"]
+    '~void~ = ^ do [comment "a"]
 )
 
 (
@@ -55,7 +55,7 @@
     1 = do [1 elide "a"]
 )
 (
-    '~void~ = @ do [elide "a"]
+    '~void~ = ^ do [elide "a"]
 )
 
 (
@@ -132,7 +132,7 @@
             tail? right,
             '|1| = look: take lookahead  ; hack...recognize selfs
         ] else [
-            fail @right [
+            fail ^right [
                 "|1| expected single expression, found residual of" :look
             ]
         ]
@@ -144,7 +144,7 @@
 ]
 
 (
-    '~void~ = @ do [|||]
+    '~void~ = ^ do [|||]
 )
 (
     3 = do [1 + 2 ||| 10 + 20, 100 + 200]
@@ -323,8 +323,8 @@
     ]
 )
 
-('~void~ = @ (if true [] else [<else>]))
-('~void~ = @ (if true [comment <true-branch>] else [<else>]))
+('~void~ = ^ (if true [] else [<else>]))
+('~void~ = ^ (if true [comment <true-branch>] else [<else>]))
 
 (1 = all [1 elide <vaporize>])
 (1 = any [1 elide <vaporize>])
@@ -365,7 +365,7 @@
 
 ; "Opportunistic Invisibility" means that functions can treat invisibility as
 ; a return type, decided on after they've already started running.  This means
-; using the @(...) form of RETURN, which can also be used for chaining.
+; using the ^(...) form of RETURN, which can also be used for chaining.
 [
     (vanish-if-odd: func [return: [<invisible> integer!] x] [
         if even? x [return x]
@@ -376,7 +376,7 @@
     (<test> = (<test> vanish-if-odd 1))
 
     (vanish-if-even: func [return: [<invisible> integer!] y] [
-       return devoid unquote @(vanish-if-odd y + 1)
+       return devoid unquote ^(vanish-if-odd y + 1)
     ] true)
 
     (<test> = (<test> vanish-if-even 2))

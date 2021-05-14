@@ -90,7 +90,7 @@ array: function [
             fail "Empty ARRAY dimensions (file issue if you want a meaning)"
         ]
         if not integer? size: size/1 [
-            fail @size ["Expect INTEGER! size in BLOCK!, not" type of size]
+            fail ^size ["Expect INTEGER! size in BLOCK!, not" type of size]
         ]
         if tail? rest [rest: null]  ; want `array [2]` => `[_ _]`, no recurse
     ]

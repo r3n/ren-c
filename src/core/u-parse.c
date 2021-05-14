@@ -1861,7 +1861,7 @@ REBNATIVE(subparse)
 
               case SYM_SEEK: {
                 FETCH_NEXT_RULE(f);  // skip the SEEK word
-                // !!! what about `seek @(first x)` ?
+                // !!! what about `seek ^(first x)` ?
                 HANDLE_SEEK_RULE_UPDATE_BEGIN(f, P_RULE, P_RULE_SPECIFIER);
                 FETCH_NEXT_RULE(f);  // e.g. skip the `x` in `seek x`
                 goto pre_rule; }

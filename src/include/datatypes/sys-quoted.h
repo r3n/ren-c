@@ -269,7 +269,7 @@ inline static RELVAL *Unquotify_Core(RELVAL *v, REBLEN unquotes) {
 #endif
 
 
-// This does what the @(...) operations do.  Quote all values except for the
+// This does what the ^(...) operations do.  Quote all values except for the
 // stable forms of null and void.
 //
 inline static REBVAL *Literalize(REBVAL *v) {
@@ -287,7 +287,7 @@ inline static REBVAL *Literalize(REBVAL *v) {
 }
 
 
-// This undoes what the @(...) operations do; if the input is a non-quoted
+// This undoes what the ^(...) operations do; if the input is a non-quoted
 // void or null, then it's assumed to be "stable" and comes back as a non
 // isotope.  But quoted forms of nulls and voids come back with the isotope.
 //

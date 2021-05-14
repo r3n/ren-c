@@ -93,8 +93,8 @@ bool Make_Invokable_From_Feed_Throws(REBVAL *out, REBFED *feed)
         return false;
     }
 
-    // !!! Unfortunately, this means that `[x y]: @(do/vanishable f)` and
-    // similar can't work; they're done as `([x y]: @ do/vanishable f)` but
+    // !!! Unfortunately, this means that `[x y]: ^(devoid do f)` and
+    // similar can't work; they're done as `([x y]: ^ devoid do f)` but
     // it would be nice to find some kind of mitigation.  Descend into the
     // feed and make sure the tail is reached?
     //

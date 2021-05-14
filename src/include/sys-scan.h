@@ -40,7 +40,7 @@ enum Reb_Token {
     TOKEN_VOID,
     TOKEN_COMMA,
     TOKEN_COLON,
-    TOKEN_AT,
+    TOKEN_CARET,
     TOKEN_WORD,
     TOKEN_LOGIC,
     TOKEN_INTEGER,

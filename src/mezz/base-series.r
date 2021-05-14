@@ -88,10 +88,10 @@ join: function [
     result: switch type of :value [
         block! [append base reduce .identity :value]
         group! [
-            fail @base "Can't JOIN a GROUP! onto a series (use AS BLOCK!)."
+            fail ^base "Can't JOIN a GROUP! onto a series (use AS BLOCK!)."
         ]
         action! [
-            fail @base "Can't JOIN an ACTION! onto a series (use APPEND)."
+            fail ^base "Can't JOIN an ACTION! onto a series (use APPEND)."
         ]
     ] else [
         append/only base :value

@@ -90,9 +90,9 @@ bool Do_Breakpoint_Throws(
         return false;  // no throw, run normally (but now, hooked)
     }
 
-    // If we get an @( ) back, that's a request to run the code outside of
+    // If we get an ^( ) back, that's a request to run the code outside of
     // the console's sandbox and return its result.  It's possible to use
-    // quoting to return simple values, like @('x)
+    // quoting to return simple values, like ^('x)
 
     assert(IS_SYM_GROUP(inst));
 

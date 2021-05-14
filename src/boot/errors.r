@@ -77,7 +77,7 @@ Syntax: [
 
 Script: [
     no-value:           [:arg1 {has no value}]
-    bad-word-get:       [:arg1 {is plain} :arg2 {(see @(..) and GET/ANY)}]
+    bad-word-get:       [:arg1 {is plain} :arg2 {(see ^^(...) and GET/ANY)}]
     need-non-null:      [:arg1 {needs a value, can't be null}]
     need-non-end:       [{end was reached while trying to set} :arg1]
     not-bound:          [:arg1 {word is not bound to a context}]
@@ -109,7 +109,7 @@ Script: [
 
     sequence-too-short: {ANY-PATH! and ANY-TUPLE! must have more than 2 items}
     bad-sequence-item:  [{Value is not a valid ANY-SEQUENCE! element:} :arg1]
-    cant-decorate-type: [{Cannot apply `:` or `@` decoration to:} :arg1]
+    cant-decorate-type: [{Cannot apply `:` or `^` decoration to:} :arg1]
 
     action-with-dotted: {ACTION! used with dotted sequence access form}
     inert-with-slashed: {ANY-INERT! used with slashed sequence access form}

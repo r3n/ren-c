@@ -235,7 +235,7 @@ void MF_Get_word(REB_MOLD *mo, REBCEL(const*) v, bool form) {
 //
 void MF_Sym_word(REB_MOLD *mo, REBCEL(const*) v, bool form) {
     UNUSED(form);
-    Append_Codepoint(mo->series, '@');
+    Append_Codepoint(mo->series, '^');
     Mold_Word(mo, v);
 }
 

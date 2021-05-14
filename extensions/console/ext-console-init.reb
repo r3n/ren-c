@@ -116,7 +116,7 @@ console!: make object! [
 
     print-result: meth [
         return: <none>
-        @v "Value (done with literal parameter to discern isotope status)"
+        ^v "Value (done with literal parameter to discern isotope status)"
             [<opt> any-value!]
     ] [
         last-result: unquote v  ; preserves isotope status of void (not null)
@@ -175,7 +175,7 @@ console!: make object! [
             ;     == ~something~  ; unfriendly
             ;
             ; The "unnatural" aspect only happens when you access them without
-            ; using GET/ANY or literalize them with @x:
+            ; using GET/ANY or literalize them with ^x:
             ;
             ;     >> x
             ;     ** Error: x is the unfriendly form of ~something~
@@ -210,7 +210,7 @@ console!: make object! [
 
         if v = (just ') [
             ;
-            ; If the @ processed a value into a *quoted* NULL, that indicates
+            ; If the ^ processed a value into a *quoted* NULL, that indicates
             ; the "heavy" isotope of NULL.  This is a transient state that only
             ; a literal parameter's quoting allows us to see.  But it's good
             ; for console users to be aware of the distinction.
@@ -219,14 +219,14 @@ console!: make object! [
             return
         ]
 
-        === ORDNARY RETURN VALUES (@ parameter convention passes as quoted) ===
+        === ORDNARY RETURN VALUES (^ parameter convention passes as quoted) ===
 
         v: unquote v  ; Now handle everything else
 
         case [
             bad-word? :v [
                 ;
-                ; If the @ processed a value into a ~quoted~ BAD-WORD!, that's
+                ; If the ^ processed a value into a ~quoted~ BAD-WORD!, that's
                 ; another "isotope" form.  These are friendlier than plain bad
                 ; words and can be accessed without triggering an error.  To
                 ; help build the intuition about the difference, label them.
@@ -475,14 +475,14 @@ ext-console-impl: func [
     ][
         switch type of item [
             issue! [
-                if not empty? instruction [append/line instruction @ ',]
+                if not empty? instruction [append/line instruction [,]]
                 insert instruction item
             ]
             text! [
                 append/line instruction compose [comment (item)]
             ]
             block! [
-                if not empty? instruction [append/line instruction @ ',]
+                if not empty? instruction [append/line instruction [,]]
                 append/line instruction compose/deep <*> item
             ]
             fail

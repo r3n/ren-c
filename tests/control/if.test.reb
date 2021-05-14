@@ -12,7 +12,7 @@
 (1 = if true [1])
 
 (null? if false [])
-('~void~ = @ if true [])
+('~void~ = ^ if true [])
 
 (error? if true [trap [1 / 0]])
 ; RETURN stops the evaluation
@@ -126,16 +126,16 @@
 ; Lit-Branching
 (
     j: 304
-    304 = if true @j
+    304 = if true ^j
 )(
     o: make object! [b: 1020]
-    1020 = if true @o/b
+    1020 = if true ^o/b
 )(
     var: <something>
     did all [
-        null? if false @(var: <something-else> [1000 + 20])
+        null? if false ^(var: <something-else> [1000 + 20])
         var = <something>
-        1020 = if true @(var: <something-else> [1000 + 20])
+        1020 = if true ^(var: <something-else> [1000 + 20])
         var = <something-else>
     ]
 )

@@ -77,9 +77,9 @@
     ([a b c :[d e]] = append [a b c] ':[d e])
     ([a b c :(d e)] = append [a b c] ':(d e))
     ([a b c :d/e] = append [a b c] ':d/e)
-    ([a b c @[d e]] = append [a b c] '@[d e])
-    ([a b c @(d e)] = append [a b c] '@(d e))
-    ([a b c @d/e] = append [a b c] '@d/e)
+    ([a b c ^[d e]] = append [a b c] '^[d e])
+    ([a b c ^(d e)] = append [a b c] '^(d e))
+    ([a b c ^d/e] = append [a b c] '^d/e)
 
     ; To efficiently make a new cell that acts as a block while not making
     ; a new allocation to do so, we can use AS.  This saves on the creation
@@ -95,9 +95,9 @@
     ([a b c d e] = append [a b c] as block! ':[d e])
     ([a b c d e] = append [a b c] as block! ':(d e))
     ([a b c d e] = append [a b c] as block! ':d/e)
-    ([a b c d e] = append [a b c] as block! '@[d e])
-    ([a b c d e] = append [a b c] as block! '@(d e))
-    ([a b c d e] = append [a b c] as block! '@d/e)
+    ([a b c d e] = append [a b c] as block! '^[d e])
+    ([a b c d e] = append [a b c] as block! '^(d e))
+    ([a b c d e] = append [a b c] as block! '^d/e)
 
     ; Classic way of subverting splicing is use of APPEND/ONLY
     ;
@@ -110,9 +110,9 @@
     ([a b c :[d e]] = append/only [a b c] ':[d e])
     ([a b c :(d e)] = append/only [a b c] ':(d e))
     ([a b c :d/e] = append/only [a b c] ':d/e)
-    ([a b c @[d e]] = append/only [a b c] '@[d e])
-    ([a b c @(d e)] = append/only [a b c] '@(d e))
-    ([a b c @d/e] = append/only [a b c] '@d/e)
+    ([a b c ^[d e]] = append/only [a b c] '^[d e])
+    ([a b c ^(d e)] = append/only [a b c] '^(d e))
+    ([a b c ^d/e] = append/only [a b c] '^d/e)
 
     ; Blockify test...should be a no-op
     ;
@@ -125,9 +125,9 @@
     ([a b c :[d e]] = append [a b c] blockify ':[d e])
     ([a b c :(d e)] = append [a b c] blockify ':(d e))
     ([a b c :d/e] = append [a b c] blockify ':d/e)
-    ([a b c @[d e]] = append [a b c] blockify '@[d e])
-    ([a b c @(d e)] = append [a b c] blockify '@(d e))
-    ([a b c @d/e] = append [a b c] blockify '@d/e)
+    ([a b c ^[d e]] = append [a b c] blockify '^[d e])
+    ([a b c ^(d e)] = append [a b c] blockify '^(d e))
+    ([a b c ^d/e] = append [a b c] blockify '^d/e)
 
     ; Enblock test...this offers a cheap way to put the "don't splice"
     ; instruction onto the value itself.
@@ -141,18 +141,18 @@
     ([a b c :[d e]] = append [a b c] enblock ':[d e])
     ([a b c :(d e)] = append [a b c] enblock ':(d e))
     ([a b c :d/e] = append [a b c] enblock ':d/e)
-    ([a b c @[d e]] = append [a b c] enblock '@[d e])
-    ([a b c @(d e)] = append [a b c] enblock '@(d e))
-    ([a b c @d/e] = append [a b c] enblock '@d/e)
+    ([a b c ^[d e]] = append [a b c] enblock '^[d e])
+    ([a b c ^(d e)] = append [a b c] enblock '^(d e))
+    ([a b c ^d/e] = append [a b c] enblock '^d/e)
 ]
 
 ; New idea: By default, a QUOTED! passed to APPEND will act as APPEND/ONLY.
 [
-    ([a b c [d e]] = append [a b c] @[d e])
+    ([a b c [d e]] = append [a b c] ^[d e])
 
-    ([a b c [3 d e]] = append [a b c] @ compose [(1 + 2) d e])
+    ([a b c [3 d e]] = append [a b c] ^ compose [(1 + 2) d e])
 
-    ([a b c] = append [a b c] @(null))
+    ([a b c] = append [a b c] ^(null))
 ]
 
 [#2383 (

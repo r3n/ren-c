@@ -17,7 +17,7 @@
 (null = match :even? 3)
 
 
-('~falsey~ = @ match blank! _)
+('~falsey~ = ^ match blank! _)
 (null = match blank! 10)
 (null = match blank! false)
 
@@ -65,10 +65,10 @@
 ; But can still be tested for then? since they are BAD-WORD!, and can be used
 ; with THEN and ELSE.
 [
-    ('~falsey~ = @ match null null)
-    ('~falsey~ = @ match blank! blank)
+    ('~falsey~ = ^ match null null)
+    ('~falsey~ = ^ match blank! blank)
     (true = match logic! true)
-    ('~falsey~ = @ match logic! false)
+    ('~falsey~ = ^ match logic! false)
 ]
 
 [
@@ -146,12 +146,12 @@
                 if action? get test [
                     f: make frame! args
                     first-arg: get in f first parameters of action of f
-                    return ((match true do f) then @first-arg)
+                    return ((match true do f) then ^first-arg)
                 ]
             ]
         ]
 
-        match :(take args) (take args-normal) else @null
+        match :(take args) (take args-normal) else ^null
     ]
     true)
 

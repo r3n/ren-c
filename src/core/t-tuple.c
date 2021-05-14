@@ -465,7 +465,7 @@ void MF_Sequence(REB_MOLD *mo, REBCEL(const*) v, bool form)
     if (kind == REB_GET_PATH or kind == REB_GET_TUPLE)
         Append_Codepoint(mo->series, ':');
     else if (kind == REB_SYM_PATH or kind == REB_SYM_TUPLE)
-        Append_Codepoint(mo->series, '@');
+        Append_Codepoint(mo->series, '^');
 
     bool first = true;
 

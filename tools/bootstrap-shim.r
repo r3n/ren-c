@@ -100,7 +100,7 @@ trap [
                 blank? :value [null]
                 block? :value [:value]
                 match any-inert! :value [:value]
-                fail 'value ["APPEND takes block, blank, ANY-INERT!"]
+                fail ^value ["APPEND takes block, blank, ANY-INERT!"]
             ]
         ]
 
@@ -110,7 +110,7 @@ trap [
                 blank? :value [null]
                 block? :value [:value]
                 match any-inert! :value [:value]
-                fail 'value ["INSERT takes block, blank, ANY-INERT!"]
+                fail ^value ["INSERT takes block, blank, ANY-INERT!"]
             ]
         ]
 
@@ -120,7 +120,7 @@ trap [
                 blank? :value [null]
                 block? :value [:value]
                 match any-inert! :value [:value]
-                fail 'value ["CHANGE takes block, blank, ANY-INERT!"]
+                fail ^value ["CHANGE takes block, blank, ANY-INERT!"]
             ]
         ]
 
@@ -411,7 +411,7 @@ function: adapt :function [set [spec body] modernize-action spec body]
 
 meth: enfixed adapt :meth [set [spec body] modernize-action spec body]
 method: func [/dummy] [
-    fail 'dummy "METHOD deprecated temporarily, use METH"
+    fail ^dummy "METHOD deprecated temporarily, use METH"
 ]
 
 trim: adapt :trim [  ; there's a bug in TRIM/AUTO in 8994d23

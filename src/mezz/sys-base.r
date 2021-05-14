@@ -78,7 +78,7 @@ do*: func [
     let original-script: _
 
     let finalizer: func [
-        @value' [<opt> any-value!]
+        ^value' [<opt> any-value!]
         /quit
         <with> return
     ][

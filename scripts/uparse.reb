@@ -93,7 +93,7 @@ combinator: func [
             let state: f.state
             let remainder: f.remainder
 
-            let result': @(devoid do f)
+            let result': ^(devoid do f)
             if state.verbose [
                 print ["RESULT:" (friendly get/any 'result') else ["; null"]]
             ]
@@ -174,7 +174,7 @@ default-combinators: make map! reduce [
         parser [action!]
         <local> result'
     ][
-        ([result' (remainder)]: @ parser input) then [
+        ([result' (remainder)]: ^ parser input) then [
             return unquote result'  ; return successful parser result
         ]
         set remainder input  ; on parser failure, make OPT remainder input
@@ -200,7 +200,7 @@ default-combinators: make map! reduce [
             [<opt> bad-word!]
         parser [action!]
     ][
-        ([# (remainder)]: @ parser input) then [  ; don't care about result
+        ([# (remainder)]: ^ parser input) then [  ; don't care about result
             return null
         ]
         set remainder input  ; parser failed, so NOT reports success
@@ -214,7 +214,7 @@ default-combinators: make map! reduce [
         parser [action!]
         <local> result'
     ][
-        ([result' #]: @ parser input) then [  ; don't care about remainder
+        ([result' #]: ^ parser input) then [  ; don't care about remainder
             return unquote result'
         ]
         return null
@@ -227,7 +227,7 @@ default-combinators: make map! reduce [
         parser [action!]
         <local> result' pos
     ][
-        ([result' pos]: @ parser input) else [
+        ([result' pos]: ^ parser input) else [
             return null  ; the parse rule did not match
         ]
         if '~void~ = result' [
@@ -259,7 +259,7 @@ default-combinators: make map! reduce [
     ][
         last-result': just '  ; quoted null as return value (unquote => null-2)
         cycle [
-            ([result' pos]: @ parser input) else [
+            ([result' pos]: ^ parser input) else [
                 set remainder input  ; overall WHILE never fails (but REJECT?)
                 return unquote last-result'
             ]
@@ -276,11 +276,11 @@ default-combinators: make map! reduce [
         parser [action!]
         <local> last-result' result' pos
     ][
-        ([last-result' input]: @ parser input) else [
+        ([last-result' input]: ^ parser input) else [
             return null
         ]
         cycle [  ; if first try succeeds, flip to same code as WHILE
-            ([result' pos]: @ parser input) else [
+            ([result' pos]: ^ parser input) else [
                 set remainder input
                 return unquote last-result'
             ]
@@ -303,7 +303,7 @@ default-combinators: make map! reduce [
             ; via a multi-return?  Can PARSE rules have multi-returns?  If
             ; so, then advanced would likely have to be done another way.  :-/
             ;
-            ([# pos]: @ parser input) else [
+            ([# pos]: ^ parser input) else [
                 set remainder input
                 return count
             ]
@@ -334,11 +334,11 @@ default-combinators: make map! reduce [
         replacer [action!]  ; !!! How to say result is used here?
         <local> replacement'
     ][
-        ([# (remainder)]: @ parser input) else [  ; first find end position
+        ([# (remainder)]: ^ parser input) else [  ; first find end position
             return null
         ]
 
-        ([replacement' #]: @ replacer input) else [
+        ([replacement' #]: ^ replacer input) else [
             return null
         ]
 
@@ -360,7 +360,7 @@ default-combinators: make map! reduce [
             [<opt> bad-word!]
         parser [action!]
     ][
-        ([# (remainder)]: @ parser input) else [  ; first find end position
+        ([# (remainder)]: ^ parser input) else [  ; first find end position
             return null
         ]
 
@@ -375,7 +375,7 @@ default-combinators: make map! reduce [
         parser [action!]
         <local> insertion'
     ][
-        ([insertion #]: @ parser input) else [  ; remainder ignored
+        ([insertion #]: ^ parser input) else [  ; remainder ignored
             return null
         ]
 
@@ -400,7 +400,7 @@ default-combinators: make map! reduce [
         <local> result'
     ][
         cycle [
-            ([result' #]: @ parser input) then [
+            ([result' #]: ^ parser input) then [
                 set remainder input  ; TO means do not include match range
                 return unquote result'
             ]
@@ -420,7 +420,7 @@ default-combinators: make map! reduce [
         <local> result' pos
     ][
         cycle [
-            ([result' pos]: @ parser input) then [
+            ([result' pos]: ^ parser input) then [
                 set remainder pos
                 return unquote result'
             ]
@@ -447,7 +447,7 @@ default-combinators: make map! reduce [
         parser [action!]
         <local> where
     ][
-        ([where (remainder)]: @ parser input) else [
+        ([where (remainder)]: ^ parser input) else [
             return null
         ]
         if '~void~ = where [
@@ -476,13 +476,13 @@ default-combinators: make map! reduce [
         parser-right [action!]
         <local> start
     ][
-        ([# start]: @ parser-left input) else [
+        ([# start]: ^ parser-left input) else [
             return null
         ]
 
         let limit: start
         cycle [
-            ([# (remainder)]: @ parser-right limit) then [  ; found it
+            ([# (remainder)]: ^ parser-right limit) then [  ; found it
                 return copy/part start limit
             ]
             if tail? limit [  ; remainder is null
@@ -529,7 +529,7 @@ default-combinators: make map! reduce [
             [<opt> any-series!]
         parser [action!]
     ][
-        ([# (remainder)]: @ parser input) then [
+        ([# (remainder)]: ^ parser input) then [
             return copy/part input get remainder
         ]
         return null
@@ -574,7 +574,7 @@ default-combinators: make map! reduce [
         subparser [action!]
         <local> subseries result
     ][
-        ([subseries (remainder)]: @ parser input) else [
+        ([subseries (remainder)]: ^ parser input) else [
             ;
             ; If the parser in the first argument can't get a value to subparse
             ; then we don't process it.
@@ -591,7 +591,7 @@ default-combinators: make map! reduce [
 
         assert [quoted? subseries]  ; no true null unless failure
 
-        ; We don't just unquote the literalizing quote from @ that's on the
+        ; We don't just unquote the literalizing quote from ^ that's on the
         ; value (which would indicate a plain series).  We dequote fully...so
         ; we can parse INTO an arbitrarily quoted series.
         ;
@@ -636,7 +636,7 @@ default-combinators: make map! reduce [
         ]
 
         let collect-base: tail state.collecting
-        ([# (remainder)]: @ parser input) else [
+        ([# (remainder)]: ^ parser input) else [
             ;
             ; Although the block rules roll back, COLLECT might be used with
             ; other combinators that run more than one rule...and one rule
@@ -660,11 +660,11 @@ default-combinators: make map! reduce [
         if not state.collecting [
             fail "UPARSE cannot KEEP with no COLLECT rule in effect"
         ]
-        ([result' (remainder)]: @ parser input) else [
+        ([result' (remainder)]: ^ parser input) else [
             return null
         ]
         if bad-word? result' [
-            fail ["Cannot KEEP a non-isotope BAD-WORD!:" @result']
+            fail ["Cannot KEEP a non-isotope BAD-WORD!:" ^result']
         ]
         assert [quoted? result']  ; true null if and only if parser failed
         append/(if only ['only]) state.collecting unquote result'
@@ -700,7 +700,7 @@ default-combinators: make map! reduce [
         ]
 
         let gather-base: tail state.gathering
-        ([# (remainder)]: @ parser input) else [
+        ([# (remainder)]: ^ parser input) else [
             ;
             ; Although the block rules roll back, GATHER might be used with
             ; other combinators that run more than one rule...and one rule
@@ -737,7 +737,7 @@ default-combinators: make map! reduce [
             state.gathering: make block! 10
         ]
 
-        ([result' (remainder)]: @ parser input) else [
+        ([result' (remainder)]: ^ parser input) else [
             return null
         ]
 
@@ -745,12 +745,12 @@ default-combinators: make map! reduce [
             fail "Cannot emit an invisible result"
         ]
 
-        ; The value is quoted because of @ on @(parser input).  This lets us
+        ; The value is quoted because of ^ on ^(parser input).  This lets us
         ; emit null fields.
         ;
         assert [quoted? result']  ; should be light null if and only if failed
-        append state.gathering @target
-        append state.gathering @result'
+        append state.gathering ^target
+        append state.gathering ^result'
         return unquote result'
     ]
 
@@ -768,7 +768,7 @@ default-combinators: make map! reduce [
         parser [action!]
         <local> result'
     ][
-        ([result' (remainder)]: @ parser input) else [
+        ([result' (remainder)]: ^ parser input) else [
             ;
             ; A failed rule leaves the set target word at whatever value it
             ; was before the set.
@@ -777,7 +777,7 @@ default-combinators: make map! reduce [
         ]
 
         if '~void~ = result' [
-            fail "Can't assign invisible synthesized rule result, use @[...]"
+            fail "Can't assign invisible synthesized rule result, use ^[...]"
         ]
 
         assert [quoted? result']
@@ -978,7 +978,7 @@ default-combinators: make map! reduce [
         ;     >> uparse "" [' (1020)]
         ;     == 1020
         ;
-        ; Arguably there is a null match at every position.  An @null might
+        ; Arguably there is a null match at every position.  An ^null might
         ; also be chosen to match)...while NULL rules do not.
         ;
         if :input.1 = unquote value [
@@ -1024,7 +1024,7 @@ default-combinators: make map! reduce [
     ][
         result': quote null  ; !!! should `0 skip` resolve to ' like this?
         loop value [
-            ([result' input]: @ parser input) else [
+            ([result' input]: ^ parser input) else [
                 return null
             ]
         ]
@@ -1066,7 +1066,7 @@ default-combinators: make map! reduce [
             return input.1
         ][
             any [
-                [item (remainder) @error]: transcode input
+                [item (remainder) ^error]: transcode input
                 value != type of :item
             ] then [
                 return null
@@ -1089,7 +1089,7 @@ default-combinators: make map! reduce [
             return input.1
         ][
             any [
-                [item (remainder) @error]: transcode input
+                [item (remainder) ^error]: transcode input
                 not find value (type of :item)
             ] then [
                 return null
@@ -1104,7 +1104,7 @@ default-combinators: make map! reduce [
     ; to be used literally as the thing matched.
     ;
     ;    x: [some rule]
-    ;    uparse [[some rule] [some rule]] [some @x]
+    ;    uparse [[some rule] [some rule]] [some ^x]
     ;
     ; The behavior is basically as if you had tried to match the thing quoted.
     ;
@@ -1160,13 +1160,13 @@ default-combinators: make map! reduce [
         value: as block! value
         parser: :(state.combinators)/(block!)
 
-        ([result' (remainder)]: @ parser state input value) else [
+        ([result' (remainder)]: ^ parser state input value) else [
             return null
         ]
 
-        ; Typically when you use the @ convention to invoke a function, you
+        ; Typically when you use the ^ convention to invoke a function, you
         ; would `return unquote` it.  But since this combinator wants to add
-        ; the semantics of @ to plain BLOCK!'s combinator, it achieves that
+        ; the semantics of ^ to plain BLOCK!'s combinator, it achieves that
         ; by simply not unquoting when it returns the literalized result.
         ;
         return result'
@@ -1188,7 +1188,7 @@ default-combinators: make map! reduce [
             [<invisible> <opt>]
         parser [action!]
     ][
-        ([# (remainder)]: @ parser input) else [
+        ([# (remainder)]: ^ parser input) else [
             return null
         ]
         return
@@ -1306,7 +1306,7 @@ default-combinators: make map! reduce [
             f.input: pos
             f.remainder: 'pos
 
-            @(do f) then temp -> [
+            ^(do f) then temp -> [
                 if '~void~ != temp  [  ; overwrite if was visible
                     result': temp
                 ]
@@ -1602,7 +1602,7 @@ uparse*: func [
     f.value: rules
     f.remainder: let pos
 
-    let synthesized': @(devoid do f) else [
+    let synthesized': ^(devoid do f) else [
         return null  ; match failure (as opposed to success, w/null result)
     ]
 
@@ -1627,10 +1627,10 @@ uparse: comment [redescribe [  ; redescribe not working at te moment (?)
 
         let synthesized'
         if auto-gather [
-            f.rules: compose [gather synthesized': @(f.rules)]
+            f.rules: compose [gather synthesized': ^(f.rules)]
         ]
 
-        let result': @(do f) else [
+        let result': ^(do f) else [
             return null  ; if f.rules failed to match, or end not reached
         ]
 
@@ -1695,7 +1695,7 @@ append redbol-combinators reduce [
     ][
         cycle [
             any [
-                else? ([# pos]: @ parser input)  ; failed rule => not success
+                else? ([# pos]: ^ parser input)  ; failed rule => not success
                 same? pos input  ; no progress => stop successfully
             ] then [
                 set remainder input
@@ -1713,7 +1713,7 @@ append redbol-combinators reduce [
         <local> pos
     ][
         any [
-            else? ([# pos]: @ parser input)  ; failed first => stop, not success
+            else? ([# pos]: ^ parser input)  ; failed first => stop, not success
             same? pos input  ; no progress first => stop, not success
         ] then [
             return null
@@ -1721,7 +1721,7 @@ append redbol-combinators reduce [
         input: pos  ; any future failings won't fail the overall rule
         cycle [
             any [
-                else? ([# pos]: @ parser input)  ; no match => stop, not success
+                else? ([# pos]: ^ parser input)  ; no match => stop, not success
                 same? pos input  ; no progress => stop successfully
             ] then [
                 set remainder input
@@ -1754,7 +1754,7 @@ append redbol-combinators reduce [
         'target [word! set-word!]
         parser [action!]
     ][
-        if else? ([# (remainder)]: @ parser input) [
+        if else? ([# (remainder)]: ^ parser input) [
             return null
         ]
         set target copy/part input get remainder
@@ -1769,7 +1769,7 @@ append redbol-combinators reduce [
         parser [action!]
         <local> pos
     ][
-        if else? ([# (remainder)]: @ parser input) [
+        if else? ([# (remainder)]: ^ parser input) [
             return null
         ]
         if same? (get remainder) input [  ; no advancement gives NONE

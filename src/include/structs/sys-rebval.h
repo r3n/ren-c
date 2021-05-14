@@ -171,7 +171,7 @@
 //
 // !!! Thought: Could FRAME! use this bit to encode when the frame is actually
 // a frame for the IDENTITY, and the value is just something that came from
-// `make frame! @ 10` or similar?  It would weave a bit of a tangled web for
+// `make frame! ^ 10` or similar?  It would weave a bit of a tangled web for
 // things like `action of f` for such frames.  Still might be worth it to
 // lie, and that way you could make ACTION!s and FRAME!s which were really
 // just QUOTED!s under the hood.

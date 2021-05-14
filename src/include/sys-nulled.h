@@ -70,7 +70,7 @@ inline static REBVAL *Init_Nulled_Core(RELVAL *out) {
 // The ultimate solution to this was to introduce a slight variant of NULL
 // which would be short-lived (e.g. "decay" to a normal NULL) but carry the
 // additional information that it was an intended branch result.  This
-// seemed sketchy at first, but with @(...) acting as a "detector" for those
+// seemed sketchy at first, but with ^(...) acting as a "detector" for those
 // who need to know the difference, it has become a holisic solution for
 //
 // The "decay" of NULL isotopes occurs on variable retrieval.  Hence:
@@ -89,7 +89,7 @@ inline static REBVAL *Init_Nulled_Core(RELVAL *out) {
 //
 // As with the natural concept of radiation, working with NULL isotopes can
 // be tricky, and should be avoided by code that doesn't need to do it.  (But
-// it has actually gotten much easier with @(...) behaviors.)
+// it has actually gotten much easier with ^(...) behaviors.)
 //
 
 inline static REBVAL *Init_Heavy_Nulled(RELVAL *out) {

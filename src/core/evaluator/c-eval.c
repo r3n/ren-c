@@ -861,8 +861,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         //    >> 10 (comment "hi")
         //    == 10
         //
-        //    >> 10 @(comment "hi")
-        //    == ~void~
+        //    >> 10 ^(comment "hi")
+        //    == ~stale~
         //
         // We thus need to signal staleness in the SYM-GROUP! case.
         //
@@ -891,7 +891,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             if (STATE_BYTE(f) == ST_EVALUATOR_SYM_GROUP) {
                 //
                 // The SYM_GROUP! is a contained evaluation that never acts
-                // invisible, e.g. @(comment "hi") is ~void~.  That's the
+                // invisible, e.g. ^(comment "hi") is ~void~.  That's the
                 // value...so there's no need to keep feeding for one.
                 //
                 Literalize(f->out);
@@ -1302,7 +1302,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             }
             else if (Is_Blackhole(item)) {
                 //
-                // !!! If someone writes `[... @(#) ...]: ...`, then there is
+                // !!! If someone writes `[... ^(#) ...]: ...`, then there is
                 // a problem if it's not the first slot; as the function needs
                 // a variable location to write the result to.  For now, just
                 // fabricate a LET variable.
@@ -1334,11 +1334,11 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
         bool literalize = false;
 
-        // !!! There is not currently support for `[x]: @(do/vanishable code)`
+        // !!! There is not currently support for `[x]: ^(do/vanishable code)`
         // due to the problems of multi-return and groups...which should be
         // addressed at least for common cases by tolerating GROUP!s that do
         // not contain more than one evaluation.  It's easier for the moment
-        // to handle the case of `([x]: @ do/vanishable code)` because it stays
+        // to handle the case of `([x]: ^ devoid do code)` because it stays
         // in the same feed.
         //
         if (IS_LIT(f_next)) {
@@ -1440,7 +1440,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     //
     // Just produces a quoted version of the block it is given:
     //
-    //    >> @[a b c]
+    //    >> ^[a b c]
     //    == '[a b c]
     //
 

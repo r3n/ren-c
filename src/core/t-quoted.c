@@ -242,7 +242,7 @@ REBNATIVE(unquote)
 // would usually be an error-inducing stable bad word.  This was introduced as
 // a way around a situation like this:
 //
-//     result: @(some expression)  ; NULL -> NULL, NULL-2 -> '
+//     result: ^(some expression)  ; NULL -> NULL, NULL-2 -> '
 //     do compose [
 //         detect-isotope unquote (
 //              match bad-word! result else [
@@ -254,7 +254,7 @@ REBNATIVE(unquote)
 // DETECT-ISOTOPE wants to avoid forcing its caller to use a quoted argument
 // calling convention.  Yet it still wants to know if its argument is a NULL-2
 // vs. a NULL, or a stable BAD-WORD! vs. an isotope BAD-WORD!.  That's what
-// @literal arguments are for...but it runs up against a wall when forced to
+// ^literal arguments are for...but it runs up against a wall when forced to
 // run from code hardened into a BLOCK!.
 //
 // This could go another route with an added operation, something along the
@@ -268,9 +268,9 @@ REBNATIVE(unquote)
 {
     INCLUDE_PARAMS_OF_UNQUOTE;
 
-    REBVAL *v = Unliteralize(ARG(value));  // remove @value quoting level
+    REBVAL *v = Unliteralize(ARG(value));  // remove ^value quoting level
 
-    // Critical to the design of literalization is that @(null) => null, and
+    // Critical to the design of literalization is that ^(null) => null, and
     // not ' (if you want ' then use QUOTE instead).  And critical to reversing
     // that is that UNQUOTE NULL => NULL
     //
@@ -294,7 +294,7 @@ REBNATIVE(unquote)
 
     Unquotify(Copy_Cell(D_OUT, v), depth);
 
-    // One of the big tools of the quoting with @(...) is that it's possible
+    // One of the big tools of the quoting with ^(...) is that it's possible
     // to detect the isotope forms.  UNQUOTE should make sure an input quoted
     // form comes back as an isotope.
     //
@@ -349,7 +349,7 @@ void MF_Lit(REB_MOLD *mo, REBCEL(const*) v, bool form)
     UNUSED(form);
     UNUSED(v);
 
-    Append_Codepoint(mo->series, '@');
+    Append_Codepoint(mo->series, '^');
 }
 
 
@@ -357,7 +357,7 @@ void MF_Lit(REB_MOLD *mo, REBCEL(const*) v, bool form)
 //  CT_Lit: C
 //
 // Must have a comparison function, otherwise SORT would not work on arrays
-// with @ in them.
+// with ^ in them.
 //
 REBINT CT_Lit(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
@@ -365,7 +365,7 @@ REBINT CT_Lit(REBCEL(const*) a, REBCEL(const*) b, bool strict)
     UNUSED(a);
     UNUSED(b);
 
-    return 0;  // All @ are equal
+    return 0;  // All ^ are equal
 }
 
 
@@ -398,7 +398,7 @@ REBTYPE(Lit)
         }
         break; }
 
-      case SYM_COPY: { // since `copy/deep [1 @ 2]` is legal, allow `copy @`
+      case SYM_COPY: { // since `copy/deep [1 ^ 2]` is legal, allow `copy ^`
         INCLUDE_PARAMS_OF_COPY;
         UNUSED(ARG(value));
 

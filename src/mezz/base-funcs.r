@@ -46,7 +46,7 @@ maybe: enfixed func* [
         ; While DEFAULT requires a BLOCK!, MAYBE does not.  Catch mistakes
         ; such as `x: maybe [...]`
         ;
-        fail @optional [
+        fail ^optional [
             "Literal" type of :optional "used w/MAYBE, use () if intentional"
         ]
     ]
@@ -141,29 +141,29 @@ func: func* [
     |
         :(if var '[  ; so long as we haven't reached any <local> or <with> etc.
             set var: [any-word! | any-path! | quoted!] (
-                append new-spec @var  ; need quote level as-is in new spec
+                append new-spec ^var  ; need quote level as-is in new spec
 
                 var: dequote var
                 case [
                     match [get-path! path!] var [
                         if (length of var != 2) or (_ <> first var) [
-                            fail ["Bad path in spec:" @var]
+                            fail ["Bad path in spec:" ^var]
                         ]
-                        append exclusions @var.2  ; exclude args/refines
+                        append exclusions ^var.2  ; exclude args/refines
                     ]
 
                     any-word? var [
-                        append exclusions @var  ; exclude args/refines
+                        append exclusions ^var  ; exclude args/refines
                     ]
 
                     true [  ; QUOTED! could have been anything
-                        fail ["Bad spec item" @var]
+                        fail ["Bad spec item" ^var]
                     ]
                 ]
             )
             |
             set other: block! (
-                append new-spec @other  ; data type blocks
+                append new-spec ^other  ; data type blocks
             )
             |
             copy other some text! (
@@ -174,8 +174,8 @@ func: func* [
         ])
     |
         set loc: tuple! (  ; locals legal anywhere
-            append exclusions @ to word! loc
-            append new-spec @loc
+            append exclusions ^ to word! loc
+            append new-spec ^loc
         )
     |
         other: here
@@ -198,8 +198,8 @@ func: func* [
     |
         <local>
         while [set var: word! set other: opt group! (
-            append new-spec @ to tuple! var
-            append exclusions @var
+            append new-spec ^ to tuple! var
+            append exclusions ^var
             if other [
                 defaulters: default [copy []]
                 append defaulters compose [  ; always sets
@@ -219,14 +219,14 @@ func: func* [
                 if not object? other [other: ensure any-context! get other]
                 bind new-body other
                 for-each [key val] other [
-                    append exclusions @key
+                    append exclusions ^key
                 ]
             )
         ]
     |
         <with> while [
             set other: [word! | path!] (
-                append exclusions @other
+                append exclusions ^other
 
                 ; Definitional returns need to be signaled even if FUNC, so
                 ; the FUNC* doesn't automatically generate one.
@@ -245,7 +245,7 @@ func: func* [
         )
         while [
             set var: word! (other: _) opt set other: group! (
-                append exclusions @var
+                append exclusions ^var
                 append statics compose [
                     (as set-word! var) ((other))
                 ]
@@ -256,12 +256,11 @@ func: func* [
         end accept
     |
         other: here (
-            print mold @other/1
             fail [
                 ; <where> spec
                 ; <near> other
-                "Invalid spec item:" (mold @other.1)
-                "in spec" @spec
+                "Invalid spec item:" (mold ^other.1)
+                "in spec" ^spec
             ]
         )
     ]]
@@ -282,7 +281,7 @@ func: func* [
     ; COLLECT-WORDS interface to efficiently give this result.
     ;
     for-each loc locals [
-        append new-spec @ to tuple! loc
+        append new-spec ^ to tuple! loc
     ]
 
     append new-spec try with-return  ; if FUNC* suppresses return generation
@@ -295,7 +294,7 @@ func: func* [
     if const? body [new-body: const new-body]
 
     func* new-spec either defaulters [
-        append defaulters @ as group! any [new-body body]
+        append defaulters ^ as group! any [new-body body]
     ][
         any [new-body body]
     ]
@@ -526,7 +525,7 @@ so: enfixed func [
     feed [<opt> <end> any-value! <variadic>]
 ][
     if not condition [
-        fail @condition make error! [
+        fail ^condition make error! [
             type: 'Script
             id: 'assertion-failure
             arg1: compose [((:condition)) so]
@@ -556,7 +555,7 @@ matched: enfixed redescribe [
         let value: :f/value  ; returned value
 
         if not do f [
-            fail @f make error! [
+            fail ^f make error! [
                 type: 'Script
                 id: 'assertion-failure
                 arg1: compose [(:value) matches (:test)]
@@ -576,7 +575,7 @@ was: enfixed redescribe [
 ](
     func [left [<opt> any-value!] right [<opt> any-value!]] [
         if :left != :right [
-            fail @return make error! [
+            fail ^return make error! [
                 type: 'Script
                 id: 'assertion-failure
                 arg1: compose [(:left) is (:right)]
@@ -666,7 +665,7 @@ find-last: redescribe [
 ](
     adapt :find-reverse [
         if not any-series? series [
-            fail @series "Can only use FIND-LAST on ANY-SERIES!"
+            fail ^series "Can only use FIND-LAST on ANY-SERIES!"
         ]
 
         series: tail of series  ; can't use plain TAIL due to /TAIL refinement

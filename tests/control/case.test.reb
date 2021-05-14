@@ -23,7 +23,7 @@
     heavy-null? case [true [null]]  ; NULL-2 indicates branch was taken (vs. null)
 )
 (
-    '~void~ = @ case [true []]
+    '~void~ = ^ case [true []]
 )
 (
     heavy-null? case [
@@ -34,7 +34,7 @@
 [#2246 (
     heavy-null? case [true [null]]
 )(
-    '~void~ = @ case [true []]
+    '~void~ = ^ case [true []]
 )]
 
 (

@@ -57,17 +57,17 @@
 
 ; Conditionals return NULL-1 on failure, and NULL-2 on a branch that executes
 ; and evaluates to either NULL-1 or NULL-2.  If the branch wishes to pass
-; the null "as-is" it should use the @ forms.
+; the null "as-is" it should use the ^ forms.
 [
     (heavy-null? if true [null])
     (heavy-null? if true [heavy null])
-    ('~void~ = @ if true [])
-    ('~custom~ = @ if true [~custom~])
-    (''~custom~ = @ if true ['~custom~])
+    ('~void~ = ^ if true [])
+    ('~custom~ = ^ if true [~custom~])
+    (''~custom~ = ^ if true ['~custom~])
 
-    (null-1? if true @[null])
-    (heavy-null? if true @[heavy null])
-    ('~void~ = @ if true @[])
-    ('~custom~ = @ if true @[~custom~])
-    (''~custom~ = @ if true @['~custom~])
+    (null-1? if true ^[null])
+    (heavy-null? if true ^[heavy null])
+    ('~void~ = ^ if true ^[])
+    ('~custom~ = ^ if true ^[~custom~])
+    (''~custom~ = ^ if true ^['~custom~])
 ]

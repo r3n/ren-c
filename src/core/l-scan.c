@@ -1049,9 +1049,9 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
         ss->end = cp + 1;
         return TOKEN_COLON;
     }
-    if (*cp == '@') {
+    if (*cp == '^') {
         ss->end = cp + 1;
-        return TOKEN_AT;
+        return TOKEN_CARET;
     }
 
     enum Reb_Token token;  // only set if falling through to `scan_word`
@@ -1262,7 +1262,7 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
         if (
             HAS_LEX_FLAG(flags, LEX_SPECIAL_AT)  // @ anywhere but at the head
             and *cp != '<'  // want <foo="@"> to be a TAG!, not an EMAIL!
-            and *cp != '\''  // want '@foo to be a SYM-WORD!
+            and *cp != '\''  // want '@foo to be a ... ?
             and *cp != '#'  // want #@ to be an ISSUE! (charlike)
         ){
             if (*cp == '@')  // consider `@a@b`, `@@`, etc. ambiguous
@@ -1276,8 +1276,8 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
 
         switch (GET_LEX_VALUE(*cp)) {
           case LEX_SPECIAL_AT:  // the case where @ is actually at the head
-            assert(false);  // already taken care of
-            panic ("@ dead end");
+            //assert(false);  // already taken care of
+            fail ("@ dead end");
 
           case LEX_SPECIAL_PERCENT:  // %filename
             if (cp[1] == '%') {  // %% is WORD! exception
@@ -1926,8 +1926,8 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         Init_Comma(DS_PUSH());
         break;
 
-      case TOKEN_AT:
-        assert(*bp == '@');
+      case TOKEN_CARET:
+        assert(*bp == '^');
         if (IS_LEX_ANY_SPACE(*ep) or *ep == ']' or *ep == ')') {
             Init_Lit(DS_PUSH());
             break;
@@ -2688,7 +2688,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                 mutable_HEART_BYTE(DS_TOP) = GETIFY_ANY_PLAIN_KIND(kind);
             break;
 
-          case TOKEN_AT:
+          case TOKEN_CARET:
             mutable_KIND3Q_BYTE(DS_TOP) = SYMIFY_ANY_PLAIN_KIND(kind);
             if (kind != REB_PATH and kind != REB_TUPLE)  // keep "heart" as is
                 mutable_HEART_BYTE(DS_TOP) = SYMIFY_ANY_PLAIN_KIND(kind);

@@ -773,7 +773,7 @@ void MF_Array(REB_MOLD *mo, REBCEL(const*) v, bool form)
             goto block;
 
           case REB_SYM_BLOCK:
-            Append_Codepoint(mo->series, '@');
+            Append_Codepoint(mo->series, '^');
             goto block;
 
           case REB_BLOCK:
@@ -792,7 +792,7 @@ void MF_Array(REB_MOLD *mo, REBCEL(const*) v, bool form)
             goto group;
 
           case REB_SYM_GROUP:
-            Append_Codepoint(mo->series, '@');
+            Append_Codepoint(mo->series, '^');
             goto group;
 
           case REB_GROUP:

@@ -1071,7 +1071,7 @@ REB_R MAKE_Path(
 // consistent with ANY-WORD! interconversion, and also allows another avenue
 // for putting blocks as-is in paths by using the decorated type:
 //
-//     >> to path! @[a b c]
+//     >> to path! ^[a b c]
 //     == /[a b c]
 //
 REB_R TO_Sequence(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {

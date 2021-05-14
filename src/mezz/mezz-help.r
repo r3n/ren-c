@@ -87,7 +87,7 @@ help: function [
         "WORD! whose value to explain, or other HELP target (try HELP HELP)"
     /doc "Open web browser to related documentation."
 ][
-    if bad-word? @topic [
+    if bad-word? ^topic [
         ;
         ; !!! This should lead to a web page that offers help on the nature
         ; of specific void usages.

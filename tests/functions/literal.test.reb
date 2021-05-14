@@ -4,24 +4,24 @@
 ; NULL, NULL-2, and END states.
 
 [
-    (did detector: func [@x [<opt> <end> any-value!]] [get/any 'x])
+    (did detector: func [^x [<opt> <end> any-value!]] [get/any 'x])
 
     ((just '10) = detector 10)
     (null = detector null)
     ((just ') = detector if true [null])
 
-    ('~void~ = @ detector (comment "hi"))
-    ('~void~ = @ detector)
+    ('~void~ = ^ detector (comment "hi"))
+    ('~void~ = ^ detector)
 
     (did left-detector: enfixed :detector)
 
     ((just '1) = (1 left-detector))
-    ('~void~ = @ left-detector)
-    ('~void~ = @(left-detector))
+    ('~void~ = ^ left-detector)
+    ('~void~ = ^(left-detector))
 ]
 
 (
     x: false
-    @(void) then [x: true]
+    ^(void) then [x: true]
     x
 )

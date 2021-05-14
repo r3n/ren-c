@@ -110,7 +110,7 @@ const char * const Token_Names[] = {
     "void",
     "comma",
     "colon",
-    "at",
+    "caret",
     "word",
     "logic",
     "integer",

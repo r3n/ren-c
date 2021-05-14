@@ -438,8 +438,8 @@
         let rules: collect [
             for-each t things [
                 counts/(t): 0
-                keep @t
-                keep @ compose/deep '(counts/(t): me + 1)
+                keep ^t
+                keep ^ compose/deep '(counts/(t): me + 1)
                 keep/line [|]
             ]
             keep [fail]
@@ -449,8 +449,8 @@
         ]) then [
             collect [
                 for-each [key value] counts [
-                    keep @key
-                    keep @value
+                    keep ^key
+                    keep ^value
                 ]
             ]
         ] else [

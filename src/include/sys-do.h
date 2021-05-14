@@ -26,10 +26,10 @@
 // a BAD-WORD! value if nothing can be synthesized, but letting the last null
 // or value fall out otherwise:
 //
-//     >> type of @ do []
+//     >> type of ^ do []
 //     == bad-word!
 //
-//     >> type of @ do [comment "hi"]
+//     >> type of ^ do [comment "hi"]
 //     == bad-word!
 //
 //     >> do [1 comment "hi"]
@@ -282,7 +282,7 @@ inline static bool Do_Branch_Core_Throws(
     //
     // To get things to pass through unmodified, you have to use the @ forms:
     //
-    //     >> if true @[null]
+    //     >> if true ^[null]
     //     ; null
     //
     if (not as_is)

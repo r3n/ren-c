@@ -396,7 +396,7 @@ inline static REBVAL *Try_Pop_Sequence_Or_Element_Or_Nulled(
         Copy_Cell(out, DS_TOP);
         DS_DROP();
 
-        if (kind != REB_PATH) {  // carry over : or @ decoration (if possible)
+        if (kind != REB_PATH) {  // carry over : or ^ decoration (if possible)
             if (
                 not IS_WORD(out)
                 and not IS_BLOCK(out)

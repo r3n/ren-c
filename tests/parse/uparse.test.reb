@@ -181,18 +181,18 @@
 ; that might want to know about invisibility status.
 [
     (did all  [
-        then? uparse "" [synthesized: @[]]  ; NULL-2 result (success)
+        then? uparse "" [synthesized: ^[]]  ; NULL-2 result (success)
         '~void~ = synthesized
     ])
     (did all  [
-        then? uparse "" [synthesized: @[('~void~)]]  ; not-NULL result
+        then? uparse "" [synthesized: ^[('~void~)]]  ; not-NULL result
         (just '~void~) = synthesized  ; friendly if user made it friendly
     ])
     (did all  [
-        then? uparse "" [synthesized: @[(~void~)]]  ; not-NULL result
+        then? uparse "" [synthesized: ^[(~void~)]]  ; not-NULL result
         '~void~ = synthesized  ; user didn't quote it, so suggests unfriendly
     ])
-    ((just '~friendly~) = @(uparse [~friendly~] [bad-word!]))
+    ((just '~friendly~) = ^(uparse [~friendly~] [bad-word!]))
 ]
 
 
@@ -364,7 +364,7 @@
     did all [
         uparse? [| | while while while | | |] [
             content: between some '| some '|
-            into (content) [x: collect [some keep @['while]]]
+            into (content) [x: collect [some keep ^['while]]]
         ]
         x = [while while while]
     ]
@@ -451,7 +451,7 @@
 ;    ]
 ;
 ;    did all [
-;        "a" = uparse "a" ["a", data: some @(gen)]
+;        "a" = uparse "a" ["a", data: some ^(gen)]
 ;        data = [1 2 3]
 ;    ]
 ;)]
@@ -460,7 +460,7 @@
 ; UPARSE can be used where "heavy" nulls produced by the rule products do not
 ; trigger ELSE, but match failures do.
 ;
-; !!! Is it worth it to add a way to do something like @[...] block rules to
+; !!! Is it worth it to add a way to do something like ^[...] block rules to
 ; say you don't want the NULL-2, or does that just confuse things?  Is it
 ; better to just rig that up from the outside?
 ;
@@ -566,7 +566,7 @@
 [(
     "" = uparse "abc" [to end]
 )(
-    '~void~ = @(uparse "abc" [elide to end])  ; ornery void
+    '~void~ = ^(uparse "abc" [elide to end])  ; ornery void
 )(
     "b" = uparse "aaabbb" [thru "b" elide to end]
 )(
@@ -684,13 +684,13 @@
 [(
     x: [some rule]
     data: [[some rule] [some rule]]
-    uparse? data [some @x]
+    uparse? data [some ^x]
 )(
     data: [[some rule] [some rule]]
-    uparse? data [some @([some rule])]
+    uparse? data [some ^([some rule])]
 )(
     obj: make object! [x: [some rule]]
-    uparse? data [some @obj.x]
+    uparse? data [some ^obj.x]
 )]
 
 

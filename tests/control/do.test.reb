@@ -4,47 +4,47 @@
 ; on invisibility to help remind you that you are not seeing the whole
 ; picture.  Returning NULL might seem "friendlier" but it is misleading.
 [
-    ('~stale~ = @ (10 + 20 do []))
-    ('~stale~ = @ (10 + 20 do [void]))
-    ('~stale~ = @ (10 + 20 do [comment "hi"]))
-    ('~stale~ = @ (10 + 20 do make frame! :void))
+    ('~stale~ = ^ (10 + 20 do []))
+    ('~stale~ = ^ (10 + 20 do [void]))
+    ('~stale~ = ^ (10 + 20 do [comment "hi"]))
+    ('~stale~ = ^ (10 + 20 do make frame! :void))
     (else? do [null])
     (heavy-null? do [if true [null]])
 
-    ('~void~ = @ comment "HI" do [comment "HI"])
+    ('~void~ = ^ comment "HI" do [comment "HI"])
 
-    ('~void~ = (10 + 20 @(do [])))
-    ('~void~ = (10 + 20 @(do [comment "hi"])))
-    ('~void~ = (10 + 20 @(do make frame! :void)))
-    (else? @(do [null]))
-    ('' = @(do [if true [null]]))
+    ('~void~ = (10 + 20 ^(do [])))
+    ('~void~ = (10 + 20 ^(do [comment "hi"])))
+    ('~void~ = (10 + 20 ^(do make frame! :void)))
+    (else? ^(do [null]))
+    ('' = ^(do [if true [null]]))
 
     (30 = (10 + 20 devoid do []))
     (30 = (10 + 20 devoid do [comment "hi"]))
     (30 = (10 + 20 devoid do make frame! :void))
-    (else? @(devoid do [null]))
-    ('' = @(devoid do [heavy null]))
-    ('' = @(devoid do [if true [null]]))
+    (else? ^(devoid do [null]))
+    ('' = ^(devoid do [heavy null]))
+    ('' = ^(devoid do [if true [null]]))
 
-    ; Try standalone @ operator so long as we're at it.
-    ('~void~ = @ @ devoid do [])
-    ('~void~ = @ @ devoid do [comment "hi"])
-    ('~void~ = @ @ devoid do make frame! :void)
-    (else? @ devoid do [null])
-    ((just ') = @ devoid do [heavy null])
-    ((just ') = @ devoid do [if true [null]])
+    ; Try standalone ^ operator so long as we're at it.
+    ('~void~ = ^ ^ devoid do [])
+    ('~void~ = ^ ^ devoid do [comment "hi"])
+    ('~void~ = ^ ^ devoid do make frame! :void)
+    (else? ^ devoid do [null])
+    ((just ') = ^ devoid do [heavy null])
+    ((just ') = ^ devoid do [if true [null]])
 ]
 
 
 [
-    ('~stale~ = @ (1 + 2 do [comment "HI"]))
-    ('~void~ = @ do [comment "HI"])
+    ('~stale~ = ^ (1 + 2 do [comment "HI"]))
+    ('~void~ = ^ do [comment "HI"])
 
     (
         x: (1 + 2 y: do [comment "HI"])
         did all [
-            '~stale~ = @x
-            '~void~ = @y
+            '~stale~ = ^x
+            '~void~ = ^y
         ]
     )
 ]
@@ -151,7 +151,7 @@
 )
 (0:00 == do [0:00])
 (0.0.0 == do [0.0.0])
-('~void~ = @ do [()])
+('~void~ = ^ do [()])
 ('a == do ['a])
 (error? trap [do trap [1 / 0] 1])
 (
@@ -162,7 +162,7 @@
     a-value: "1"
     1 == do :a-value
 )
-('~void~ = @ do "")
+('~void~ = ^ do "")
 (1 = do "1")
 (3 = do "1 2 3")
 
@@ -207,8 +207,8 @@
 (
     value: <overwritten>
     did all [
-        null? @ [# value]: evaluate []
-        '~void~ = @value
+        null? ^ [# value]: evaluate []
+        '~void~ = ^value
     ]
 )
 (

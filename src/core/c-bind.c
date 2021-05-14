@@ -314,7 +314,7 @@ REBNATIVE(let)
     // But be conservative in what the product of these GROUP!s can be, since
     // there are conflicting demands where we want `(thing):` to be equivalent
     // to `[(thing)]:`, while at the same time we don't want to wind up with
-    // "mixed decorations" where `('@thing):` would become both SET!-like and
+    // "mixed decorations" where `('^thing):` would become both SET!-like and
     // SYM!-like.
     //
     REBSPC *f_value_specifier;  // f_value may become specified by this
