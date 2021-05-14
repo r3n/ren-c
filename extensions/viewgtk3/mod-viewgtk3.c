@@ -23,13 +23,14 @@
 // See README.md for notes about this extension.
 //
 
-#include <gtk/gtk.h>
-
 #define REBOL_IMPLICIT_END
+#define DEBUG_STDIO_OK
 // Include the rebol core for the rebnative c-function
 #include "sys-core.h"
 
 #include "tmp-mod-viewgtk3.h"
+
+#include <gtk/gtk.h>
 
 // Helper functions
 
@@ -52,11 +53,11 @@ REBNATIVE(gtk_window_new)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WINDOW_NEW;
 
-    GtkWindowType * type = cast(GtkWindowType*, VAL_STRING_AT(ARG(type)));
+    GtkWindowType type = cast(GtkWindowType, VAL_STRING_AT(ARG(type)));
     
-    if (type == NULL or type == "") {
-        type = GTK_WINDOW_TOPLEVEL;
-    }
+//    if (type == NULL) {
+//        type = GTK_WINDOW_TOPLEVEL;
+//    }
     GtkWidget *window = gtk_window_new(type);
 
     return rebHandle(window, 0, nullptr);
@@ -81,15 +82,17 @@ REBNATIVE(gtk_label_new)
 
     const char * str = cast(char*, VAL_STRING_AT(ARG(str)));
     
-    GTKWidget *label = gtk_label_new(str);
+    GtkWidget *label = gtk_label_new(str);
 
     return rebHandle(label, 0, nullptr);
 }
 
 //
-//  export gtk-button-get-text: native [
+//  export gtk-label-get-text: native [
 //
-//      {Creates a GtkButton widget with a GtkLabel child containing the given text.}
+//      {Fetches the text from a label widget, as displayed on the screen. 
+// This does not include any embedded underlines indicating mnemonics or Pango markup. 
+// (See gtk_label_get_label())}
 //
 //      return: [text!]
 //      label [handle!]
@@ -99,7 +102,7 @@ REBNATIVE(gtk_label_get_text)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_LABEL_GET_TEXT;
 
-    GTKWidget *label = VAL_HANDLE_POINTER(GTKWidget, ARG(label));
+    GtkLabel *label = VAL_HANDLE_POINTER(GtkLabel, ARG(label));
      
     const char *result = gtk_label_get_text(label);
 
@@ -124,11 +127,11 @@ REBNATIVE(gtk_label_set_text)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_LABEL_SET_TEXT;
 
-    GTKWidget *label = VAL_HANDLE_POINTER(GTKWidget, ARG(label));
+    GtkLabel *label = VAL_HANDLE_POINTER(GtkLabel, ARG(label));
 
     const char * str = cast(char*, VAL_STRING_AT(ARG(str)));
      
-    GTKWidget *label = gtk_label_set_text(str);
+    gtk_label_set_text(label, str);
 
     return rebVoid();
 }
@@ -147,7 +150,7 @@ REBNATIVE(gtk_button_new)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_BUTTON_NEW;
 
-    GTKWidget *button = gtk_button_new();
+    GtkWidget *button = gtk_button_new();
 
     return rebHandle(button, 0, nullptr);
 }
@@ -167,7 +170,7 @@ REBNATIVE(gtk_button_new_with_label)
 
     const char * str = cast(char*, VAL_STRING_AT(ARG(str)));
      
-    GTKWidget *button = gtk_button_new_with_label(str);
+    GtkWidget *button = gtk_button_new_with_label(str);
 
     return rebHandle(button, 0, nullptr);
 }
@@ -185,7 +188,7 @@ REBNATIVE(gtk_button_get_label)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_BUTTON_GET_LABEL;
 
-    GTKWidget *button = VAL_HANDLE_POINTER(GTKWidget, ARG(button));
+    GtkButton *button = VAL_HANDLE_POINTER(GtkButton, ARG(button));
      
     const char *result = gtk_button_get_label(button);
 
@@ -198,6 +201,7 @@ REBNATIVE(gtk_button_get_label)
 //      {Sets the text of the label of the button to str.}
 //
 //      return: [void!]
+//      button [handle!]
 //      str [text!]
 //  ]
 //
@@ -205,9 +209,11 @@ REBNATIVE(gtk_button_set_label)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_BUTTON_SET_LABEL;
 
+    GtkButton *button = VAL_HANDLE_POINTER(GtkButton, ARG(button));
+
     const char * str = cast(char*, VAL_STRING_AT(ARG(str)));
      
-    gtk_button_set_label(str);
+    gtk_button_set_label(button, str);
 
     return rebVoid();
 }
@@ -226,7 +232,7 @@ REBNATIVE(gtk_image_new)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_IMAGE_NEW;
 
-    GTKWidget *image = gtk_image_new();
+    GtkWidget *image = gtk_image_new();
 
     return rebHandle(image, 0, nullptr);
 }
@@ -246,13 +252,13 @@ REBNATIVE(gtk_image_new_from_file)
 
     const char * str = cast(char*, VAL_STRING_AT(ARG(str)));
 
-    GTKWidget *image = gtk_image_new_from_file(str);
+    GtkWidget *image = gtk_image_new_from_file(str);
 
     return rebHandle(image, 0, nullptr);
 }
 
 //
-//  export gtk-image-new-from-file: native [
+//  export gtk-image-set-from-file: native [
 //
 //      {Creates a new empty GtkImage widget.}
 //
@@ -263,9 +269,9 @@ REBNATIVE(gtk_image_new_from_file)
 //
 REBNATIVE(gtk_image_set_from_file)
 {
-    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_IMAGE_NEW_FROM_FILE;
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_IMAGE_SET_FROM_FILE;
 
-    GTKWidget *image = VAL_HANDLE_POINTER(GTKWidget, ARG(image));
+    GtkImage *image = VAL_HANDLE_POINTER(GtkImage, ARG(image));
 
     const char * str = cast(char*, VAL_STRING_AT(ARG(str)));
 
@@ -285,9 +291,9 @@ REBNATIVE(gtk_image_set_from_file)
 //
 REBNATIVE(gtk_image_clear)
 {
-    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_BUTTON_IMAGE_CLEAR;
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_IMAGE_CLEAR;
 
-    GTKWidget *image = VAL_HANDLE_POINTER(GTKWidget, ARG(image));
+    GtkImage *image = VAL_HANDLE_POINTER(GtkImage, ARG(image));
      
     gtk_image_clear(image);
 
@@ -308,7 +314,7 @@ REBNATIVE(gtk_entry_new)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_ENTRY_NEW;
 
-    GTKWidget *field = gtk_entry_new();
+    GtkWidget *field = gtk_entry_new();
 
     return rebHandle(field, 0, nullptr);
 }
@@ -326,15 +332,15 @@ REBNATIVE(gtk_entry_new_with_buffer)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_ENTRY_NEW_WITH_BUFFER;
 
-    GTKWidget *buffer = VAL_HANDLE_POINTER(GTKWidget, ARG(buffer));
+    GtkEntryBuffer *buffer = VAL_HANDLE_POINTER(GtkEntryBuffer, ARG(buffer));
 
-    GTKWidget *field = gtk_entry_new_with_buffer(buffer);
+    GtkWidget *field = gtk_entry_new_with_buffer(buffer);
 
     return rebHandle(field, 0, nullptr);
 }
 
 //
-//  export gtk-entry-new-with-buffer: native [
+//  export gtk-entry-get-buffer: native [
 //
 //      {Get the GtkEntryBuffer object which holds the text for this widget.}
 //
@@ -346,9 +352,9 @@ REBNATIVE(gtk_entry_get_buffer)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_ENTRY_GET_BUFFER;
 
-    GTKWidget *field = VAL_HANDLE_POINTER(GTKWidget, ARG(field));
+    GtkEntry *field = VAL_HANDLE_POINTER(GtkEntry, ARG(field));
 
-    GTKWidget *buffer = gtk_entry_get_buffer(field);
+    GtkEntryBuffer *buffer = gtk_entry_get_buffer(field);
 
     return rebHandle(buffer, 0, nullptr);
 }
@@ -367,7 +373,7 @@ REBNATIVE(gtk_entry_set_text)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_ENTRY_SET_TEXT;
 
-    GTKWidget *field = VAL_HANDLE_POINTER(GTKWidget, ARG(field));
+    GtkEntry *field = VAL_HANDLE_POINTER(GtkEntry, ARG(field));
 
     const char * str = cast(char*, VAL_STRING_AT(ARG(str)));
 
@@ -391,7 +397,7 @@ REBNATIVE(gtk_entry_get_text)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_ENTRY_GET_TEXT;
 
-    GTKWidget *field = VAL_HANDLE_POINTER(GTKWidget, ARG(field));
+    GtkEntry *field = VAL_HANDLE_POINTER(GtkEntry, ARG(field));
      
     const char *result = gtk_entry_get_text(field);
 
@@ -413,7 +419,7 @@ REBNATIVE(gtk_entry_get_text_length)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_ENTRY_GET_TEXT_LENGTH;
 
-    GTKWidget *field = VAL_HANDLE_POINTER(GTKWidget, ARG(field));
+    GtkEntry *field = VAL_HANDLE_POINTER(GtkEntry, ARG(field));
      
     unsigned int result = gtk_entry_get_text_length(field);
 
@@ -423,7 +429,7 @@ REBNATIVE(gtk_entry_get_text_length)
 // todo
 // Don't know yet how to read or return a character (issue! type)
 // void gtk_entry_set_invisible_char (GtkEntry *entry,
-//                                    gunichar ch);
+//                                    gunichar ch); This appears to be an unsigned int
 // Sets the character to use in place of the actual text when gtk_entry_set_visibility() 
 // has been called to set text visibility to FALSE. i.e. this is the character used in “password mode” 
 // to show the user how many characters have been typed. By default, 
@@ -435,7 +441,7 @@ REBNATIVE(gtk_entry_get_text_length)
 //
 //      {Retrieves the character displayed in place of the real characters for entries with visibility set to false.}
 //
-//      return: [issue! text!]
+//      return: [integer!]
 //      field [handle!]
 //  ]
 //
@@ -443,11 +449,11 @@ REBNATIVE(gtk_entry_get_invisible_char)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_ENTRY_GET_INVISIBLE_CHAR;
 
-    GTKEntry *field = VAL_HANDLE_POINTER(GTKEntry, ARG(field));
+    GtkEntry *field = VAL_HANDLE_POINTER(GtkEntry, ARG(field));
 
-    const char* result = gtk_entry_get_invisible_char(field);
+    unsigned int result = gtk_entry_get_invisible_char(field);
 
-    return rebText(result);
+    return rebInteger(result);
 }
 
 //
@@ -463,9 +469,9 @@ REBNATIVE(gtk_entry_get_invisible_char)
 //
 REBNATIVE(gtk_entry_set_max_length)
 {
-    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_ENTRY_SET_TEXT;
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_ENTRY_SET_MAX_LENGTH;
 
-    GTKWidget *field = VAL_HANDLE_POINTER(GTKWidget, ARG(field));
+    GtkEntry *field = VAL_HANDLE_POINTER(GtkEntry, ARG(field));
 
     unsigned int maxlen = rebUnboxInteger(ARG(maxlen));
 
@@ -475,7 +481,7 @@ REBNATIVE(gtk_entry_set_max_length)
 }
 
 //
-//  export gtk-entry-get-maxfield
+//  export gtk-entry-get-max-length: native [
 //      return: [integer!]
 //      field [handle!]
 //  ]
@@ -484,7 +490,7 @@ REBNATIVE(gtk_entry_get_max_length)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_ENTRY_GET_MAX_LENGTH;
 
-    GTKWidget *field = VAL_HANDLE_POINTER(GTKWidget, ARG(field));
+    GtkEntry *field = VAL_HANDLE_POINTER(GtkEntry, ARG(field));
      
     unsigned int result = gtk_entry_get_max_length(field);
 
@@ -505,7 +511,7 @@ REBNATIVE(gtk_entry_set_visibility)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_ENTRY_SET_VISIBILITY;
 
-    GTKWidget *field = VAL_HANDLE_POINTER(GTKWidget, ARG(field));
+    GtkEntry *field = VAL_HANDLE_POINTER(GtkEntry, ARG(field));
 
     bool visible = rebDid(ARG(visible));
  
@@ -527,9 +533,9 @@ REBNATIVE(gtk_entry_get_visibility)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_ENTRY_GET_VISIBILITY;
 
-    GTKWidget *field = VAL_HANDLE_POINTER(GTKWidget, ARG(field));
+    GtkEntry *field = VAL_HANDLE_POINTER(GtkEntry, ARG(field));
      
-    bool result = gtk_entry_get_visibility(connection);
+    bool result = gtk_entry_get_visibility(field);
     REBVAL *logic = rebValue("TO LOGIC!", result);
 
     return rebValue(logic);
@@ -549,7 +555,7 @@ REBNATIVE(gtk_drawing_area_new)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_DRAWING_AREA_NEW;
 
-    GTKWidget *canvas = gtk_drawing_area_new();
+    GtkWidget *canvas = gtk_drawing_area_new();
 
     return rebHandle(canvas, 0, nullptr);
 }
@@ -576,7 +582,7 @@ REBNATIVE(gtk_box_new)
 
     unsigned int spacing = rebUnboxInteger(ARG(spacing));
 
-    GTKWidget *box = gtk_box_new(orientation, spacing);
+    GtkWidget *box = gtk_box_new(*orientation, spacing);
     
     return rebHandle(box, 0, nullptr);
 }
@@ -599,8 +605,8 @@ REBNATIVE(gtk_box_pack_start)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_BOX_PACK_START;
 
-    GTKBox *box = VAL_HANDLE_POINTER(GTKBox, ARG(box));
-    GTKWidget *child = VAL_HANDLE_POINTER(GTKWidget, ARG(child));
+    GtkBox *box = VAL_HANDLE_POINTER(GtkBox, ARG(box));
+    GtkWidget *child = VAL_HANDLE_POINTER(GtkWidget, ARG(child));
 
     bool expand = rebDid(ARG(expand));
     bool fill = rebDid(ARG(fill));
@@ -630,8 +636,8 @@ REBNATIVE(gtk_box_pack_end)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_BOX_PACK_END;
 
-    GTKBox *box = VAL_HANDLE_POINTER(GTKBox, ARG(box));
-    GTKWidget *child = VAL_HANDLE_POINTER(GTKWidget, ARG(child));
+    GtkBox *box = VAL_HANDLE_POINTER(GtkBox, ARG(box));
+    GtkWidget *child = VAL_HANDLE_POINTER(GtkWidget, ARG(child));
 
     bool expand = rebDid(ARG(expand));
     bool fill = rebDid(ARG(fill));
@@ -646,7 +652,7 @@ REBNATIVE(gtk_box_pack_end)
 //
 //  export gtk-box-get-spacing: native [
 //
-//      {Sets the “spacing” property of box, which is the number of pixels to place between children of box.}
+//      {Sets the spacing property of box, which is the number of pixels to place between children of box.}
 //
 //      return: [integer!]
 //      box [handle!]
@@ -656,7 +662,7 @@ REBNATIVE(gtk_box_get_spacing)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_BOX_GET_SPACING;
 
-    GTKBox *box = VAL_HANDLE_POINTER(GTKWidget, ARG(box));
+    GtkBox *box = VAL_HANDLE_POINTER(GtkBox, ARG(box));
      
     unsigned int result = gtk_box_get_spacing(box);
 
@@ -666,7 +672,7 @@ REBNATIVE(gtk_box_get_spacing)
 //
 //  export gtk-box-set_spacing: native [
 //
-//      {Sets the “spacing” property of box, which is the number of pixels to place between children of box.}
+//      {Sets the spacing property of box, which is the number of pixels to place between children of box.}
 //
 //      return: [void!]
 //      box [handle!]
@@ -677,7 +683,7 @@ REBNATIVE(gtk_box_set_spacing)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_BOX_SET_SPACING;
 
-    GTKBox *box = VAL_HANDLE_POINTER(GTKBox, ARG(box));
+    GtkBox *box = VAL_HANDLE_POINTER(GtkBox, ARG(box));
  
     unsigned int spacing = rebUnboxInteger(ARG(spacing));
 
@@ -700,7 +706,7 @@ REBNATIVE(gtk_grid_new)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_GRID_NEW;
 
-    GTKWidget *grid = gtk_grid_new();
+    GtkWidget *grid = gtk_grid_new();
     
     return rebHandle(grid, 0, nullptr);
 }
@@ -710,9 +716,8 @@ REBNATIVE(gtk_grid_new)
 //
 //      {Adds a widget to the grid.
 // The position of child is determined by left and top. 
-// The number of “cells” that child will occupy is determined by width and height.}
+// The number of "cells" that child will occupy is determined by width and height.}
 //
-//      return: [void!]
 //      grid [handle!]
 //      child [handle!]
 //      left [integer!]
@@ -725,8 +730,8 @@ REBNATIVE(gtk_grid_attach)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_GRID_ATTACH;
 
-    GTKGrid *grid = VAL_HANDLE_POINTER(GTKGrid, ARG(grid));
-    GTKWidget *child = VAL_HANDLE_POINTER(GTKWidget, ARG(child));
+    GtkGrid *grid = VAL_HANDLE_POINTER(GtkGrid, ARG(grid));
+    GtkWidget *child = VAL_HANDLE_POINTER(GtkWidget, ARG(child));
  
     unsigned int left = rebUnboxInteger(ARG(left));
     unsigned int top = rebUnboxInteger(ARG(top));
@@ -739,7 +744,7 @@ REBNATIVE(gtk_grid_attach)
 }
 
 //
-//  export gtk-grid-insert-row : native [
+//  export gtk-grid-insert-row: native [
 //
 //      {Inserts a row at the specified position.
 // Children which are attached at or below this position are moved one row down. 
@@ -754,7 +759,7 @@ REBNATIVE(gtk_grid_insert_row)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_GRID_INSERT_ROW;
 
-    GTKGrid *grid = VAL_HANDLE_POINTER(GTKGrid, ARG(grid));
+    GtkGrid *grid = VAL_HANDLE_POINTER(GtkGrid, ARG(grid));
  
     unsigned int position = rebUnboxInteger(ARG(position));
 
@@ -764,7 +769,7 @@ REBNATIVE(gtk_grid_insert_row)
 }
 
 //
-//  export gtk-grid-insert-column : native [
+//  export gtk-grid-insert-column: native [
 //
 //      {Inserts a column at the specified position.
 // Children which are attached at or to the right of this position are moved one column to the right. 
@@ -779,7 +784,7 @@ REBNATIVE(gtk_grid_insert_column)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_GRID_INSERT_COLUMN;
 
-    GTKGrid *grid = VAL_HANDLE_POINTER(GTKGrid, ARG(grid));
+    GtkGrid *grid = VAL_HANDLE_POINTER(GtkGrid, ARG(grid));
  
     unsigned int position = rebUnboxInteger(ARG(position));
 
@@ -788,20 +793,19 @@ REBNATIVE(gtk_grid_insert_column)
     return rebVoid();
 }
 
+
 // Widget Show (and Hide) functions
 
 //
 //  export gtk-widget-show: native [
 //
 //      {Flags a widget to be displayed. 
-// Any widget that isn’t shown will not appear on the screen. 
+// Any widget that is not shown will not appear on the screen. 
 // If you want to show all the widgets in a container, 
-// it’s easier to call gtk_widget_show_all() on the container, 
+// it is easier to call gtk_widget_show_all() on the container, 
 // instead of individually showing the widgets.
-// 
 // Remember that you have to show the containers containing a widget, 
 // in addition to the widget itself, before it will appear onscreen.
-// 
 // When a toplevel container is shown, it is immediately realized and mapped; 
 // other shown widgets are realized and mapped when 
 // their toplevel container is realized and mapped.}
@@ -814,7 +818,7 @@ REBNATIVE(gtk_widget_show)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WIDGET_SHOW;
 
-    GTKWidget *widget = VAL_HANDLE_POINTER(GTKWidget, ARG(widget));
+    GtkWidget *widget = VAL_HANDLE_POINTER(GtkWidget, ARG(widget));
      
     gtk_widget_show(widget);
 
@@ -838,7 +842,7 @@ REBNATIVE(gtk_widget_show_now)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WIDGET_SHOW_NOW;
 
-    GTKWidget *widget = VAL_HANDLE_POINTER(GTKWidget, ARG(widget));
+    GtkWidget *widget = VAL_HANDLE_POINTER(GtkWidget, ARG(widget));
      
     gtk_widget_show_now(widget);
 
@@ -859,7 +863,7 @@ REBNATIVE(gtk_widget_hide)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WIDGET_HIDE;
 
-    GTKWidget *widget = VAL_HANDLE_POINTER(GTKWidget, ARG(widget));
+    GtkWidget *widget = VAL_HANDLE_POINTER(GtkWidget, ARG(widget));
      
     gtk_widget_hide(widget);
 
@@ -877,11 +881,37 @@ REBNATIVE(gtk_widget_hide)
 //
 REBNATIVE(gtk_widget_show_all)
 {
-    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WIDGET_SHOW;
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WIDGET_SHOW_ALL;
 
-    GTKWidget *widget = VAL_HANDLE_POINTER(GTKWidget, ARG(widget));
+    GtkWidget *widget = VAL_HANDLE_POINTER(GtkWidget, ARG(widget));
      
     gtk_widget_show_all(widget);
+
+    return rebVoid();
+}
+
+// Window and Widget destroy function
+
+//
+//  export gtk-widget-destroy: native [
+//
+//      {Destroys a widget.
+// When a widget is destroyed all references it holds on other objects will be released:
+//    if the widget is inside a container, it will be removed from its parent
+//    if the widget is a container, all its children will be destroyed, recursively
+//    if the widget is a top level, it will be removed from the list of top level widgets that GTK+ maintains internally}
+//
+//      return: [void!]
+//      widget [handle!]
+//  ]
+//
+REBNATIVE(gtk_widget_destroy)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WIDGET_DESTROY;
+
+    GtkWidget *widget = VAL_HANDLE_POINTER(GtkWidget, ARG(widget));
+
+    gtk_widget_destroy(widget);
 
     return rebVoid();
 }
