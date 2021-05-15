@@ -441,13 +441,13 @@ REB_R Compose_To_Stack_Core(
 //
 //  {Evaluates only contents of GROUP!-delimited expressions in an array}
 //
-//      return: [blackhole! any-array! any-path! any-word! action!]
+//      return: [blackhole! any-array! any-sequence! any-word! action!]
 //      'predicate [<skip> action!]  ; !!! PATH! may be meant as value (!)
 //          "Function to run on composed slots (default: ENBLOCK)"
 //      'label "Distinguish compose groups, e.g. [(plain) (<*> composed)]"
 //          [<skip> tag! file!]
 //      value "The template to fill in (no-op if WORD!, ACTION! or SPACE!)"
-//          [blackhole! any-array! any-path! any-word! action!]
+//          [blackhole! any-array! any-sequence! any-word! action!]
 //      /deep "Compose deeply into nested arrays"
 //      /only "Do not exempt ((...)) from predicate application"
 //  ]

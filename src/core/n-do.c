@@ -196,7 +196,7 @@ REBNATIVE(shove)
         if (IS_SET_WORD(left)) {
             Copy_Cell(D_OUT, Lookup_Word_May_Fail(left, SPECIFIED));
         }
-        else if (IS_SET_PATH(left)) {
+        else if (IS_SET_PATH(left) or IS_SET_TUPLE(left)) {
             f->feed->gotten = nullptr;  // calling arbitrary code, may disrupt
             composed_set_path = rebValueQ("compose", left);
             REBVAL *temp = rebValueQ("get/hard", composed_set_path);
@@ -242,7 +242,7 @@ REBNATIVE(shove)
         if (IS_SET_WORD(left)) {
             Copy_Cell(Sink_Word_May_Fail(left, SPECIFIED), D_OUT);
         }
-        else if (IS_SET_PATH(left)) {
+        else if (IS_SET_PATH(left) or IS_SET_TUPLE(left)) {
             f->feed->gotten = nullptr;  // calling arbitrary code, may disrupt
             rebElideQ("set/hard", composed_set_path, NULLIFY_NULLED(D_OUT));
             rebRelease(composed_set_path);

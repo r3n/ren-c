@@ -678,7 +678,7 @@ void Set_Var_May_Fail(
 //
 //      return: [<opt> any-value!]
 //          {Will be the values set to, or void if any set values are void}
-//      target [blackhole! any-word! any-path! block! quoted!]
+//      target [blackhole! any-word! any-sequence! block! quoted!]
 //          {Word or path, or block of words and paths}
 //      value [<opt> <literal> any-value!]
 //          "Value or block of values (NULL means unset)"
