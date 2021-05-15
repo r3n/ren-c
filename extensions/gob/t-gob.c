@@ -968,7 +968,7 @@ REBTYPE(Gob)
             fail (Error_Index_Out_Of_Range_Raw());
         if (
             VAL_WORD_ID(verb) == SYM_CHANGE
-            && (REF(part) || REF(only) || REF(dup))
+            && (REF(part) || REF(dup))
         ){
             fail (Error_Not_Done_Raw());
         }
@@ -996,7 +996,7 @@ REBTYPE(Gob)
         if (REF(line))
             fail (Error_Bad_Refines_Raw());
 
-        if (REF(part) || REF(only) || REF(dup))
+        if (REF(part) || REF(dup))
             fail (Error_Not_Done_Raw());
 
         REBLEN len;

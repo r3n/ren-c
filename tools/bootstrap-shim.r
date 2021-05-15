@@ -129,7 +129,7 @@ trap [
 
     ; LOAD changed to have no /ALL so enforcing getting a block is weird
     ;
-    if find parameters of :load /all [
+    if find parameters of :load [/all] [
         load-all: :load/all
         load-value: :load  ; imperfect...works for rebmake
     ] else [

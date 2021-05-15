@@ -31,6 +31,29 @@ void!: bad-word!
 void?: :bad-word?
 
 
+; !!! As a first step of removing the need for APPEND/ONLY (and friends), this
+; moves the behavior into mezzanine code for testing.
+
+onlify: func [
+    {Add /ONLY behavior to APPEND, INSERT, CHANGE}
+    action [action!]
+    /param [word!]
+][
+    param: default ['value]
+    adapt (augment :action [/only]) compose/deep [
+        all [only, any-array? series] then [
+            (param): ^(param)
+        ]
+        ; ...fall through to normal handling
+    ]
+]
+
+append: my onlify
+insert: my onlify
+change: my onlify
+find: my onlify/param 'pattern
+
+
 ; See notes on the future where FUNC and FUNCTION are synonyms (same will be
 ; true of METH and METHOD:
 ;

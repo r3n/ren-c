@@ -400,7 +400,6 @@ REBTYPE(Typeset)
         INCLUDE_PARAMS_OF_FIND;
         UNUSED(ARG(series));  // covered by `v`
 
-        UNUSED(REF(only));  // !!! tolerate, even though ignored?
         UNUSED(REF(case));  // !!! tolerate, even though ignored?
 
         if (

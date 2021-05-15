@@ -93,7 +93,7 @@ save: function [
         ;
         case [
             null? compress [
-                compress: did find try (select header 'options) 'compress
+                compress: did find try (select header 'options) [compress]
             ]
             compress = false [
                 remove find to-value select header 'options 'compress
@@ -124,9 +124,9 @@ save: function [
     append data newline  ; MOLD does not append a newline
 
     case/all [
-        tmp: find try header 'checksum [
+        tmp: find/tail try header [checksum:] [  ; e.g. says "checksum: true"
             ; Checksum uncompressed data, if requested
-            change next tmp (checksum-core 'crc32 data)
+            change tmp ^(checksum-core 'crc32 data)
         ]
 
         compress [
@@ -143,7 +143,7 @@ save: function [
         ]
 
         length [
-            change find/tail header 'length (length of data)
+            change find/tail header [length:] ^(length of data)
         ]
 
         header [

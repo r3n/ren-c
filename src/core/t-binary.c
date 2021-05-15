@@ -427,21 +427,44 @@ REBTYPE(Binary)
         INCLUDE_PARAMS_OF_INSERT;  // compatible frame with APPEND, CHANGE
         UNUSED(PAR(series));  // covered by `v`
 
-        if (REF(only)) {
-            // !!! Doesn't pay attention...all binary appends are /ONLY
-        }
-
         REBLEN len; // length of target
         if (VAL_WORD_ID(verb) == SYM_CHANGE)
             len = Part_Len_May_Modify_Index(v, ARG(part));
         else
             len = Part_Limit_Append_Insert(ARG(part));
 
+        // Note that while inserting or appending NULL is a no-op, CHANGE with
+        // a /PART can actually erase data.
+        //
+        if (IS_BLANK(ARG(value))) {  // only blanks bypass
+            if (len == 0) {
+                if (sym == SYM_APPEND) // append always returns head
+                    VAL_INDEX_RAW(v) = 0;
+                RETURN (v); // don't fail on read only if it would be a no-op
+            }
+            Init_Nulled(ARG(value));  // low-level code treats NULL as nothing
+        }
+
         REBFLGS flags = 0;
         if (REF(part))
             flags |= AM_PART;
         if (REF(line))
             flags |= AM_LINE;
+
+        // !!! This mimics the historical behavior for now:
+        //
+        //     rebol2>> append "abc" quote 'd
+        //     == "abcd"
+        //
+        //     rebol2>> append/only "abc" [d e]  ; like appending (the '[d e])
+        //     == "abcde"
+        //
+        // But for consistency, it would seem that if the incoming value is
+        // quoted that should give molding semantics, so quoted blocks include
+        // their brackets.  Review.
+        //
+        if (IS_QUOTED(ARG(value)))
+            Unquotify(ARG(value), 1);
 
         VAL_INDEX_RAW(v) = Modify_String_Or_Binary(
             v,
@@ -467,8 +490,7 @@ REBTYPE(Binary)
         // !!! R3-Alpha FIND/MATCH historically implied /TAIL.  Should it?
         //
         REBFLGS flags = (
-            (REF(only) ? AM_FIND_ONLY : 0)
-            | (REF(match) ? AM_FIND_MATCH : 0)
+            (REF(match) ? AM_FIND_MATCH : 0)
             | (REF(case) ? AM_FIND_CASE : 0)
         );
 

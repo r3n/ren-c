@@ -605,7 +605,7 @@ REBTYPE(Bitset)
         UNUSED(REF(reverse));  // Deprecated https://forum.rebol.info/t/1126
         UNUSED(REF(last));  // ...a HIJACK in %mezz-legacy errors if used
 
-        if (REF(part) or REF(only) or REF(skip) or REF(tail) or REF(match))
+        if (REF(part) or REF(skip) or REF(tail) or REF(match))
             fail (Error_Bad_Refines_Raw());
 
         if (not Check_Bits(VAL_BITSET(v), ARG(pattern), did REF(case)))

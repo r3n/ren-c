@@ -579,8 +579,9 @@ pe-format: context [
             word [any-word!]
         ][
             any [
-                find words to word! word
-                find def to set-word! word
+                find words ^ to word! word
+                find def ^ to set-word! word
+            ] then [
                 append def ^ to set-word! word
             ]
         ]

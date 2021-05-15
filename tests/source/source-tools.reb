@@ -125,7 +125,7 @@ rebsource: context [
                 for-each source list/source-files [
                     if find whitelisted source [continue]
 
-                    keep analyse/file source
+                    keep try analyse/file source
                 ]
             ]
         ]

@@ -869,14 +869,14 @@ module: func [
     ]
     let mod: into
 
-    if find spec/options 'extension [
+    if find spec/options just extension [
         append mod 'lib-base ; specific runtime values MUST BE FIRST
     ]
 
     if not spec/type [spec/type: 'module] ; in case not set earlier
 
     ; Collect 'export keyword exports, removing the keywords
-    if find body 'export [
+    if find body [export] [
         if not block? select spec 'exports [
             append spec compose [exports (make block! 10)]
         ]
@@ -901,7 +901,7 @@ module: func [
 
     ; Collect 'hidden keyword words, removing the keywords. Ignore exports.
     let hidden: _
-    if find body 'hidden [
+    if find body [hidden] [
         hidden: make block! 10
         ; Note: Exports are not hidden, silently for now
         parse body [while [
@@ -930,7 +930,7 @@ module: func [
     ; Add exported words at top of context (performance):
     if block? select spec 'exports [bind/new spec/exports mod]
 
-    if find spec/options 'isolate [
+    if find spec/options [isolate] [
         ;
         ; All words of the module body are module variables:
         ;
@@ -972,7 +972,7 @@ cause-error: func [
     ; Filter out functional values:
     iterate args [
         if action? first args [
-            change/only args meta-of first args
+            change args ^(meta-of first args)
         ]
     ]
 

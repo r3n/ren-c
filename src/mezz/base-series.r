@@ -94,7 +94,7 @@ join: function [
             fail ^base "Can't JOIN an ACTION! onto a series (use APPEND)."
         ]
     ] else [
-        append/only base :value
+        append base ^value
     ]
 
     if type [

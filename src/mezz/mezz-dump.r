@@ -127,7 +127,7 @@ dump-to-newline: adapt :dump [
             tail? extra
             '| = extra/1
         ]] [
-            append/only value extra/1
+            append value ^extra/1
             all [
                 match [block! group!] :extra/1
                 contains-newline :extra/1

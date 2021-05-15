@@ -284,10 +284,9 @@ find: generic [
     series [
         <blank> any-series! any-context! map! bitset! typeset!
     ]
-    pattern [any-value!]
+    pattern [<blank> any-value!]
     /part "Limits the search to a given length or position"
         [any-number! any-series! pair!]
-    /only "Treats a series value as only a single value"
     /case "Characters are case-sensitive"
     /skip "Treat the series as records of fixed size"
         [integer!]
@@ -305,7 +304,6 @@ select: generic [
     value [any-value!]
     /part "Limits the search to a given length or position"
         [any-number! any-series! pair!]
-    /only "Treats a series value as only a single value"
     /case "Characters are case-sensitive"
     /skip "Treat the series as records of fixed size"
         [integer!]
@@ -368,10 +366,10 @@ insert: generic [
         integer!]  ; !!! INSERT returns INTEGER! in ODBC, review this
     series "At position (modified)"
         [any-series! port! map! object! bitset! port!]
-    value [<opt> any-value!] {The value to insert}
+    value "What to insert (BLANK!s opt out)"
+        [any-value!]
     /part "Limits to a given length or position"
         [any-number! any-series! pair!]
-    /only "Insert a block as a single value (not the contents of the block)"
     /dup "Duplicates the insert a specified number of times"
         [any-number! pair!]
     /line "Data should be its own line (use as formatting cue if ANY-ARRAY!)"
@@ -386,10 +384,10 @@ append: generic [
     return: [any-series! port! map! object! module! bitset!]
     series "Any position (modified)"
         [any-series! port! map! object! module! bitset!]
-    value [<opt> any-value!]
+    value "What to append (BLANK!s opt out)"
+        [any-value!]
     /part "Limits to a given length or position"
         [any-number! any-series! pair!]
-    /only "Insert a block as a single value (not the contents of the block)"
     /dup "Duplicates the insert a specified number of times"
         [any-number! pair!]
     /line "Data should be its own line (use as formatting cue if ANY-ARRAY!)"
@@ -404,10 +402,10 @@ change: generic [
     return: [any-series! port!]
     series "At position (modified)"
         [any-series! port!]
-    value [<opt> any-value!] {The new value}
+    value "The new value (BLANK!s opt out)"
+        [any-value!]
     /part "Limits the amount to change to a given length or position"
         [any-number! any-series! pair!]
-    /only "Change a block as a single value (not the contents of the block)"
     /dup "Duplicates the change a specified number of times"
         [any-number! pair!]
     /line "Data should be its own line (use as formatting cue if ANY-ARRAY!)"

@@ -279,10 +279,10 @@ REB_R Compose_To_Stack_Core(
             }
             else if (
                 insert
-                and Splices_Without_Only(insert)
+                and ANY_ARRAY(insert)
                 and (predicate or doubled_group)
             ){
-                // We splice blocks if they were produced by a predicate
+                // We splice arrays if they were produced by a predicate
                 // application, or if (( )) was used.
 
                 // compose [(([a b])) merges] => [a b merges]

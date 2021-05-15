@@ -929,7 +929,6 @@ REBTYPE(Context)
         INCLUDE_PARAMS_OF_FIND;
         UNUSED(ARG(series));  // extracted as `c`
         UNUSED(ARG(part));
-        UNUSED(ARG(only));
         UNUSED(ARG(skip));
         UNUSED(ARG(tail));
         UNUSED(ARG(match));

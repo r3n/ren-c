@@ -68,7 +68,7 @@ mixin?: func [
     if module? mod [mod: meta-of mod]  ; Get the header object
 
     return did all [
-        find select mod 'options 'private
+        find (select mod 'options) [private]
 
         ; If there are no exports, there's no difference
         block? select mod 'exports
@@ -175,7 +175,7 @@ load-header: function [
         return 'bad-header
     ]
 
-    if find hdr/options 'content [
+    if find hdr/options just content [
         append hdr compose [content (data)]  ; as of start of header
     ]
 
@@ -198,7 +198,7 @@ load-header: function [
     if :key = 'rebol [
         ; regular script, binary or script encoded compression supported
         case [
-            find hdr/options 'compress [
+            find hdr/options just compress [
                 rest: any [
                     attempt [
                         ; Raw bits.  whitespace *could* be tolerated; if
@@ -226,7 +226,7 @@ load-header: function [
         data: transcode data  ; decode embedded script
         rest: skip data 2  ; !!! what is this skipping ("hdr/length" ??)
 
-        if find hdr/options 'compress [  ; script encoded only
+        if find hdr/options just compress [  ; script encoded only
             rest: attempt [gunzip first rest] else [
                 return 'bad-compress
             ]
@@ -309,8 +309,8 @@ load: function [
         ]
     ]
 
-    if not find [unbound rebol] type [
-        if find system/options/file-types type [
+    if not find [unbound rebol] ^type [
+        if find system/options/file-types ^type [
             return decode type :data
         ]
 
@@ -350,7 +350,7 @@ load: function [
     all .not [
         'unbound = type
         'module = select hdr 'type
-        find try get 'hdr/options 'unbound
+        find (try get 'hdr/options) [unbound]
     ] then [
         data: intern data
     ]
@@ -668,7 +668,7 @@ load-module: func [
             import [
                 ; /IMPORT overrides 'delay option
             ]
-            not delay [delay: did find hdr/options 'delay]
+            not delay [delay: did find hdr/options just delay]
         ]
     ] else [
         ; !!! Some circumstances, e.g. `do <json>`, will wind up not passing
@@ -700,7 +700,7 @@ load-module: func [
 
         ; But make it a mixin and it will be imported directly later
 
-        if not find hdr/options 'private [
+        if not find hdr/options just private [
             hdr/options: append any [hdr/options, make block! 1] [private]
         ]
     ]
@@ -718,7 +718,7 @@ load-module: func [
     let pos
     all [
         override?: not no-lib  ; set to false later if existing module is used
-        set [name0 mod0] pos: try find/skip system/modules name 2
+        set [name0 mod0] pos: try find/skip system/modules ^name 2
     ]
     then [  ; Get existing module's info
 
@@ -780,15 +780,15 @@ load-module: func [
     if not mod [
         ; not prebuilt or delayed, make a module
 
-        if find hdr/options 'isolate [no-share: true]  ; in case of delay
+        if find hdr/options just isolate [no-share: true]  ; in case of delay
 
         if object? code [ ; delayed extension
             fail "Code has not been updated for LOAD-EXT-MODULE"
 
             set [hdr: code:] load-ext-module code
             hdr/name: name ; in case of delayed rename
-            if all [no-share not find hdr/options 'isolate] [
-                hdr/options: append any [hdr/options, make block! 1] [isolate]
+            if all [no-share, not find hdr/options just isolate] [
+                hdr/options: append (any [hdr/options, make block! 1]) [isolate]
             ]
         ]
 
@@ -958,7 +958,7 @@ import: function [
 
         any [
             no-lib
-            find select hdr 'options 'private  ; /NO-LIB causes private
+            find (select hdr 'options) [private]  ; /NO-LIB causes private
         ][
             ; It's a private module (mixin)
             ; we must add *all* of its exports to user

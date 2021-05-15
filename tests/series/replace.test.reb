@@ -14,7 +14,7 @@
 ([1 2 8 9 5] = replace [1 2 3 4 5] [3 4] [8 9])
 ([1 2 8 5] = replace [1 2 3 4 5] [3 4] 8)
 ([1 2 a 5] = replace [1 2 3 4 5] [3 4] [a])
-([a g c d] = replace [a b c d] 'b [g])
+([a g c d] = replace [a b c d] just b [g])
 (#{006400} = replace #{000100} #{01} 100)
 (%file.ext = replace %file.sub.ext ".sub." #".")
 ("abra-abra" = replace "abracadabra" "cad" #"-")
@@ -51,22 +51,22 @@
 (<tag xyXx> = replace/case <tag xXXx> "X" "y")
 (<tag xyyx> = replace/case/all <tag xXXx> "X" "y")
 (["a" "B" "x"] = replace/case/all ["a" "B" "a" "b"] ["a" "b"] "x")
-((the (x A x)) = replace/case/all lit (a A a) 'a 'x)
+('(x A x) = replace/case/all '(a A a) [a] [x])
 
 ;((make hash! [x a b [a B]]) = replace/case make hash! [a B a b [a B]] [a B] 'x)
 
-; REPLACE null behavior (Ren-C only, as only it has null)
+; REPLACE BLANK! behavior
 ; https://forum.rebol.info/t/null-first-class-values-and-safety/895/2
 
-([3 4] = replace copy [3 0 4] 0 null)
-([3 0 4] = replace copy [3 0 4] null 1020)
-([2 0 2 0] = replace/all copy [1 0 2 0 1 0 2 0] [1 0] null)
-("34" = replace copy "304" "0" null)
-("304" = replace copy "304" null "1020")
-("2020" = replace/all copy "10201020" "10" null)
-(#{3040} = replace copy #{300040} #{00} null)
-(#{300040} = replace copy #{300040} null #{10002000})
-(#{20002000} = replace/all copy #{1000200010002000} #{1000} null)
+([3 4] = replace copy [3 0 4] 0 blank)
+([3 0 4] = replace copy [3 0 4] blank 1020)
+([2 0 2 0] = replace/all copy [1 0 2 0 1 0 2 0] [1 0] blank)
+("34" = replace copy "304" "0" blank)
+("304" = replace copy "304" blank "1020")
+("2020" = replace/all copy "10201020" "10" blank)
+(#{3040} = replace copy #{300040} #{00} blank)
+(#{300040} = replace copy #{300040} blank #{10002000})
+(#{20002000} = replace/all copy #{1000200010002000} #{1000} blank)
 
 ; REPLACE/DEEP - /DEEP not (yet?) implemented in Ren-C
 

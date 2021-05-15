@@ -71,7 +71,7 @@ remold: redescribe [
     ]
 )
 
-array: function [
+array: func [
     {Makes and initializes a block of a given size}
 
     return: "Generated block or null if blank input"
@@ -80,8 +80,9 @@ array: function [
         [<blank> integer! block!]
     /initial "Initial value (will be called each time if a function)"
         [any-value!]
+    <local> rest block
 ][
-    initial: :initial else '_  ; default to BLANK!
+    initial: try :initial  ; default to BLANK!
     if block? size [
         rest: next size else [
             ;
@@ -99,16 +100,16 @@ array: function [
     block: make block! size
     case [
         block? rest [
-            loop size [append/only block array/initial rest :initial]
+            loop size [append block ^(array/initial rest :initial)]
         ]
         any-series? :initial [
-            loop size [append/only block copy/deep initial]
+            loop size [append block ^(copy/deep initial/)]
         ]
         action? :initial [
-            loop size [append/only block initial]  ; Called every time
+            loop size [append block ^(initial/)]  ; Called every time
         ]
     ] else [
-        append/only/dup block :initial size
+        append/dup block ^initial size
     ]
     return block
 ]
@@ -120,9 +121,9 @@ replace: function [
     target "Series to replace within (modified)"
         [any-series!]
     pattern "Value to be replaced (converted if necessary)"
-        [<opt> any-value!]
+        [any-value!]
     replacement "Value to replace with (called each time if a function)"
-        [<opt> any-value!]
+        [any-value!]
 
     ; !!! Note these refinments alias ALL, CASE, TAIL natives!
     /all "Replace all occurrences"
@@ -131,7 +132,7 @@ replace: function [
 
     ; Consider adding an /any refinement to use find/any, once that works.
 ][
-    if not set? 'pattern [return target]
+    if blank? :pattern [return target]
 
     all_REPLACE: all
     all: :lib/all
@@ -403,7 +404,7 @@ extract: function [
     index: default '1
     out: make (type of series) len
     iterate-skip series width [
-        append/only out pick series index
+        append out try ^(pick series index)
     ]
 ]
 
@@ -661,8 +662,8 @@ split: function [
     ; or where the dlm was a char/string/charset and it was the last char
     ; (so we want to append an empty field that the above rule misses).
     ;
-    fill-val: does [copy either any-array? series [[]] [""]]
-    add-fill-val: does [append/only result fill-val]
+    fill-val: does [copy either any-array? series [just []] [""]]
+    add-fill-val: does [append result fill-val]
     if integer? dlm [
         if into [
             ; If the result is too short, i.e., less items than 'size, add
@@ -682,8 +683,8 @@ split: function [
             char! [dlm = last series]
             text! tag! word! [
                 did all [
-                    find series dlm
-                    empty? find-last/tail series dlm
+                    find series ^dlm
+                    empty? find-last/tail series ^dlm
                 ]
             ]
             block! [false]

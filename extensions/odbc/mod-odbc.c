@@ -1625,10 +1625,10 @@ REBNATIVE(copy_odbc)
             }
 
             REBVAL *temp = ODBC_Column_To_Rebol_Value(col);
-            rebElide("append/only", record, rebR(temp));
+            rebElide("append", record, "quote", rebR(temp));
         }
 
-        rebElide("append/only", results, rebR(record));
+        rebElide("append", results, "quote", rebR(record));
         ++row;
     }
 

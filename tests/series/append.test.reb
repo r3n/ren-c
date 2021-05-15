@@ -32,9 +32,9 @@
 
 ; https://forum.rebol.info/t/justifiable-asymmetry-to-on-block/751
 ;
-([a b c d/e/f] = append copy [a b c] 'd/e/f)
+([a b c d/e/f] = append copy [a b c] just d/e/f)
 ('a/b/c/d/e/f = join 'a/b/c ['d 'e 'f])
-('(a b c d/e/f) = append copy '(a b c) 'd/e/f)
+('(a b c d/e/f) = append copy '(a b c) just d/e/f)
 (did trap ['a/b/c/d/e/f = join 'a/b/c '('d 'e 'f)])
 ('a/b/c/d/e/f = join 'a/b/c 'd/e/f)
 
@@ -44,7 +44,7 @@
     (
         b: blockify a: [<x> #y]
         append b/1 "x"
-        append b 'z
+        append b just z
         a = [<xx> #y z]
     )(
         b: blockify a: <x>
@@ -52,7 +52,7 @@
         did all [
             b = [<xx>]
             trap [
-                append b 'z  ; block doesn't truly "exist", can't append
+                append b just z  ; block doesn't truly "exist", can't append
             ] then e -> [
                 e/id = 'series-frozen
             ]
@@ -69,17 +69,17 @@
     ;
     ([a b c d e] = append [a b c] [d e])
     ([a b c d e] = append [a b c] '[d e])  ; quote burned off by evaluation
-    ([a b c (d e)] = append [a b c] '(d e))
-    ([a b c d/e] = append [a b c] 'd/e)
-    ([a b c [d e]:] = append [a b c] '[d e]:)
-    ([a b c (d e):] = append [a b c] '(d e):)
-    ([a b c d/e:] = append [a b c] 'd/e:)
-    ([a b c :[d e]] = append [a b c] ':[d e])
-    ([a b c :(d e)] = append [a b c] ':(d e))
-    ([a b c :d/e] = append [a b c] ':d/e)
-    ([a b c ^[d e]] = append [a b c] '^[d e])
-    ([a b c ^(d e)] = append [a b c] '^(d e))
-    ([a b c ^d/e] = append [a b c] '^d/e)
+    ([a b c (d e)] = append [a b c] just (d e))
+    ([a b c d/e] = append [a b c] just d/e)
+    ([a b c [d e]:] = append [a b c] just [d e]:)
+    ([a b c (d e):] = append [a b c] just (d e):)
+    ([a b c d/e:] = append [a b c] just d/e:)
+    ([a b c :[d e]] = append [a b c] just :[d e])
+    ([a b c :(d e)] = append [a b c] just :(d e))
+    ([a b c :d/e] = append [a b c] just :d/e)
+    ([a b c ^[d e]] = append [a b c] just ^[d e])
+    ([a b c ^(d e)] = append [a b c] just ^(d e))
+    ([a b c ^d/e] = append [a b c] just ^d/e)
 
     ; To efficiently make a new cell that acts as a block while not making
     ; a new allocation to do so, we can use AS.  This saves on the creation
@@ -152,7 +152,12 @@
 
     ([a b c [3 d e]] = append [a b c] ^ compose [(1 + 2) d e])
 
-    ([a b c] = append [a b c] ^(null))
+    ([a b c] = append [a b c] quote null)
+
+    (
+        e: trap [[a b c] = append [a b c] ^(null)]
+        e/id = 'arg-required
+    )
 ]
 
 [#2383 (

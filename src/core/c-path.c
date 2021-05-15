@@ -836,7 +836,7 @@ REBNATIVE(pick)
 
     PVS_PICKER(pvs) = ARG(picker);
 
-    pvs->label = nullptr; // applies to e.g. :append/only returning APPEND
+    pvs->label = nullptr; // applies to e.g. :append/dup returning APPEND
     pvs->param = nullptr;
 
   redo: ;  // semicolon is intentional, next line is declaration
@@ -939,7 +939,7 @@ REBNATIVE(poke)
 
     PVS_PICKER(pvs) = ARG(picker);
 
-    pvs->label = nullptr;  // e.g. :append/only returning APPEND
+    pvs->label = nullptr;  // e.g. :append/dup returning APPEND
     pvs->param = cast_PAR(ARG(value));
 
     PATH_HOOK *hook = Path_Hook_For_Type_Of(location);

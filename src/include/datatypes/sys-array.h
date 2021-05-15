@@ -584,16 +584,6 @@ inline static RELVAL *Init_Relative_Block_At(
     Init_Relative_Block_At((out), (action), (array), 0)
 
 
-// The rule for splicing is now fixed as "only plain BLOCK! splices":
-// https://forum.rebol.info/t/1332
-//
-// Despite the simple contract, using a call to this routine helps document
-// placs where the decision to splice or not is being made.
-//
-#define Splices_Without_Only(v) \
-    IS_BLOCK(v)
-
-
 // Checks if ANY-GROUP! is like ((...)) or (...), used by COMPOSE & PARSE
 //
 inline static bool Is_Any_Doubled_Group(REBCEL(const*) group) {

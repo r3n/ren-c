@@ -890,22 +890,41 @@ REBTYPE(Array)
 
         REBVAL *pattern = ARG(pattern);
 
+        if (IS_NULLED(pattern))
+            fail ("Cannot FIND/SELECT null (use BLANK!, see TRY)");
+        if (IS_BLANK(pattern))
+            return nullptr;  // BLANK! in, NULL out
+
+        REBFLGS flags = (
+            (REF(match) ? AM_FIND_MATCH : 0)
+            | (REF(case) ? AM_FIND_CASE : 0)
+        );
+
         REBLEN len;
-        if (ANY_ARRAY(pattern))
-            VAL_ARRAY_LEN_AT(&len, pattern);
-        else
+        if (IS_QUOTED(pattern)) {
+            Unquotify(pattern, 1);
+            flags |= AM_FIND_ONLY;
             len = 1;
+        }
+        else if (ANY_ARRAY(pattern)) {
+            VAL_ARRAY_LEN_AT(&len, pattern);
+        }
+        else {
+            // !!! Need to think about `select block 'key` when you are trying
+            // to have get select-parity between blocks and objects.  Rethink
+            // what FIND on objects means, also.
+            //
+            if (not ANY_INERT(pattern) and sym == SYM_FIND)
+                fail ("Cannot FIND evaluative values w/o QUOTE");
+
+            flags |= AM_FIND_ONLY;
+            len = 1;
+        }
 
         REBLEN limit = Part_Tail_May_Modify_Index(array, ARG(part));
 
         const REBARR *arr = VAL_ARRAY(array);
         REBLEN index = VAL_INDEX(array);
-
-        REBFLGS flags = (
-            (REF(only) ? AM_FIND_ONLY : 0)
-            | (REF(match) ? AM_FIND_MATCH : 0)
-            | (REF(case) ? AM_FIND_CASE : 0)
-        );
 
         REBINT skip;
         if (REF(skip)) {
@@ -924,9 +943,6 @@ REBTYPE(Array)
             return nullptr;
 
         assert(ret <= limit);
-
-        if (REF(only))
-            len = 1;
 
         if (VAL_WORD_ID(verb) == SYM_FIND) {
             if (REF(tail) or REF(match))
@@ -959,10 +975,13 @@ REBTYPE(Array)
         // Note that while inserting or appending NULL is a no-op, CHANGE with
         // a /PART can actually erase data.
         //
-        if (IS_NULLED(ARG(value)) and len == 0) {  // only nulls bypass writes
-            if (sym == SYM_APPEND) // append always returns head
-                VAL_INDEX_RAW(array) = 0;
-            RETURN (array); // don't fail on read only if it would be a no-op
+        if (IS_BLANK(ARG(value))) {  // only blanks bypass
+            if (len == 0) {
+                if (sym == SYM_APPEND) // append always returns head
+                    VAL_INDEX_RAW(array) = 0;
+                RETURN (array); // don't fail on read only if would be a no-op
+            }
+            Init_Nulled(ARG(value));  // low-level code treats NULL as nothing
         }
 
         REBARR *arr = VAL_ARRAY_ENSURE_MUTABLE(array);
@@ -972,19 +991,15 @@ REBTYPE(Array)
 
         Copy_Cell(D_OUT, array);
 
-        if (not REF(only)) {
-            if (IS_NULLED(ARG(value)))
-                fail ("Cannot APPEND/INSERT/CHANGE null (use BLANK!, see TRY)");
-            if (IS_BLANK(ARG(value)))
-                return D_OUT;  // no-op
-
-            if (IS_QUOTED(ARG(value)))
-                Unquotify(ARG(value), 1);
-            else if (not ANY_INERT(ARG(value)))
-                fail ("Cannot APPEND/INSERT/CHANGE evaluative values w/o QUOTE");
-            else if (Splices_Without_Only(ARG(value)))
-                flags |= AM_SPLICE;
+        if (IS_NULLED(ARG(value))) {
+            // handled before mutability check
         }
+        else if (IS_QUOTED(ARG(value)))
+            Unquotify(ARG(value), 1);
+        else if (not ANY_INERT(ARG(value)))
+            fail ("Cannot APPEND/INSERT/CHANGE evaluative values w/o QUOTE");
+        else if (ANY_ARRAY(ARG(value)))
+            flags |= AM_SPLICE;
 
         if (REF(part))
             flags |= AM_PART;

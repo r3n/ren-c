@@ -2561,7 +2561,7 @@ REBNATIVE(subparse)
                     Derelativize(specified, rule, P_RULE_SPECIFIER);
 
                     REBLEN mod_flags = (P_FLAGS & PF_INSERT) ? 0 : AM_PART;
-                    if (not only and Splices_Without_Only(specified))
+                    if (not only and ANY_ARRAY(specified))
                         mod_flags |= AM_SPLICE;
 
                     // Note: We could check for mutability at the start
