@@ -14,9 +14,9 @@
     ('~void~ = friendly ^(void))
 ]
 
-((just '10) = ^(10 comment "hi"))
+((the '10) = ^(10 comment "hi"))
 
 (null = ^(null))
-((just ') = ^(if true [null]))
+((the ') = ^(if true [null]))
 
-((just '1020) = ^(1000 + 20))
+((the '1020) = ^(1000 + 20))

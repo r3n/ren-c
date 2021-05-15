@@ -363,7 +363,7 @@ apply: emulate [
                 arg: block/1
                 try next block
             ] else [
-                try evaluate/result block (just arg:)
+                try evaluate/result block (the arg:)
             ]
 
             if refinement? params/1 [
@@ -1255,7 +1255,7 @@ append: emulate [oldsplicer :append]
 insert: emulate [oldsplicer :insert]
 change: emulate [oldsplicer :change]
 
-quote: emulate [:just]
+quote: emulate [:the]
 
 cloaker: helper [function [  ; specialized as CLOAK and DECLOAK
     {Simple and insecure data scrambler, was native C code in Rebol2/R3-Alpha}

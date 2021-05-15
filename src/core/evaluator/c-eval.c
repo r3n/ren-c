@@ -1608,7 +1608,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         //
         // There's no way to have ' represent an isotope state and something
         // else represent the stable state.  There is no "something else".  So
-        // to produce nulls in blocks (like `compose [null? (just ')`]) you
+        // to produce nulls in blocks (like `do compose [null? (the ')]`) you
         // have no other way to do it either.
         //
         // This is why NULL-2 is solely a transient state, and once you store
@@ -1785,8 +1785,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // Left-quoting by enfix needs to be done in the lookahead before an
         // evaluation, not this one that's after.  This happens in cases like:
         //
-        //     left-just: enfix func [:value] [:value]
-        //     just <something> just-lit
+        //     left-the: enfix func [:value] [:value]
+        //     the <something> left-the
         //
         // But due to the existence of <end>-able and <skip>-able parameters,
         // the left quoting function might be okay with seeing nothing on the
@@ -1914,9 +1914,9 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // Want to keep this flag between an operation and an ensuing enfix in
     // the same frame, so can't clear in Drop_Action(), e.g. due to:
     //
-    //     left-just: enfix :Just
+    //     left-the: enfix :the
     //     o: make object! [f: does [1]]
-    //     o/f left-just  ; want error suggesting >- here, need flag for that
+    //     o/f left-the  ; want error suggesting >- here, need flag for that
     //
     CLEAR_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH);
     assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));  // must be consumed

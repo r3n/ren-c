@@ -25,16 +25,16 @@
 ; !!! There was once special accounting for where the quoting level of the
 ; test would match the quoting level of the rule:
 ;
-;    (just 'foo = match just 'word! just 'foo)
-;    (null = match just 'word! just foo)
+;    (the 'foo = match the 'word! the 'foo)
+;    (null = match the 'word! the foo)
 ;
 ;    quoted-word!: quote word!
-;    (''foo = match ['quoted-word!] just ''foo)
-;    (null = match ['quoted-word!] just '''foo)
-;    ('''foo = match just '['quoted-word!] just '''foo)
+;    (''foo = match ['quoted-word!] the ''foo)
+;    (null = match ['quoted-word!] the '''foo)
+;    ('''foo = match the '['quoted-word!] the '''foo)
 ;
 ;    even-int: 'integer!/[:even?]
-;    (just '304 = match just '[block!/3 even-int] just '304)
+;    (the '304 = match the '[block!/3 even-int] the '304)
 ;
 ; This idea was killed off in steps; one step made it so that MATCH itself did
 ; not take its argument literally so it would not see quotes.  That made it

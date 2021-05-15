@@ -133,7 +133,7 @@ math: func [
 
     <static>
 
-    slash (just /)
+    slash (the /)
 
     expr-val (_)
 

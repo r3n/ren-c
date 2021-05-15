@@ -66,7 +66,7 @@
 )
 (
     pos: evaluate evaluate [1 elide "a" elide "b" + 2 * 3 fail "too far"]
-    pos = just '[elide "b" + 2 * 3 fail "too far"]
+    pos = the '[elide "b" + 2 * 3 fail "too far"]
 )
 (
     pos: evaluate [
@@ -339,7 +339,7 @@
 ; REEVAL has been tuned to be able to act invisibly if the thing being
 ; reevaluated turns out to be invisible.
 ;
-(integer? reeval just (comment "this group vaporizes") 1020)
+(integer? reeval the (comment "this group vaporizes") 1020)
 (<before> = (<before> reeval :comment "erase me"))
 (
     x: <before>

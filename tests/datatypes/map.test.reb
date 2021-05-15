@@ -93,8 +93,8 @@
 
 [
     (
-        b2: copy just ''[x y]
-        b4: copy just ''''[m n o p]
+        b2: copy the ''[x y]
+        b4: copy the ''''[m n o p]
         m: make map! compose [
             a 0 'a 1 ''a 2 '''a 3 ''''a 4
             ((b2)) II ((b4)) IIII
@@ -102,17 +102,17 @@
         true
     )
 
-    (0 = select/case m just a)
-    (1 = select/case m just 'a)
-    (2 = select/case m just ''a)
-    (3 = select/case m just '''a)
-    (4 = select/case m just ''''a)
+    (0 = select/case m the a)
+    (1 = select/case m the 'a)
+    (2 = select/case m the ''a)
+    (3 = select/case m the '''a)
+    (4 = select/case m the ''''a)
 
-    ((trap [select m just a])/id = 'conflicting-key)
-    ((trap [m/(just a)])/id = 'conflicting-key)
+    ((trap [select m the a])/id = 'conflicting-key)
+    ((trap [m/(the a)])/id = 'conflicting-key)
 
-    ((trap [select m just ''''a])/id = 'conflicting-key)
-    ((trap [m/(just ''''a)])/id = 'conflicting-key)
+    ((trap [select m the ''''a])/id = 'conflicting-key)
+    ((trap [m/(the ''''a)])/id = 'conflicting-key)
 
     ('II = m/[x y])
     ('IIII = m/[m n o p])

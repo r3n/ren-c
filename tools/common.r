@@ -243,7 +243,7 @@ for-each-record: function [
         spec: collect [
             for-each column-name headings [
                 keep/only column-name
-                keep compose/only [just (table/1)]
+                keep compose/only [the (table/1)]
                 table: next table
             ]
         ]

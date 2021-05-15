@@ -4,5 +4,5 @@
 ("foo" = as text! '^foo)
 (sym-word! = type of '^foo)
 
-(x: 10, (just '10) = ^x)
+(x: 10, (the '10) = ^x)
 (x: null, null = ^x)

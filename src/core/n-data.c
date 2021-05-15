@@ -1723,12 +1723,12 @@ REBNATIVE(heavy_null_q)
     REBVAL *v = ARG(optional);
 
     // Be consistent with other typecheckers and error if given a non-isotope
-    // form of a BAD-WORD!.  (@params should be used sparingly/carefully.)
+    // form of a BAD-WORD!.  (^params should be used sparingly/carefully.)
     //
-    if (IS_BAD_WORD(v))  // @param gives non-quoted void if stable void was input
+    if (IS_BAD_WORD(v))  // ^param gives non-quoted when mean bad word is input
         fail (PAR(optional));
 
-    // isotope form @literalizes as quoted null, (just ')
+    // isotope form ^literalizes as quoted null, (the ')
     return Init_Logic(D_OUT, KIND3Q_BYTE(v) == REB_NULL + REB_64);
 }
 
@@ -1744,7 +1744,7 @@ REBNATIVE(heavy_null_q)
 //
 REBNATIVE(light_null_q)
 //
-// Note: We could tell whether something is null-2 or null without the @literal
+// Note: We could tell whether something is null-2 or null without the ^literal
 // convention in native code, by looking at CELL_FLAG_ISOTOPE on a normal
 // parameter.  But we try not to make it more aboveboard by having the same
 // function spec a usermode function would need to detect the condition.
@@ -1754,9 +1754,9 @@ REBNATIVE(light_null_q)
     REBVAL *v = ARG(optional);
 
     // Be consistent with other typecheckers and error if given a non-isotope
-    // form of a BAD-WORD!.  (@params should be used sparingly/carefully.)
+    // form of a BAD-WORD!.  (^params should be used sparingly/carefully.)
     //
-    if (IS_BAD_WORD(v))  // @param gives non-quoted void if stable void was input
+    if (IS_BAD_WORD(v))  // ^param gives non-quoted when mean bad word is input
         fail (PAR(optional));
 
     return Init_Logic(D_OUT, KIND3Q_BYTE(v) == REB_NULL);

@@ -196,7 +196,7 @@
         assert [pos = ""]
         assert [g = as get-word! word]
 
-        [l pos]: transcode unspaced ["^" str]
+        [l pos]: transcode unspaced ["^^" str]
         assert [pos = ""]
         assert [l = as get-word! word]
     ]

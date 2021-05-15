@@ -269,13 +269,13 @@
 
     (10 == hard 10)
     ('a == hard a)
-    (just 'a == hard 'a)
-    (just :a == hard :a)
-    (just a: == hard a:)
-    (just (10 + 20) == hard (10 + 20))
+    (the 'a == hard 'a)
+    (the :a == hard :a)
+    (the a: == hard a:)
+    (the (10 + 20) == hard (10 + 20))
     (
         o: context [f: 10]
-        just :o/f == hard :o/f
+        the :o/f == hard :o/f
     )
 ]
 

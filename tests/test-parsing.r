@@ -234,7 +234,7 @@ make object! [
                 while whitespace
                 [
                     position: "%"
-                    (next-position: transcode/next (just value:) position)
+                    (next-position: transcode/next (the value:) position)
                     :next-position
                         |
                     ; dialect failure?

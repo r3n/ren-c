@@ -771,7 +771,7 @@ sys/make-scheme [
             ]
             port/state/connection: conn: make port! compose [
                 scheme: (
-                    either port/spec/scheme = 'http [just 'tcp][just 'tls]
+                    either port/spec/scheme = 'http [the 'tcp][the 'tls]
                 )
                 host: port/spec/host
                 port-id: port/spec/port-id

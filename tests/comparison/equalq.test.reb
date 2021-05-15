@@ -427,7 +427,7 @@
 ; word! vs. get-word! symmetry
 (equal? equal? 'a first [:a] equal? first [:a] 'a)
 ; {word! vs. lit-word!
-(equal? just 'a first ['a])
+(equal? the 'a first ['a])
 ; word! vs. lit-word! symmetry
 (equal? equal? 'a first ['a] equal? first ['a] 'a)
 ; word! vs. refinement! (changed in Ren-C)
@@ -617,7 +617,7 @@
 ; Error in R2 (could be fixed).
 (not equal? make port! http:// make port! http://)
 [#859 (
-    a: copy just ()
+    a: copy the ()
     insert/only a a
     error? trap [do a]
 )]

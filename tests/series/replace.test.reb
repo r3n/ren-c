@@ -51,7 +51,7 @@
 (<tag xyXx> = replace/case <tag xXXx> "X" "y")
 (<tag xyyx> = replace/case/all <tag xXXx> "X" "y")
 (["a" "B" "x"] = replace/case/all ["a" "B" "a" "b"] ["a" "b"] "x")
-((just (x A x)) = replace/case/all lit (a A a) 'a 'x)
+((the (x A x)) = replace/case/all lit (a A a) 'a 'x)
 
 ;((make hash! [x a b [a B]]) = replace/case make hash! [a B a b [a B]] [a B] 'x)
 

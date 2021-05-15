@@ -186,13 +186,13 @@
     ])
     (did all  [
         then? uparse "" [synthesized: ^[('~void~)]]  ; not-NULL result
-        (just '~void~) = synthesized  ; friendly if user made it friendly
+        (the '~void~) = synthesized  ; friendly if user made it friendly
     ])
     (did all  [
         then? uparse "" [synthesized: ^[(~void~)]]  ; not-NULL result
         '~void~ = synthesized  ; user didn't quote it, so suggests unfriendly
     ])
-    ((just '~friendly~) = ^(uparse [~friendly~] [bad-word!]))
+    ((the '~friendly~) = ^(uparse [~friendly~] [bad-word!]))
 ]
 
 

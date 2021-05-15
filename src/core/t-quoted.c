@@ -133,7 +133,7 @@ REB_R PD_Quoted(
 // on QUOTED!.  e.g. "do whatever the non-quoted version would do, then add
 // the quotedness onto the result".
 //
-//     >> add (just '''1) 2
+//     >> add (the '''1) 2
 //     == '''3
 //
 // While a bit outlandish for ADD, it might seem to make more sense for FIND
@@ -166,7 +166,7 @@ REBTYPE(Quoted)
 
 
 //
-//  just: native/body [
+//  the: native/body [
 //
 //  "Returns value passed in without evaluation"
 //
@@ -182,9 +182,9 @@ REBTYPE(Quoted)
 //      ]
 //  ]
 //
-REBNATIVE(just)
+REBNATIVE(the)
 {
-    INCLUDE_PARAMS_OF_JUST;
+    INCLUDE_PARAMS_OF_THE;
 
     REBVAL *v = ARG(value);
 
@@ -299,7 +299,7 @@ REBNATIVE(unquote)
     // form comes back as an isotope.
     //
     if (IS_NULLED(D_OUT) or IS_BAD_WORD(D_OUT))
-        SET_CELL_FLAG(D_OUT, ISOTOPE);  // (unquote just ') => heavy null
+        SET_CELL_FLAG(D_OUT, ISOTOPE);  // (unquote the ') => heavy null
 
     return D_OUT;
 }

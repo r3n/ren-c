@@ -18,10 +18,10 @@ REBOL [
 
 
 ; LIT now has new meanings, but is used some places (like <json>) until the
-; JUST change has propagated completely.
+; "THE" change has propagated completely.
 ; https://forum.rebol.info/t/just-vs-lit-literal-literally/1453
 ;
-lit: :just
+lit: :the
 
 
 ; !!! Compatibility for VOID!, remove as time goes on.  BAD-WORD! has come

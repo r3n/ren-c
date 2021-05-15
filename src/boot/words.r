@@ -219,7 +219,7 @@ break
 skip
 to
 thru
-quote  ; !!! kept for compatibility, but use JUST instead
+quote  ; !!! kept for compatibility, but use THE instead
 just
 lit-word!  ; !!! simulated datatype constraint (a QUOTED! like 'x)
 lit-path!  ; !!! simulated datatype costraint (a QUOTED! like 'x/y)

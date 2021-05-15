@@ -80,7 +80,7 @@ dump: function [
 
     case [
         swp: match [set-word! set-path!] :value [ ; `dump x: 1 + 2`
-            pos: evaluate/result extra (just result:)
+            pos: evaluate/result extra (the result:)
             set swp :result
             print [swp, result]
         ]
@@ -88,7 +88,7 @@ dump: function [
         b: match block! :value [
             while [not tail? b] [
                 if swp: match [set-word! set-path!] :b/1 [ ; `dump [x: 1 + 2]`
-                    b: evaluate/result b (just result:)
+                    b: evaluate/result b (the result:)
                     print [swp, result]
                 ] else [
                     dump-one b/1

@@ -31,8 +31,8 @@
     ('~void~ = ^ ^ devoid do [comment "hi"])
     ('~void~ = ^ ^ devoid do make frame! :void)
     (else? ^ devoid do [null])
-    ((just ') = ^ devoid do [heavy null])
-    ((just ') = ^ devoid do [if true [null]])
+    ((the ') = ^ devoid do [heavy null])
+    ((the ') = ^ devoid do [if true [null]])
 ]
 
 

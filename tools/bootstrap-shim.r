@@ -69,8 +69,8 @@ trap [
     ; https://forum.rebol.info/t/just-vs-lit-literal-literally/1453
     ; bootstrap executable on GitHub CI doesn't have this change
     ;
-    if undefined? 'just [
-        just: :literal
+    if undefined? 'the [
+        the: :literal
 
         ; Workaround the <void> => <none> spec change, for same version
 
@@ -432,10 +432,10 @@ mutable: func [x [any-value!]] [
     :x
 ]
 
-just: :quote  ; Renamed due to the QUOTED! datatype
+the: :quote  ; Renamed due to the QUOTED! datatype
 quote: func [x [<opt> any-value!]] [
     switch type of x [
-        null [just ()]
+        null [the ()]
         word! [to lit-word! x]
         path! [to lit-path! x]
 

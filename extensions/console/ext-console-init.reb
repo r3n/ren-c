@@ -208,7 +208,7 @@ console!: make object! [
             return
         ]
 
-        if v = (just ') [
+        if v = (the ') [
             ;
             ; If the ^ processed a value into a *quoted* NULL, that indicates
             ; the "heavy" isotope of NULL.  This is a transient state that only

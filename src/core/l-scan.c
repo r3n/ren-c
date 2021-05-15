@@ -2085,7 +2085,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         if (level->mode == ')')
             goto done;
 
-        if (Is_Dot_Or_Slash(level->mode)) {  // implicit end e.g. (just /)
+        if (Is_Dot_Or_Slash(level->mode)) {  // implicit end e.g. (the /)
             Init_Blank(DS_PUSH());
             --ss->begin;
             --ss->end;
