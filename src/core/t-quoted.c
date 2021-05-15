@@ -201,6 +201,46 @@ REBNATIVE(the)
 
 
 //
+//  just: native/body [
+//
+//  "Returns quoted eversion of value passed in without evaluation"
+//
+//      return: "Input value, verbatim--unless /SOFT and soft quoted type"
+//          [<opt> any-value!]
+//      'value [any-value!]
+//      /soft "Evaluate if a GET-GROUP!, GET-WORD!, or GET-PATH!"
+//  ][
+//      if soft and (match [get-group! get-word! get-path!] :value) [
+//          reeval value
+//      ] else [
+//          :value  ; also sets unevaluated bit, how could a user do so?
+//      ]
+//  ]
+//
+REBNATIVE(just)
+//
+// Note: This could be defined as `chain [:the | :quote]`.  However, it can be
+// needed early in the boot (before REDESCRIBE is available), and it is also
+// something that needs to perform well due to common use.  Having it be its
+// own native is probably worthwhile. 
+{
+    INCLUDE_PARAMS_OF_THE;
+
+    REBVAL *v = ARG(value);
+
+    if (REF(soft) and ANY_ESCAPABLE_GET(v)) {
+        if (Eval_Value_Throws(D_OUT, v, SPECIFIED))
+            return R_THROWN;
+        return Quotify(D_OUT, 1);  // Don't set UNEVALUATED flag
+    }
+
+    Copy_Cell(D_OUT, v);
+    SET_CELL_FLAG(D_OUT, UNEVALUATED);  // !!! should this bit be set?
+    return Quotify(D_OUT, 1);
+}
+
+
+//
 //  quote: native [
 //
 //  {Constructs a quoted form of the evaluated argument}

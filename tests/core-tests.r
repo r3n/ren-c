@@ -246,6 +246,7 @@
 %series/indexq.test.reb
 %series/insert.test.reb
 %series/intersect.test.reb
+%series/just.test.reb
 %series/last.test.reb
 %series/lengthq.test.reb
 %series/next.test.reb

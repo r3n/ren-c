@@ -257,7 +257,7 @@ default-combinators: make map! reduce [
         parser [action!]
         <local> last-result' result' pos
     ][
-        last-result': just '  ; quoted null as return value (unquote => null-2)
+        last-result': the '  ; quoted null as return value (unquote => null-2)
         cycle [
             ([result' pos]: ^ parser input) else [
                 set remainder input  ; overall WHILE never fails (but REJECT?)
