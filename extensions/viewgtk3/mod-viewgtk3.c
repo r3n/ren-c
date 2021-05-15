@@ -95,6 +95,80 @@ REBNATIVE(gtk_main_quit)
     return rebVoid();
 }
 
+// Signal function(s)
+
+// g_signal_connect, g_signal_connect_after and g_signal_connect_swapped
+// are convenience wrappers (macro/define) around the actual function 
+// g_signal_connect_data.
+// gulong g_signal_connect_data (gpointer instance,
+//                               const gchar *detailed_signal,
+//                               GCallback c_handler,
+//                               gpointer data,
+//                               GClosureNotify destroy_data,
+//                               GConnectFlags connect_flags);
+// #define g_signal_connect(instance, detailed_signal, c_handler, data) \
+//    g_signal_connect_data ((instance), (detailed_signal), (c_handler), (data), NULL, (GConnectFlags) 0)
+// #define g_signal_connect_after(instance, detailed_signal, c_handler, data) \
+//    g_signal_connect_data ((instance), (detailed_signal), (c_handler), (data), NULL, G_CONNECT_AFTER)
+//#define g_signal_connect_swapped(instance, detailed_signal, c_handler, data) \
+//    g_signal_connect_data ((instance), (detailed_signal), (c_handler), (data), NULL, G_CONNECT_SWAPPED)
+// Where the connectflags are defined to be
+// typedef enum
+// {
+//   G_CONNECT_AFTER       = 1 << 0,
+//   G_CONNECT_SWAPPED     = 1 << 1
+// } GConnectFlags;
+
+//
+//  export g-signal-connect-data: native [
+//
+//      {Connects a GCallback function to a signal for a particular object. Similar to g_signal_connect(), 
+// but allows to provide a GClosureNotify for the data which will be called when the signal handler is 
+// disconnected and no longer used.
+// Specify connect_flags if you need ..._after() or ..._swapped() variants of this function.
+// Usage example: g-signal-connect-data  as-handle window*  "destroy"  as-integer :quit  null
+// g-connect-signal-data instance detailed-signal handler data null 0
+// g-connect-signal-data instance detailed-signal handler data null connect-swapped 
+// (where connect-swapped = 2 and connect-after = 1, normal = 0)}
+//
+//      return: [integer!]
+//      instance [handle!]
+//      detailedsignal [text!]
+//      handler [handle!]
+//      data [handle! integer!]
+//      cleardata [integer!]
+//      flags [integer!]
+//  ]
+//
+REBNATIVE(g_signal_connect_data)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_G_SIGNAL_CONNECT_DATA;
+
+    // instance is a gpointer type, handle, so integer
+    GtkWidget *instance = VAL_HANDLE_POINTER(GtkWidget, ARG(instance));
+
+    // detailedsignal is a text to hold the description of the action. For example "quit", "clicked"
+    // signal names are to make distinction between the action to perform.
+    const char * detailedsignal = cast(char*, VAL_STRING_AT(ARG(detailedsignal)));
+
+    // handler is an integer type for a g-callback
+    GCallback handler = (GCallback) rebUnboxInteger(ARG(handler));
+
+    // data is a gpointer for a handle, so an integer
+    gpointer *data = VAL_HANDLE_POINTER(gpointer, ARG(data));
+
+    // cleardata is an integer for g-closure-notify, often value null is used
+    GClosureNotify cleardata = (GClosureNotify) rebUnboxInteger(ARG(cleardata));
+
+    // flags is an integer value, 0 = normal signal connect, 1 = after, 2 = swapped
+    GConnectFlags flags = (GConnectFlags) rebUnboxInteger(ARG(flags));
+
+    // result is > 0 for success adding a signal
+    unsigned int result = g_signal_connect_data(instance, detailedsignal, handler, data, cleardata, flags);
+
+    return rebInteger(result);
+}
+
 // Window functions
 
 //
