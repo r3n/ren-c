@@ -986,9 +986,12 @@ cause-error: func [
 ]
 
 
+; Note that in addition to this definition of FAIL, there is an early-boot
+; definition which runs if a FAIL happens before this point, which panics and
+; gives more debug information.
+;
 ; !!! Should there be a special bit or dispatcher used on the FAIL to ensure
-; it does not continue running?  `return: []` has been freed up as it no
-; longer means invisible...
+; it does not continue running?  `return: <divergent>`?
 ;
 ; Though HIJACK would have to be aware of it and preserve the rule.
 ;

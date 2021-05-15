@@ -249,3 +249,31 @@ REBNATIVE(panic)
 
     Panic_Core(p, tick, FRM_FILE_UTF8(frame_), FRM_LINE(frame_));
 }
+
+
+//
+//  fail: native [
+//
+//  {Early-boot version of FAIL (overridden by more complex usermode version)}
+//
+//      'blame [<skip> sym-word! sym-path!]
+//       reason [<end> <opt> any-value!]  ; permissive to avoid callsite error
+//       /where [frame! any-word!]
+//   ]
+//
+REBNATIVE(fail)
+{
+    INCLUDE_PARAMS_OF_FAIL;
+
+  #if defined(NDEBUG)
+    UNUSED(ARG(blame));
+    UNUSED(ARG(where));
+  #else
+    printf("!!! Early-Boot FAIL, called fail: native [], not fail: func []\n");
+    PROBE(ARG(reason));
+    PROBE(ARG(blame));
+    PROBE(ARG(where));
+  #endif
+
+    panic (ARG(reason));
+}

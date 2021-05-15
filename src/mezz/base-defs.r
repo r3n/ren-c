@@ -655,15 +655,6 @@ print: func* [
     (write-stdout try spaced line) then [write-stdout newline]
 ]
 
-; In case an early fail happens before FAIL boots, try to give some idea of
-; what the arguments to the fail are by printing them.
-;
-fail: func* [reason] [
-    print "YES THIS IS A FAILURE"
-    print reason
-    fhqwghds
-]
-
 
 internal!: make typeset! [
     handle!
