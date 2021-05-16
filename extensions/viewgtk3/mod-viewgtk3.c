@@ -174,10 +174,23 @@ REBNATIVE(g_signal_connect_data)
 //
 //  export gtk-window-new: native [
 //
-//      {Creates a new label with the given text inside it.}
+//      {Creates a new GtkWindow, which is a toplevel window that can contain other widgets.
+// Nearly always, the type of the window should be GTK_WINDOW_TOPLEVEL. If you’re implementing
+// something like a popup menu from scratch (which is a bad idea, just use GtkMenu), you might
+// use GTK_WINDOW_POPUP. GTK_WINDOW_POPUP is not for dialogs, though in some other toolkits dialogs 
+// are called “popups”. In GTK+, GTK_WINDOW_POPUP means a pop-up menu or pop-up tooltip.
+// On X11, popup windows are not controlled by the window manager.
+// 
+// If you simply want an undecorated window (no window borders), use gtk_window_set_decorated(), don’t use GTK_WINDOW_POPUP.
+// 
+// All top-level windows created by gtk_window_new() are stored in an internal top-level window list. 
+// This list can be obtained from gtk_window_list_toplevels(). Due to Gtk+ keeping a reference to the window internally, 
+// gtk_window_new() does not return a reference to the caller.
+// 
+// To delete a GtkWindow, call gtk_widget_destroy().}
 //
 //      return: [handle! void!]
-//      type [text!]
+//      type [integer!]
 //  ]
 //
 REBNATIVE(gtk_window_new)
@@ -830,7 +843,7 @@ REBNATIVE(gtk_text_view_set_cursor_visible)
     GtkTextView *textview = VAL_HANDLE_POINTER(GtkTextView, ARG(textview));
 
     bool setting = rebDid(ARG(setting));
- 
+
     gtk_text_view_set_cursor_visible(textview, setting);
 
     return rebVoid();
@@ -857,75 +870,6 @@ REBNATIVE(gtk_text_view_get_cursor_visible)
     return rebValue(logic);
 }
 
-// Widget Canvas (drawing area) functions
-
-//
-//  export gtk-drawing-area-new: native [
-//
-//      {Creates a new drawing area.}
-//
-//      return: [handle! void!]
-//  ]
-//
-REBNATIVE(gtk_drawing_area_new)
-{
-    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_DRAWING_AREA_NEW;
-
-    GtkWidget *canvas = gtk_drawing_area_new();
-
-    return rebHandle(canvas, 0, nullptr);
-}
-
-// Widget Interface functions
-
-// Editable
-
-//
-//  export gtk-editable-set-editable: native [
-//
-//      {Determines if the user can edit the text in the editable widget or not.}
-//
-//      return: [void!]
-//      field [handle!]
-//      editable [logic!]
-//  ]
-//
-REBNATIVE(gtk_editable_set_editable)
-{
-    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_EDITABLE_SET_EDITABLE;
-
-    GtkEditable *field = VAL_HANDLE_POINTER(GtkEditable, ARG(field));
-
-    bool editable = rebDid(ARG(editable));
- 
-    gtk_editable_set_editable(field, editable);
-
-    return rebVoid();
-}
-
-//
-//  export gtk-editable-get-editable: native [
-//
-//      {Retrieves whether the text in entry is visible.}
-//
-//      return: [logic!]
-//      field [handle!]
-//  ]
-//
-REBNATIVE(gtk_editable_get_editable)
-{
-    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_EDITABLE_GET_EDITABLE;
-
-    GtkEditable *field = VAL_HANDLE_POINTER(GtkEditable, ARG(field));
-     
-    bool result = gtk_editable_get_editable(field);
-    REBVAL *logic = rebValue("TO LOGIC!", result);
-
-    return rebValue(logic);
-}
-
-// Text Buffer
-
 //
 //  export gtk-text-buffer-set-text: native [
 //
@@ -944,7 +888,7 @@ REBNATIVE(gtk_text_buffer_set_text)
 
     GtkTextBuffer *buffer = VAL_HANDLE_POINTER(GtkTextBuffer, ARG(buffer));
 
-   const char * str = cast(char*, VAL_STRING_AT(ARG(str)));
+    const char * str = cast(char*, VAL_STRING_AT(ARG(str)));
 
     unsigned int length = rebUnboxInteger(ARG(length));
 
