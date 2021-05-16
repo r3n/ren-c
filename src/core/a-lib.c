@@ -1256,7 +1256,9 @@ char *RL_rebSpell(
     Run_Va_May_Fail(v, quotes, p, vaptr);  // calls va_end()
 
     if (IS_NULLED(v))
-        return nullptr;  // NULL is passed through, for opting out
+        fail ("rebSpell() does not take NULL (use TRY/BLANK! to opt out)");
+    if (IS_BLANK(v))
+        return nullptr;  // blank in, null out
 
     size_t size = Spell_Into(nullptr, 0, v);
     char *result = rebAllocN(char, size);  // no +1 for term needed...
@@ -1363,7 +1365,9 @@ REBWCHAR *RL_rebSpellWide(
     Run_Va_May_Fail(v, quotes, p, vaptr);  // calls va_end()
 
     if (IS_NULLED(v))
-        return nullptr;  // null passed through, for opting out
+        fail ("rebSpellWide() does not take NULL (use TRY/BLANK! to opt out)");
+    if (IS_BLANK(v))
+        return nullptr;  // blank in, null out
 
     REBLEN len = Spell_Into_Wide(nullptr, 0, v);
     REBWCHAR *result = cast(
@@ -1473,9 +1477,11 @@ unsigned char *RL_rebBytes(
     DECLARE_LOCAL (v);
     Run_Va_May_Fail(v, quotes, p, vaptr);  // calls va_end()
 
-    if (IS_NULLED(v)) {
+    if (IS_NULLED(v))
+        fail ("rebBytes() does not take NULL (use TRY/BLANK! to opt out)");
+    if (IS_BLANK(v)) {
         *size_out = 0;
-        return nullptr;  // nullptr is passed through, for opting out
+        return nullptr;  // blank in, null out
     }
 
     REBSIZ size = Bytes_Into(nullptr, 0, v);
