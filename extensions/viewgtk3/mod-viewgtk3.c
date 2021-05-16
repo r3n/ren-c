@@ -700,6 +700,163 @@ REBNATIVE(gtk_entry_get_visibility)
     return rebValue(logic);
 }
 
+// Widget Text View (Multi line text field) functions
+
+//
+//  export gtk-text-view-new: native [
+//
+//      {Creates a new GtkTextView. If you don’t call gtk_text_view_set_buffer() before using the text view, 
+// an empty default buffer will be created for you. Get the buffer with gtk_text_view_get_buffer(). 
+// If you want to specify your own buffer, consider gtk_text_view_new_with_buffer().}
+//
+//      return: [handle! void!]
+//  ]
+//
+REBNATIVE(gtk_text_view_new)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_TEXT_VIEW_NEW;
+
+    GtkWidget *textview = gtk_text_view_new();
+
+    return rebHandle(textview, 0, nullptr);
+}
+
+//
+//  export gtk-text-view-set-buffer: native [
+//
+//      {Sets buffer as the buffer being displayed by text_view. The previous buffer displayed by the text view 
+// is unreferenced, and a reference is added to buffer. If you owned a reference to buffer before passing it to 
+// this function, you must remove that reference yourself; GtkTextView will not “adopt” it.}
+//
+//      return: [void!]
+//      textview [handle!]
+//      buffer [handle!]
+//  ]
+//
+REBNATIVE(gtk_text_view_set_buffer)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_TEXT_VIEW_SET_BUFFER;
+
+    GtkTextView *textview = VAL_HANDLE_POINTER(GtkTextView, ARG(textview));
+
+    GtkTextBuffer *buffer = VAL_HANDLE_POINTER(GtkTextBuffer, ARG(buffer));
+ 
+    gtk_text_view_set_buffer(textview, buffer);
+
+    return rebVoid();
+}
+
+//
+//  export gtk-text-view-get-buffer: native [
+//
+//      {Returns the GtkTextBuffer being displayed by this text view. 
+// The reference count on the buffer is not incremented; the caller of this function won’t own a new reference.}
+//
+//      return: [handle! void!]
+//      textview [handle!]
+//  ]
+//
+REBNATIVE(gtk_text_view_get_buffer)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_TEXT_VIEW_GET_BUFFER;
+
+    GtkTextView *textview = VAL_HANDLE_POINTER(GtkTextView, ARG(textview));
+
+    GtkTextBuffer *buffer = gtk_text_view_get_buffer(textview);
+
+    return rebHandle(buffer, 0, nullptr);
+}
+
+//
+//  export gtk-text-view-set-editable: native [
+//
+//      {Sets the default editability of the GtkTextView. 
+// You can override this default setting with tags in the buffer, using the “editable” attribute of tags..}
+//
+//      return: [void!]
+//      textview [handle!]
+//      setting [logic!]
+//  ]
+//
+REBNATIVE(gtk_text_view_set_editable)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_TEXT_VIEW_SET_EDITABLE;
+
+    GtkTextView *textview = VAL_HANDLE_POINTER(GtkTextView, ARG(textview));
+
+    bool setting = rebDid(ARG(setting));
+ 
+    gtk_text_view_set_editable(textview, setting);
+
+    return rebVoid();
+}
+
+//
+//  export gtk-text-view-get-editable: native [
+//
+//      {Returns the default editability of the GtkTextView. Tags in the buffer may override this setting for some ranges of text.}
+//
+//      return: [logic!]
+//      textview [handle!]
+//  ]
+//
+REBNATIVE(gtk_text_view_get_editable)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_TEXT_VIEW_GET_EDITABLE;
+
+    GtkTextView *textview = VAL_HANDLE_POINTER(GtkTextView, ARG(textview));
+     
+    bool result = gtk_text_view_get_editable(textview);
+    REBVAL *logic = rebValue("TO LOGIC!", result);
+
+    return rebValue(logic);
+}
+
+//
+//  export gtk-text-view-set-cursor-visible: native [
+//
+//      {Toggles whether the insertion point should be displayed. 
+// A buffer with no editable text probably shouldn’t have a visible cursor, so you may want to turn the cursor off.}
+//
+//      return: [void!]
+//      textview [handle!]
+//      setting [logic!]
+//  ]
+//
+REBNATIVE(gtk_text_view_set_cursor_visible)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_TEXT_VIEW_SET_CURSOR_VISIBLE;
+
+    GtkTextView *textview = VAL_HANDLE_POINTER(GtkTextView, ARG(textview));
+
+    bool setting = rebDid(ARG(setting));
+ 
+    gtk_text_view_set_cursor_visible(textview, setting);
+
+    return rebVoid();
+}
+
+//
+//  export gtk-text-view-get-cursor-visible: native [
+//
+//      {Find out whether the cursor should be displayed.}
+//
+//      return: [logic!]
+//      textview [handle!]
+//  ]
+//
+REBNATIVE(gtk_text_view_get_cursor_visible)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_TEXT_VIEW_GET_CURSOR_VISIBLE;
+
+    GtkTextView *textview = VAL_HANDLE_POINTER(GtkTextView, ARG(textview));
+     
+    bool result = gtk_text_view_get_cursor_visible(textview);
+    REBVAL *logic = rebValue("TO LOGIC!", result);
+
+    return rebValue(logic);
+}
+
 // Widget Canvas (drawing area) functions
 
 //
@@ -765,6 +922,94 @@ REBNATIVE(gtk_editable_get_editable)
     REBVAL *logic = rebValue("TO LOGIC!", result);
 
     return rebValue(logic);
+}
+
+// Text Buffer
+
+//
+//  export gtk-text-buffer-set-text: native [
+//
+//      {Deletes current contents of buffer, and inserts text instead. 
+// If len is -1, text must be nul-terminated. text must be valid UTF-8.}
+//
+//      return: [void!]
+//      buffer [handle!]
+//      str [text!]
+//      length [integer!]
+//  ]
+//
+REBNATIVE(gtk_text_buffer_set_text)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_TEXT_BUFFER_SET_TEXT;
+
+    GtkTextBuffer *buffer = VAL_HANDLE_POINTER(GtkTextBuffer, ARG(buffer));
+
+   const char * str = cast(char*, VAL_STRING_AT(ARG(str)));
+
+    unsigned int length = rebUnboxInteger(ARG(length));
+
+    gtk_text_buffer_set_text(buffer, str, length);
+
+    return rebVoid();
+}
+
+//
+//  export gtk-text-buffer-get-text: native [
+//
+//      {Returns the text in the range [start ,end ). Excludes undisplayed text (text marked with tags 
+// that set the invisibility attribute) if include_hidden_chars is FALSE. 
+// Does not include characters representing embedded images, so byte and character indexes into 
+// the returned string do not correspond to byte and character indexes into the buffer. 
+// Contrast with gtk_text_buffer_get_slice(). Not implemented (yet).}
+//
+//      return: [text!]
+//      buffer [handle!]
+//      start [handle!]
+//      end [handle!]
+//      hidden [logic!] "include hidden characters"
+//  ]
+//
+REBNATIVE(gtk_text_buffer_get_text)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_TEXT_BUFFER_GET_TEXT;
+
+    GtkTextBuffer *buffer = VAL_HANDLE_POINTER(GtkTextBuffer, ARG(buffer));
+
+    GtkTextIter *start = VAL_HANDLE_POINTER(GtkTextIter, ARG(start));
+
+    GtkTextIter *end = VAL_HANDLE_POINTER(GtkTextIter, ARG(end));
+
+    bool hidden = rebDid(ARG(hidden));
+
+    const char *result = gtk_text_buffer_get_text(buffer, start, end, hidden);
+
+    return rebText(result);
+}
+
+//
+//  export gtk-text-buffer-get-bounds: native [
+//
+//      {Retrieves the first and last iterators in the buffer, i.e. the entire buffer lies within the range [start ,end ).}
+//
+//      return: [void!]
+//      buffer [handle!]
+//      start [handle!]
+//      end [handle!]
+//  ]
+//
+REBNATIVE(gtk_text_buffer_get_bounds)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_TEXT_BUFFER_GET_BOUNDS;
+
+    GtkTextBuffer *buffer = VAL_HANDLE_POINTER(GtkTextBuffer, ARG(buffer));
+
+    GtkTextIter *start = VAL_HANDLE_POINTER(GtkTextIter, ARG(start));
+
+    GtkTextIter *end = VAL_HANDLE_POINTER(GtkTextIter, ARG(end));
+
+    gtk_text_buffer_get_bounds(buffer, start, end);
+
+    return rebVoid();
 }
 
 // Widget Layout functions
