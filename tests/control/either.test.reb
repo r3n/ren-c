@@ -10,11 +10,11 @@
 (1 = either true [1] [2])
 (2 = either false [1] [2])
 
-(heavy-null? either true [null] [1])
-(heavy-null? either false [1] [null])
+('~null~ = ^ either true [null] [1])
+('~null~ = ^ either false [1] [null])
 
-(null-1? either true ^[null] [1])
-(null-1? either false [1] ^[null])
+(null? either true ^[null] [1])
+(null? either false [1] ^[null])
 
 (error? either true [trap [1 / 0]] [])
 (error? either false [] [trap [1 / 0]])

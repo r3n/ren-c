@@ -574,7 +574,7 @@ REBNATIVE(get)
             did REF(hard)
         );
         if (IS_NULLED(temp))  // blocks can't contain nulls
-            Init_Bad_Word_Core(dest, Canon(SYM_NULLED), CELL_FLAG_ISOTOPE);
+            Init_Bad_Word_Core(dest, Canon(SYM_NULL), CELL_FLAG_ISOTOPE);
         else
             Copy_Cell(dest, temp);
     }
@@ -627,6 +627,9 @@ void Set_Var_May_Fail(
 ){
     if (Is_Blackhole(target))  // name for a space-bearing ISSUE! ('#')
         return;
+
+    if (Is_Heavy_Nulled(setval))
+        setval = NULLED_CELL;
 
     enum Reb_Kind kind = CELL_KIND(VAL_UNESCAPED(target));
 
@@ -804,7 +807,7 @@ REBNATIVE(opt)
     // creating a likely error in those cases.  To get around it, OPT TRY
     //
     if (IS_NULLED(ARG(optional)))
-        return Init_Curse_Word(D_OUT, SYM_NULLED);
+        return Init_Curse_Word(D_OUT, SYM_NULL);
 
     RETURN (ARG(optional));
 }
@@ -1703,66 +1706,6 @@ REBNATIVE(null_q)
 
 
 //
-//  heavy-null?: native [
-//
-//  "Tells you if the argument is a heavy null"
-//
-//      return: [logic!]
-//      optional [<opt> <literal> any-value!]
-//  ]
-//
-REBNATIVE(heavy_null_q)
-//
-// Note: We could tell whether something is null-2 or null without the @literal
-// convention in native code, by looking at CELL_FLAG_ISOTOPE on a normal
-// parameter.  But we try not to make it more aboveboard by having the same
-// function spec a usermode function would need to detect the condition.
-{
-    INCLUDE_PARAMS_OF_HEAVY_NULL_Q;
-
-    REBVAL *v = ARG(optional);
-
-    // Be consistent with other typecheckers and error if given a non-isotope
-    // form of a BAD-WORD!.  (^params should be used sparingly/carefully.)
-    //
-    if (IS_BAD_WORD(v))  // ^param gives non-quoted when mean bad word is input
-        fail (PAR(optional));
-
-    // isotope form ^literalizes as quoted null, (the ')
-    return Init_Logic(D_OUT, KIND3Q_BYTE(v) == REB_NULL + REB_64);
-}
-
-
-//
-//  light-null?: native [
-//
-//  "Tells you if the argument is a light null"
-//
-//      return: [logic!]
-//      optional [<opt> <literal> any-value!]
-//  ]
-//
-REBNATIVE(light_null_q)
-//
-// Note: We could tell whether something is null-2 or null without the ^literal
-// convention in native code, by looking at CELL_FLAG_ISOTOPE on a normal
-// parameter.  But we try not to make it more aboveboard by having the same
-// function spec a usermode function would need to detect the condition.
-{
-    INCLUDE_PARAMS_OF_LIGHT_NULL_Q;
-
-    REBVAL *v = ARG(optional);
-
-    // Be consistent with other typecheckers and error if given a non-isotope
-    // form of a BAD-WORD!.  (^params should be used sparingly/carefully.)
-    //
-    if (IS_BAD_WORD(v))  // ^param gives non-quoted when mean bad word is input
-        fail (PAR(optional));
-
-    return Init_Logic(D_OUT, KIND3Q_BYTE(v) == REB_NULL);
-}
-
-//
 //  heavy: native [
 //
 //  {Make the heavy form of NULL (passes through all other values)}
@@ -1777,7 +1720,7 @@ REBNATIVE(heavy) {
     Move_Cell(D_OUT, Unliteralize(ARG(optional)));
 
     if (IS_NULLED(D_OUT))
-        SET_CELL_FLAG(D_OUT, ISOTOPE);
+        Init_Heavy_Nulled(D_OUT);
 
     return D_OUT;
 }
@@ -1797,8 +1740,7 @@ REBNATIVE(light) {
 
     Move_Cell(D_OUT, Unliteralize(ARG(optional)));
 
-    if (IS_NULLED(D_OUT))
-        CLEAR_CELL_FLAG(D_OUT, ISOTOPE);
+    Decay_If_Nulled(D_OUT);
 
     return D_OUT;
 }
@@ -1877,7 +1819,7 @@ REBNATIVE(voidify)
     INCLUDE_PARAMS_OF_VOIDIFY;
 
     if (IS_NULLED(ARG(optional)))
-        return Init_Curse_Word(D_OUT, SYM_NULLED);
+        return Init_Curse_Word(D_OUT, SYM_NULL);
 
     RETURN (ARG(optional));
 }

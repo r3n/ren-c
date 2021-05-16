@@ -115,6 +115,8 @@ REBARR *Copy_Values_Len_Extra_Shallow_Core(
     for (; count < len; ++count, ++src, ++dest) {
         if (KIND3Q_BYTE_UNCHECKED(src) == REB_NULL)  // allow unreadable void
             assert(IS_VARLIST(a));  // usually not legal
+        if (KIND3Q_BYTE_UNCHECKED(src) == REB_BAD_WORD)
+            assert(GET_CELL_FLAG(src, ISOTOPE));
 
         Derelativize(dest, src, specifier);
     }

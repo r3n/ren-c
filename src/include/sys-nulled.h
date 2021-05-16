@@ -56,65 +56,6 @@ inline static REBVAL *Init_Nulled_Core(RELVAL *out) {
     Init_Nulled_Core(TRACK_CELL_IF_DEBUG(out))
 
 
-//=//// NULL ISOTOPE (NULL-2) /////////////////////////////////////////////=//
-//
-// There was considerable deliberation about how to handle branches that
-// actually want to return NULL without triggering ELSE:
-//
-//     >> if true [null] else [print "Don't want this to print"]
-//     ; null (desired result)
-//
-// Making branch results NULL if-and-only-if the branch ran would mean having
-// to distort the result (e.g. into a void).
-//
-// The ultimate solution to this was to introduce a slight variant of NULL
-// which would be short-lived (e.g. "decay" to a normal NULL) but carry the
-// additional information that it was an intended branch result.  This
-// seemed sketchy at first, but with ^(...) acting as a "detector" for those
-// who need to know the difference, it has become a holisic solution for
-//
-// The "decay" of NULL isotopes occurs on variable retrieval.  Hence:
-//
-//     >> x: if true [null]
-//     ; null-2
-//
-//     >> x
-//     ; null
-//
-// This means getting one's hands on a NULL isotope to start with is tricky,
-// and has to be done with a function (NULL-2).
-//
-//     >> null-2
-//     ; null-2
-//
-// As with the natural concept of radiation, working with NULL isotopes can
-// be tricky, and should be avoided by code that doesn't need to do it.  (But
-// it has actually gotten much easier with ^(...) behaviors.)
-//
-
-inline static REBVAL *Init_Heavy_Nulled(RELVAL *out) {
-    RESET_CELL(out, REB_NULL, CELL_FLAG_ISOTOPE);
-    return cast(REBVAL*, out);
-}
-
-inline static bool Is_Light_Nulled(const RELVAL *v)
-  { return IS_NULLED(v) and NOT_CELL_FLAG(v, ISOTOPE); }
-
-inline static bool Is_Heavy_Nulled(const RELVAL *v)
-  { return IS_NULLED(v) and GET_CELL_FLAG(v, ISOTOPE); }
-
-inline static RELVAL *Decay_If_Nulled(RELVAL *v) {
-    if (IS_NULLED(v))
-        CLEAR_CELL_FLAG(v, ISOTOPE);  // would Init_Nulled() be faster?
-    return v;
-}
-
-inline static RELVAL *Isotopify_If_Nulled(RELVAL *v) {
-    if (IS_NULLED(v))
-        SET_CELL_FLAG(v, ISOTOPE);  // would Init_Heavy_Nulled() be faster?
-    return v;
-}
-
 
 // !!! A theory was that the "evaluated" flag would help a function that took
 // both <opt> and <end>, which are converted to nulls, distinguish what kind

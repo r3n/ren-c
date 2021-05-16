@@ -38,10 +38,13 @@ inline static bool VAL_LOGIC(REBCEL(const*) v) {
 }
 
 inline static bool IS_TRUTHY(const RELVAL *v) {
-    if (KIND3Q_BYTE(v) > REB_LOGIC)
-        return true;  // includes JUST: `if just '_ [-- "this is truthy"]`
-    if (IS_BAD_WORD(v))
+    if (IS_BAD_WORD(v)) {
+        if (NOT_CELL_FLAG(v, ISOTOPE) and VAL_BAD_WORD_ID(v) == SYM_NULL)
+            return false;  // special exemption is made for unfriendly ~null~
         fail (Error_Bad_Conditional_Raw());
+    }
+    if (KIND3Q_BYTE(v) > REB_LOGIC)
+        return true;  // includes QUOTED! `if first ['_] [-- "this is truthy"]`
     if (IS_LOGIC(v))
         return VAL_LOGIC(v);
     assert(IS_BLANK(v) or IS_NULLED(v));

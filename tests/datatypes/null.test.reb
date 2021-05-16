@@ -43,13 +43,12 @@
 ; The specific role of NULL-2 is to be reactive with THEN and not ELSE, so
 ; that branches may be purposefully NULL.
 [
-    (null? null)
+    (null = ^ null)
     (null? heavy null)
-    (null-1? null)
-    (heavy-null? heavy null)
+    ('~null~ = ^ heavy null)
 
-    (x: heavy null, null-1? x)
-    (x: heavy null, null-1? :x)
+    (x: heavy null, null = ^ x)
+    (x: heavy null, null = ^ :x)
 
     (304 = (null then [1020] else [304]))
     (1020 = (heavy null then [1020] else [304]))
@@ -59,14 +58,14 @@
 ; and evaluates to either NULL-1 or NULL-2.  If the branch wishes to pass
 ; the null "as-is" it should use the ^ forms.
 [
-    (heavy-null? if true [null])
-    (heavy-null? if true [heavy null])
+    ('~null~ = ^ if true [null])
+    ('~null~ = ^ if true [heavy null])
     ('~void~ = ^ if true [])
     ('~custom~ = ^ if true [~custom~])
     (''~custom~ = ^ if true ['~custom~])
 
-    (null-1? if true ^[null])
-    (heavy-null? if true ^[heavy null])
+    (null = ^ if true ^[null])
+    ('~null~ = ^ if true ^[heavy null])
     ('~void~ = ^ if true ^[])
     ('~custom~ = ^ if true ^[~custom~])
     (''~custom~ = ^ if true ^['~custom~])

@@ -708,7 +708,6 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         }
 
         Copy_Cell(f->out, unwrap(gotten));  // no copy CELL_FLAG_UNEVALUATED
-        Decay_If_Nulled(f->out);
         break;
 
 
@@ -725,6 +724,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
       set_word_with_out:
 
+        Decay_If_Nulled(f->out);
         Copy_Cell(Sink_Word_May_Fail(v, v_specifier), f->out);
         break; }
 
@@ -763,8 +763,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (IS_ACTION(f->out))  // cache the word's label in the cell
             INIT_VAL_ACTION_LABEL(f->out, VAL_WORD_SYMBOL(v));
 
-        if (IS_NULLED(f->out))  // !!! Should Lookup_Word() handle this?
-            CLEAR_CELL_FLAG(f->out, ISOTOPE);
+        Decay_If_Nulled(f->out);  // !!! Should Lookup_Word() handle this?
 
         if (STATE_BYTE(f) == ST_EVALUATOR_SYM_WORD)
             Literalize(f->out);
@@ -1002,7 +1001,6 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             fail (Error_Bad_Word_Get_Core(v, v_specifier, f_spare));
 
         Copy_Cell(f->out, f_spare);  // won't move CELL_FLAG_UNEVALUATED
-        Decay_If_Nulled(f->out);
         break; }
 
 
@@ -1037,6 +1035,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             goto return_thrown;
 
       set_path_with_out:
+
+        Decay_If_Nulled(f->out);
 
         if (Eval_Path_Throws_Core(
             f_spare,  // output if thrown, used as scratch space otherwise
@@ -1099,9 +1099,6 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         //
         /* assert(NOT_CELL_FLAG(f->out, CELL_FLAG_UNEVALUATED)); */
         CLEAR_CELL_FLAG(f->out, UNEVALUATED);
-
-        if (IS_NULLED(f->out))
-            CLEAR_CELL_FLAG(f->out, ISOTOPE);
 
         if (STATE_BYTE(f) == ST_EVALUATOR_SYM_PATH_OR_SYM_TUPLE)
             Literalize(f->out);
@@ -1584,13 +1581,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         //    >> '
         //    ; null
         //
-        // This is different from what UNQUOTE does with '
-        //
-        //    >> unquote just '
-        //    ; null-2 (isotope)
-        //
-        // It's a twist that exists for a reason.  That's because there is no
-        // reified representation for NULL that exists besides '
+        // That's because there is no reified representation for NULL that
+        // exists besides '
         //
         //     >> make object! [n: null, v1: ~void~, v2: '~void~]
         //     == make object! [
@@ -1604,15 +1596,13 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // to produce nulls in blocks (like `do compose [null? (the ')]`) you
         // have no other way to do it either.
         //
-        // This is why NULL-2 is solely a transient state, and once you store
+        // This is why ~null~ is solely a transient state, and once you store
         // an evaluation into a variable it can no longer be detected.  But
-        // with voids, the whole idea is that unquoted turns them into an
+        // with bad words, the whole idea is that unquoted turns them into an
         // isotope form.  Since their quoted forms and unquoted forms can
         // both appear in blocks, it doesn't run into the same problems.
         //
-        if (IS_NULLED(f->out))
-            CLEAR_CELL_FLAG(f->out, ISOTOPE);
-        else if (IS_BAD_WORD(f->out))
+        if (IS_BAD_WORD(f->out))
             SET_CELL_FLAG(f->out, ISOTOPE);
         break;
     }

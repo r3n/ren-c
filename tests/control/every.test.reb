@@ -47,4 +47,4 @@
     ]
 )
 
-(heavy-null? every x [] [<unused>])
+('~null~ = ^ every x [] [<unused>])

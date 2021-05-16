@@ -674,10 +674,9 @@ REBNATIVE(return)
     if (not REF(isotope)) {
         //
         // If we aren't paying attention to isotope status, then remove it
-        // from the value...so NULL-2 decays to null.
+        // from the value...so ~null~ decays to null.
         //
-        if (IS_NULLED(v))
-            CLEAR_CELL_FLAG(v, ISOTOPE);
+        Decay_If_Nulled(v);
     }
 
     // Check type NOW instead of waiting and letting Eval_Core()

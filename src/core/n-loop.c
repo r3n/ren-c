@@ -589,8 +589,14 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
 
           case LOOP_MAP_EACH:
           case LOOP_MAP_EACH_SPLICED:
-            if (IS_NULLED(les->out))
-                Init_Curse_Word(les->out, SYM_NULLED);  // null signals break
+            if (IS_NULLED(les->out) or Is_Curse_Word(les->out, SYM_NULL))
+                Init_Curse_Word(les->out, SYM_NULL);  // null signals break
+            else if (
+                IS_BAD_WORD(les->out)
+                and NOT_CELL_FLAG(les->out, ISOTOPE)
+            ){
+                fail (les->out);
+            }
             else if (
                 les->mode == LOOP_MAP_EACH_SPLICED
                 and IS_BLOCK(les->out)
@@ -600,8 +606,9 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
                 for (; v != tail; ++v)
                     Derelativize(DS_PUSH(), v, VAL_SPECIFIER(les->out));
             }
-            else
+            else {
                 Copy_Cell(DS_PUSH(), les->out);  // non nulls added to result
+            }
             break;
         }
     } while (more_data and not broke);
@@ -763,7 +770,8 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
         // any other value is the last body result, and is truthy
         // only illegal value here is void (would cause error if body gave it)
         //
-        assert(not IS_BAD_WORD(D_OUT));
+        if (IS_BAD_WORD(D_OUT) and NOT_CELL_FLAG(D_OUT, ISOTOPE))
+            assert(Is_Heavy_Nulled(D_OUT));
         return D_OUT;
 
       case LOOP_MAP_EACH:
@@ -1701,13 +1709,20 @@ REBNATIVE(while)
 {
     INCLUDE_PARAMS_OF_WHILE;
 
-    Init_Heavy_Nulled(D_OUT); // result if body never runs
+    Init_Heavy_Nulled(D_OUT);  // result if body never runs
 
     do {
-        if (Do_Branch_Throws(D_SPARE, ARG(condition))) {
+        if (Do_Branch_With_Throws(D_SPARE, ARG(condition), D_OUT)) {
             Move_Cell(D_OUT, D_SPARE);
             return R_THROWN;  // don't see BREAK/CONTINUE in the *condition*
         }
+
+        // !!! We use Do_Branch_Throws() here because we want to run actions as
+        // well as blocks, feeding back the body result each time if it's an
+        // action.  But when you use branching you might get ~null~.  Decay
+        // it if so, to keep from having trouble with the IF_FALSEY().
+        //
+        Decay_If_Nulled(D_SPARE);
 
         if (IS_FALSEY(D_SPARE))  // will error if void, neither true nor false
             return D_OUT;  // condition was false, so return last body result

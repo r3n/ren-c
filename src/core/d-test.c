@@ -79,6 +79,9 @@ REBNATIVE(test_librebol)
     Copy_Cell(DS_PUSH(), mtest2);
     rebRelease(mtest2);
 
+    SET_CELL_FLAG(Init_Integer(DS_PUSH(), 5), NEWLINE_BEFORE);
+    Init_Logic(DS_PUSH(), rebDid("null?", nullptr));
+
     rebRelease(macro);
 
     return Init_Block(D_OUT, Pop_Stack_Values(dsp_orig));

@@ -20,19 +20,19 @@
     null? case []  ; empty case block is legal (e.g. as COMPOSE product)
 )
 (
-    heavy-null? case [true [null]]  ; NULL-2 indicates branch was taken (vs. null)
+    '~null~ = ^ case [true [null]]  ; indicates branch was taken (vs. null)
 )
 (
     '~void~ = ^ case [true []]
 )
 (
-    heavy-null? case [
+    '~null~ = ^ case [
         true [null]
         false [1 + 2]
     ]
 )
 [#2246 (
-    heavy-null? case [true [null]]
+    '~null~ = ^ case [true [null]]
 )(
     '~void~ = ^ case [true []]
 )]

@@ -112,15 +112,24 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
 
     if (not p) {  // libRebol's null/<opt> (IS_NULLED prohibited in CELL case)
 
-        if (QUOTING_BYTE(feed) == 0)
-            panic ("Cannot directly splice nulls...use rebQ(), rebXxxQ()");
-
-        // !!! We could make a global QUOTED_NULLED_VALUE with a stable
-        // pointer and not have to use fetched or FETCHED_MARKED_TEMPORARY.
-        //
-        assert(FEED_SPECIFIER(feed) == SPECIFIED);
-
-        Quotify(Init_Nulled(&feed->fetched), 1);
+        if (QUOTING_BYTE(feed) == 0) {
+            //
+            // This is the compromise of convenience, where ~null~ is put in
+            // to the feed.  If it's converted into an array we've told a
+            // small lie (~null~ is a BAD-WORD! and a thing, so not the same
+            // as the NULL non-thing).  But it's a mean enough thing that
+            // any misunderstandings should cause a problem...while typical
+            // uses will be all right.
+            //
+            Init_Bad_Word_Core(&feed->fetched, Canon(SYM_NULL), CELL_FLAG_ISOTOPE);
+        }
+        else {
+            // !!! We could make a global QUOTED_NULLED_VALUE with a stable
+            // pointer and not have to use fetched or FETCHED_MARKED_TEMPORARY.
+            //
+            assert(FEED_SPECIFIER(feed) == SPECIFIED);
+            Quotify(Init_Nulled(&feed->fetched), 1);
+        }
         feed->value = &feed->fetched;
 
     } else switch (Detect_Rebol_Pointer(p)) {

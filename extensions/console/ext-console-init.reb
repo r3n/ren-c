@@ -7,7 +7,7 @@ REBOL [
     Options: []  ; !!! If ISOLATE, wouldn't see LIB/PRINT changes, etc.
 
     Rights: {
-        Copyright 2016-2018 Ren-C Open Source Contributors
+        Copyright 2016-2021 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -172,22 +172,22 @@ console!: make object! [
             ; They can be LOAD-ed naturally, so this seems consistent:
             ;
             ;     >> x: ~something~
-            ;     == ~something~  ; unfriendly
+            ;     == ~something~  ; isotope
             ;
             ; The "unnatural" aspect only happens when you access them without
             ; using GET/ANY or literalize them with ^x:
             ;
             ;     >> x
-            ;     ** Error: x is the unfriendly form of ~something~
+            ;     ** Error: x is the isotope form of ~something~
             ;
             ; But the console seems like it's giving you the right feedback to
             ; show it undecorated.
             ;
-            print [result mold v space space "; unfriendly"]
+            print [result mold v space space "; isotope"]
             return
         ]
 
-        === NULL VARIATIONS ===
+        === NULL ===
 
         if v = null [  ; not an isotope, e.g. can trigger ELSE
             ;
@@ -205,17 +205,6 @@ console!: make object! [
             ; ground users in what is going on.
             ;
             print "; null"
-            return
-        ]
-
-        if v = (the ') [
-            ;
-            ; If the ^ processed a value into a *quoted* NULL, that indicates
-            ; the "heavy" isotope of NULL.  This is a transient state that only
-            ; a literal parameter's quoting allows us to see.  But it's good
-            ; for console users to be aware of the distinction.
-            ;
-            print ["; heavy null"]  ; no representation, use comment
             return
         ]
 

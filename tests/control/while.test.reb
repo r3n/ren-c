@@ -9,7 +9,7 @@
     num: 0
     1 = while [num < 1] [num: num + 1]
 )]
-(heavy-null? while [false] [])
+('~null~ = ^ while [false] [])
 ; zero repetition
 (
     success: true

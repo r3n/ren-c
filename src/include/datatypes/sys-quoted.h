@@ -276,8 +276,8 @@ inline static REBVAL *Literalize(REBVAL *v) {
     if (IS_END(v)) {
         return Init_Void(v);  // *unfriendly*
     }
-    if (IS_NULLED(v) and NOT_CELL_FLAG(v, ISOTOPE)) {
-        return v;  // don't set the isotope flag on a plain null
+    if (IS_NULLED(v)) {
+        return v;  // as-is
     }
     if (IS_BAD_WORD(v) and NOT_CELL_FLAG(v, ISOTOPE)) {
         SET_CELL_FLAG(v, ISOTOPE);  // make it "friendly" now
@@ -294,11 +294,14 @@ inline static REBVAL *Literalize(REBVAL *v) {
 // !!! Same code as UNQUOTE, should it be shared?
 //
 inline static REBVAL *Unliteralize(REBVAL *v) {
-    if (IS_BAD_WORD(v) or IS_NULLED(v))
+    if (IS_NULLED(v))
+        return v;  // do nothing
+
+    if (IS_BAD_WORD(v))
         CLEAR_CELL_FLAG(v, ISOTOPE);
     else {
         Unquotify_Core(v, 1);
-        if (IS_BAD_WORD(v) or IS_NULLED(v))
+        if (IS_BAD_WORD(v))
             SET_CELL_FLAG(v, ISOTOPE);
     }
     return v;

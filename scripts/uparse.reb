@@ -257,7 +257,7 @@ default-combinators: make map! reduce [
         parser [action!]
         <local> last-result' result' pos
     ][
-        last-result': the '  ; quoted null as return value (unquote => null-2)
+        last-result': '~null~  ; (unquote '~null~) => ~null~ isotope
         cycle [
             ([result' pos]: ^ parser input) else [
                 set remainder input  ; overall WHILE never fails (but REJECT?)
@@ -666,7 +666,10 @@ default-combinators: make map! reduce [
         if bad-word? result' [
             fail ["Cannot KEEP a non-isotope BAD-WORD!:" ^result']
         ]
-        assert [quoted? result']  ; true null if and only if parser failed
+        assert [any [
+            '~null~ = result'  ; true null if and only if parser failed
+            quoted? result'
+        ]]
         append/(if only ['only]) state.collecting unquote result'
         return unquote result'
     ]
@@ -748,7 +751,10 @@ default-combinators: make map! reduce [
         ; The value is quoted because of ^ on ^(parser input).  This lets us
         ; emit null fields.
         ;
-        assert [quoted? result']  ; should be light null if and only if failed
+        assert [any [
+            '~null~ = result'  ; true null if and only if parser failed
+            quoted? result'
+        ]]
         append state.gathering ^target
         append state.gathering ^result'
         return unquote result'
@@ -780,7 +786,10 @@ default-combinators: make map! reduce [
             fail "Can't assign invisible synthesized rule result, use ^[...]"
         ]
 
-        assert [quoted? result']
+        assert [any [
+            '~null~ = result'  ; true null if and only if parser failed
+            quoted? result'
+        ]]
         set value unquote result'  ; value is the SET-WORD!
         return unquote result'
     ]

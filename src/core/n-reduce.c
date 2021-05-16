@@ -109,6 +109,8 @@ REBNATIVE(reduce)
         //
         if (not IS_NULLED(D_OUT)) {
             Copy_Cell(DS_PUSH(), D_OUT);
+            if (IS_BAD_WORD(DS_TOP))
+                SET_CELL_FLAG(DS_TOP, ISOTOPE);  // must be block-safe
             if (line)
                 SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
         }

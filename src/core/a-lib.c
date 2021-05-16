@@ -892,6 +892,15 @@ static void Run_Va_May_Fail_Core(
     }
 
     CLEAR_CELL_FLAG(out, OUT_NOTE_STALE);
+
+    // We want cases like `rebDid(nullptr)` to work, but the variadic
+    // evaluator cannot splice NULL into the feed of execution and have it
+    // be convertible into an array.  The ~null~ BAD-WORD! in isotope form
+    // provides a compromise, and it decays into a regular null several
+    // places in the system (e.g. normal arguments).  Here is another place
+    // the tolerance is extended to.
+    // 
+    Decay_If_Nulled(out);
 }
 
 #define Run_Va_May_Fail(out,quotes,p,vaptr) \

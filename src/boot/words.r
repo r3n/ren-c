@@ -41,8 +41,7 @@ datatypes
 void
 stale  ; for non-/VOID DO, e.g. `(1 + 2 do [comment "hi"])` is ~stale~
 unset
-nulled
-blanked
+; null  ; already added as a symbol from type table
 falsey
 errored  ; when rebRescue() has no handler and evaluates to non-fail ERROR!
 trash  ; only release build uses (debug build uses null as label to assert)

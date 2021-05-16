@@ -394,7 +394,6 @@ inline static void INIT_BINDING_MAY_MANAGE(
 #include "datatypes/sys-blank.h"
 #include "datatypes/sys-comma.h"
 
-#include "datatypes/sys-logic.h"
 #include "datatypes/sys-integer.h"
 #include "datatypes/sys-decimal.h"
 
@@ -455,6 +454,8 @@ inline static void SET_SIGNAL(REBFLGS f) { // used in %sys-series.h
 
 #include "sys-symbol.h"
 #include "datatypes/sys-void.h"  // SYMID needed
+
+#include "datatypes/sys-logic.h"  // ~null~ BAD-WORD! is falsey
 
 #include "datatypes/sys-pair.h"
 #include "datatypes/sys-quoted.h"  // pairings for storage, void used as well

@@ -278,11 +278,11 @@ inline static bool Do_Branch_Core_Throws(
     // NULL to NULL-2:
     //
     //     >> if true [null]
-    //     ; null-2
+    //     == ~null~  ; isotope
     //
-    // To get things to pass through unmodified, you have to use the @ forms:
+    // To get things to pass through unmodified, you use a different branch:
     //
-    //     >> if true ^[null]
+    //     >> if true ^[null]  ; currently ^, may become @
     //     ; null
     //
     if (not as_is)

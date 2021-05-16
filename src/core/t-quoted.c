@@ -338,8 +338,8 @@ REBNATIVE(unquote)
     // to detect the isotope forms.  UNQUOTE should make sure an input quoted
     // form comes back as an isotope.
     //
-    if (IS_NULLED(D_OUT) or IS_BAD_WORD(D_OUT))
-        SET_CELL_FLAG(D_OUT, ISOTOPE);  // (unquote the ') => heavy null
+    if (IS_BAD_WORD(D_OUT))
+        SET_CELL_FLAG(D_OUT, ISOTOPE);
 
     return D_OUT;
 }

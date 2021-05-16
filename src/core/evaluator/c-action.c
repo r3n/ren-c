@@ -327,6 +327,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
                 if (pclass == REB_P_LITERAL)
                     Literalize(f->arg);
+                else if (pclass == REB_P_NORMAL)
+                    Normalize(f->arg);  // !!! avoid assign ~void~ to f->arg?
                 break;
 
               case REB_P_HARD:
@@ -519,6 +521,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             }
             else if (pclass == REB_P_LITERAL)
                 Literalize(f->arg);
+            else if (pclass == REB_P_NORMAL)
+                Normalize(f->arg);
             break; }
 
   //=//// HARD QUOTED ARG-OR-REFINEMENT-ARG ///////////////////////////////=//

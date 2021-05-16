@@ -136,6 +136,69 @@ inline static bool Is_Curse_Word(const RELVAL *v, enum Reb_Symbol_Id sym) {
 #define Is_None(v)          Is_Curse_Word((v), SYM_NONE)
 
 
+//=//// NULL ISOTOPE (unfriendly ~null~) ///////////////////////////////////=//
+//
+// There was considerable deliberation about how to handle branches that
+// actually want to return NULL without triggering ELSE:
+//
+//     >> if true [null] else [print "Don't want this to print"]
+//     ; null (desired result)
+//
+// Making branch results NULL if-and-only-if the branch ran would mean having
+// to distort the result.
+//
+// The ultimate solution to this was to introduce a slight variant of NULL
+// which would be short-lived (e.g. "decay" to a normal NULL) but carry the
+// additional information that it was an intended branch result.  This
+// seemed sketchy at first, but with ^(...) acting as a "detector" for those
+// who need to know the difference, it has become a holistic solution.
+//
+// The "decay" of NULL isotopes occurs on variable retrieval.  Hence:
+//
+//     >> x: if true [null]
+//     == ~null~  ; isotope
+//
+//     >> x
+//     ; null
+//
+// As with the natural concept of radiation, working with NULL isotopes can
+// be tricky, and should be avoided by code that doesn't need to do it.  (But
+// it has actually gotten much easier with ^(...) behaviors.)
+//
+
+inline static REBVAL *Init_Heavy_Nulled(RELVAL *out) {
+    Init_Curse_Word(out, SYM_NULL);
+    return cast(REBVAL*, out);
+}
+
+inline static bool Is_Light_Nulled(const RELVAL *v)
+  { return IS_NULLED(v); }
+
+inline static bool Is_Heavy_Nulled(const RELVAL *v)
+  { return Is_Curse_Word(v, SYM_NULL); }
+
+inline static RELVAL *Decay_If_Nulled(RELVAL *v) {
+    if (Is_Curse_Word(v, SYM_NULL))
+        Init_Nulled(v);
+    return v;
+}
+
+inline static RELVAL *Isotopify_If_Nulled(RELVAL *v) {
+    if (IS_NULLED(v))
+        Init_Heavy_Nulled(v);
+    return v;
+}
+
+// When a parameter is "normal" then it is willing to turn the unfriendly form
+// of ~null~ into a regular null.  This is leveraged by the API in order to
+// make some common forms of null handling work more smoothly.
+
+inline static REBVAL *Normalize(REBVAL *v) {
+    Decay_If_Nulled(v);
+    return v;
+}
+
+
 //=//// CELL MOVEMENT //////////////////////////////////////////////////////=//
 
 // Moving a cell invalidates the old location.  This idea is a potential

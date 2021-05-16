@@ -16,5 +16,5 @@
     ]
 )(
     once: oneshot
-    heavy-null? once [null]
+    '~null~ = ^ once [null]
 )
