@@ -41,6 +41,25 @@
 // General functions
 
 //
+//  export gtk-init-plain: native [
+//
+//      {Call this function before using any other GTK+ functions in your GUI applications. 
+// It will initialize everything needed to operate the toolkit and parses some standard command line options.}
+//
+//      return: [void!]
+//  ]
+//
+REBNATIVE(gtk_init_plain)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_INIT_PLAIN;
+
+    int argc = 0;
+    gtk_init(&argc, nullptr);
+    
+    return rebVoid();
+}
+
+//
 //  export gtk-init: native [
 //
 //      {Call this function before using any other GTK+ functions in your GUI applications. 
@@ -197,11 +216,12 @@ REBNATIVE(gtk_window_new)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WINDOW_NEW;
 
-    GtkWindowType type = cast(GtkWindowType, VAL_STRING_AT(ARG(type)));
+    GtkWindowType type = (GtkWindowType) rebUnboxInteger(ARG(type));
+    // GtkWindowType type = cast(GtkWindowType, VAL_STRING_AT(ARG(type)));
     
-//    if (type == NULL) {
-//        type = GTK_WINDOW_TOPLEVEL;
-//    }
+    if (type == GTK_WINDOW_TOPLEVEL) {
+        type = GTK_WINDOW_TOPLEVEL;
+    }
     GtkWidget *window = gtk_window_new(type);
 
     return rebHandle(window, 0, nullptr);
