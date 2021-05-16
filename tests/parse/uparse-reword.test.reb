@@ -23,8 +23,8 @@
 
     out: make (type of source) length of source
 
-    prefix: '~unset~
-    suffix: '~unset~
+    prefix: ~unset~
+    suffix: ~unset~
     case [
         null? escape [prefix: "$"]  ; refinement not used, so use default
 

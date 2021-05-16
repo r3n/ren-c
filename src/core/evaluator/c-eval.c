@@ -528,15 +528,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // and preferring to set it to ~stale~ instead.
     //
     /*assert(NOT_EVAL_FLAG(f, INPUT_WAS_INVISIBLE));*/  // !!! recurse set-word
-    if (
-        IS_END(f->out)
-        or (
-            Is_Bad_Word_With_Sym(f->out, SYM_VOID)
-            and NOT_CELL_FLAG(f->out, ISOTOPE)
-        )
-    ){
+    if (IS_END(f->out) or Is_Void(f->out))
         SET_EVAL_FLAG(f, INPUT_WAS_INVISIBLE);
-    }
 
   //=//// BEGIN MAIN SWITCH STATEMENT /////////////////////////////////////=//
 
@@ -1625,8 +1618,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     }
 
     if (  // see EVAL_FLAG_INPUT_WAS_INVISIBLE for why f->out is changed
-        Is_Bad_Word_With_Sym(f->out, SYM_VOID)
-        and NOT_CELL_FLAG(f->out, ISOTOPE)
+        Is_Void(f->out)
         and NOT_EVAL_FLAG(f, INPUT_WAS_INVISIBLE)
     ){
         Init_Stale(f->out);

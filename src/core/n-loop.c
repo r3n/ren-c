@@ -590,7 +590,7 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
           case LOOP_MAP_EACH:
           case LOOP_MAP_EACH_SPLICED:
             if (IS_NULLED(les->out))
-                Init_Bad_Word(les->out, SYM_NULLED);  // null signals break only
+                Init_Curse_Word(les->out, SYM_NULLED);  // null signals break
             else if (
                 les->mode == LOOP_MAP_EACH_SPLICED
                 and IS_BLOCK(les->out)

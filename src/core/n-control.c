@@ -568,7 +568,7 @@ REBNATIVE(match_p)
         // In "safe" operation, falsey matched values return BAD-WORD! to show
         // they did match, but to avoid misleading falseness of the result.
         //
-        return Init_Bad_Word(D_OUT, SYM_FALSEY);
+        return Init_Curse_Word(D_OUT, SYM_FALSEY);
     }
 
     Move_Cell(D_OUT, v);  // Otherwise, input is the result
@@ -1132,7 +1132,18 @@ REBNATIVE(default)
         }
     }
 
-    if (not (IS_NULLED(D_OUT) or IS_BAD_WORD(D_OUT))) {
+    // We only consider those bad words which are in the "unfriendly" state
+    // that the system also knows to mean "emptiness" as candidates for
+    // overriding.  That's ~unset~ and ~void~ at the moment.  Note that
+    // friendly ones do not count:
+    //
+    //     >> x: second [~void~ ~unset~]
+    //     == ~unset~
+    //
+    //     >> x: default [10]
+    //     == ~unset~
+    //
+    if (not (IS_NULLED(D_OUT) or Is_Unset(D_OUT) or Is_Void(D_OUT))) {
         if (not REF(predicate)) {  // no custom additional constraint
             if (not IS_BLANK(D_OUT))  // acts as `x: default .not.blank? [...]`
                 return D_OUT;  // count it as "already set"

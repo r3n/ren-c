@@ -26,21 +26,17 @@
 //
 // https://forum.rebol.info/t/947
 //
-// BAD-WORD!s are the default retur values for things like `do []`, or
+// BAD-WORD!s are the default return values for things like `do []`, or
 // `print "Hello"`.  Unlike NULL, a bad word *is* a value...however a somewhat
 // unfriendly one.  While NULLs are falsey, bad words are *neither* truthy nor
 // falsey.  Though a bad-word! can be put in an array (a NULL can't), the
 // baseline access through a word! or path! access will error.
 //
-// In the debug build, it is possible to make an "unreadable" bad-word!.  This
-// will behave neutrally as far as the garbage collector is concerned, so
-// it can be used as a placeholder for a value that will be filled in at
-// some later time--spanning an evaluation.  But if the special IS_UNREADABLE
-// checks are not used, it will not respond to IS_BAD_WORD() and will also
-// refuse VAL_TYPE() checks.  This is useful anytime a placeholder is needed
-// in a slot temporarily where the code knows it's supposed to come back and
-// fill in the correct thing later...where the asserts serve as a reminder
-// if that fill in never happens.
+//=//// NOTES //////////////////////////////////////////////////////////////=//
+//
+// * See %sys-trash.h for a special case of a cell that will trigger panics
+//   if it is ever read in the debug build, but is just an ordinary BAD-WORD!
+//   of ~trash~ in the release build.
 //
 
 inline static REBVAL *Init_Bad_Word_Untracked(
@@ -66,8 +62,44 @@ inline static REBVAL *Init_Bad_Word_Untracked(
 #define Init_Bad_Word_Core(out,label,flags) \
     Init_Bad_Word_Untracked(TRACK_CELL_IF_DEBUG(out), (label), (flags))
 
-#define Init_Bad_Word(out,sym) \
+inline static const REBSYM* VAL_BAD_WORD_LABEL(
+    REBCEL(const*) v
+){
+    assert(CELL_KIND(v) == REB_BAD_WORD);
+    assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
+    return cast(const REBSYM*, VAL_NODE1(v));
+}
+
+#define VAL_BAD_WORD_ID(v) \
+    ID_OF_SYMBOL(VAL_BAD_WORD_LABEL(v))
+
+
+//=//// CURSE WORDS ////////////////////////////////////////////////////////=//
+
+// A "curse word" is when a BAD-WORD! does not have the friendly bit set (e.g.
+// it has been evaluated, and is not being manipulated as raw material)
+
+inline static bool Is_Curse_Word(const RELVAL *v, enum Reb_Symbol_Id sym) {
+    assert(sym != SYM_0);
+    if (not IS_BAD_WORD(v))
+        return false;
+    if (GET_CELL_FLAG(v, ISOTOPE))
+        return false;  // friendly form of BAD-WORD!
+    if (cast(REBLEN, sym) == cast(REBLEN, VAL_BAD_WORD_ID(v)))
+        return true;
+    return false;
+}
+
+#define Init_Curse_Word(out,sym) \
     Init_Bad_Word_Core((out), Canon(sym), CELL_MASK_NONE)
+
+
+// ~unset~ is chosen in particular by the system to represent variables that
+// have not been  assigned.
+
+#define UNSET_VALUE         c_cast(const REBVAL*, &PG_Unset_Value)
+#define Init_Unset(out)     Init_Curse_Word((out), SYM_UNSET)
+#define Is_Unset(v)         Is_Curse_Word(v, SYM_UNSET)
 
 
 // `~void~` is treated specially by the system, to convey "invisible intent".
@@ -77,15 +109,15 @@ inline static REBVAL *Init_Bad_Word_Untracked(
 // (like printing `; == ~void~` if the command you ran had no other output
 // printed, just so you know it wasn't a no-op?)
 
-#define Init_Void(out) \
-    Init_Bad_Word((out), SYM_VOID)
+#define Init_Void(out)      Init_Curse_Word((out), SYM_VOID)
+#define Is_Void(v)          Is_Curse_Word((v), SYM_VOID)
 
 
 // See EVAL_FLAG_INPUT_WAS_INVISIBLE for the rationale behind ~stale~, that
 // has a special relationship with ~void~.
 //
-#define Init_Stale(out) \
-    Init_Bad_Word((out), SYM_STALE)
+#define Init_Stale(out)     Init_Curse_Word((out), SYM_STALE)
+#define Is_Stale(v)         Is_Curse_Word((v), SYM_STALE)
 
 
 // `~none~` is the default RETURN for when you just write something like
@@ -100,83 +132,11 @@ inline static REBVAL *Init_Bad_Word_Untracked(
 // and you couldn't write `print [...] else [...]` if it would be sometimes
 // invisible and sometimes not.
 //
-#define Init_None(out) \
-    Init_Bad_Word((out), SYM_NONE)
+#define Init_None(out)      Init_Curse_Word((out), SYM_NONE)
+#define Is_None(v)          Is_Curse_Word((v), SYM_NONE)
 
 
-inline static const REBSYM* VAL_BAD_WORD_LABEL(
-    REBCEL(const*) v
-){
-    assert(CELL_KIND(v) == REB_BAD_WORD);
-    assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
-    return cast(const REBSYM*, VAL_NODE1(v));
-}
-
-inline static bool Is_Bad_Word_With_Sym(const RELVAL *v, SYMID sym) {
-    assert(sym != SYM_0);
-    if (not IS_BAD_WORD(v))
-        return false;
-    if (cast(REBLEN, sym) == cast(REBLEN, ID_OF_SYMBOL(VAL_BAD_WORD_LABEL(v))))
-        return true;
-    return false;
-}
-
-
-#if !defined(DEBUG_UNREADABLE_TRASH)  // release behavior, just ~unreadable~
-    #define Init_Trash(v) \
-        Init_Bad_Word_Core((v), PG_Trash_Canon, CELL_MASK_NONE)
-
-    #define IS_BAD_WORD_RAW(v) \
-        IS_BAD_WORD(v)
-
-    #define IS_UNREADABLE_DEBUG(v) false
-
-    #define ASSERT_UNREADABLE_IF_DEBUG(v) \
-        assert(IS_BAD_WORD(v))  // would have to be a void even if not unreadable
-
-    #define ASSERT_READABLE_IF_DEBUG(v) \
-        NOOP
-#else
-    inline static REBVAL *Init_Trash_Debug(RELVAL *out) {
-        RESET_VAL_HEADER(out, REB_BAD_WORD, CELL_FLAG_FIRST_IS_NODE);
-        mutable_BINDING(out) = nullptr;
-
-        // While SYM_UNREADABLE might be nice here, this prevents usage at
-        // boot time (e.g. data stack initialization)...and it's a good way
-        // to crash sites that expect normal voids.  It's usually clear
-        // from the assert that the void is unreadable, anyway.
-        //
-        INIT_VAL_NODE1(out, nullptr);  // FIRST_IS_NODE needed to do this
-        return cast(REBVAL*, out);
-    }
-
-    #define Init_Trash(out) \
-        Init_Trash_Debug(TRACK_CELL_IF_DEBUG(out))
-
-    #define IS_BAD_WORD_RAW(v) \
-        (KIND3Q_BYTE_UNCHECKED(v) == REB_BAD_WORD)
-
-    inline static bool IS_TRASH(const RELVAL *v) {
-        if (KIND3Q_BYTE_UNCHECKED(v) != REB_BAD_WORD)
-            return false;
-        return VAL_NODE1(v) == nullptr;
-    }
-#endif
-
-
-// There are isotope versions and non isotope versions. Usually when messing
-// with unsets in the system, the intent is to work with the "stable" form
-// (which triggers errors on access).
-
-#define UNSET_VALUE \
-    c_cast(const REBVAL*, &PG_Unset_Value)
-
-#define Init_Unset(out) \
-    Init_Bad_Word((out), SYM_UNSET)
-
-inline static bool Is_Unset(const RELVAL *v)
-  { return Is_Bad_Word_With_Sym(v, SYM_UNSET) and NOT_CELL_FLAG(v, ISOTOPE); }
-
+//=//// CELL MOVEMENT //////////////////////////////////////////////////////=//
 
 // Moving a cell invalidates the old location.  This idea is a potential
 // prelude to being able to do some sort of reference counting on series based
@@ -184,6 +144,9 @@ inline static bool Is_Unset(const RELVAL *v)
 // the meantime, setting to unreadable void helps see when a value that isn't
 // thought to be used any more is still being used.
 //
+// (It basically would involve setting the old cell to trash, so the functions
+// live here for now.)
+
 inline static REBVAL *Move_Cell_Untracked(
     RELVAL *out,
     REBVAL *v,

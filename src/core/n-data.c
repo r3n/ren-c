@@ -574,7 +574,7 @@ REBNATIVE(get)
             did REF(hard)
         );
         if (IS_NULLED(temp))  // blocks can't contain nulls
-            Init_Bad_Word(dest, SYM_NULLED);
+            Init_Bad_Word_Core(dest, Canon(SYM_NULLED), CELL_FLAG_ISOTOPE);
         else
             Copy_Cell(dest, temp);
     }
@@ -804,7 +804,7 @@ REBNATIVE(opt)
     // creating a likely error in those cases.  To get around it, OPT TRY
     //
     if (IS_NULLED(ARG(optional)))
-        return Init_Bad_Word(D_OUT, SYM_NULLED);
+        return Init_Curse_Word(D_OUT, SYM_NULLED);
 
     RETURN (ARG(optional));
 }
@@ -1877,7 +1877,7 @@ REBNATIVE(voidify)
     INCLUDE_PARAMS_OF_VOIDIFY;
 
     if (IS_NULLED(ARG(optional)))
-        return Init_Bad_Word(D_OUT, SYM_NULLED);
+        return Init_Curse_Word(D_OUT, SYM_NULLED);
 
     RETURN (ARG(optional));
 }
@@ -1899,7 +1899,9 @@ REBNATIVE(devoid)
 
     REBVAL *v = ARG(optional);
 
-    if (Is_Bad_Word_With_Sym(v, SYM_VOID))  // not quoted, so wasn't isotope
+    // not quoted, so wasn't isotope...regular BAD-WORD! for examination
+    //
+    if (IS_BAD_WORD(v) and VAL_BAD_WORD_ID(v) == SYM_VOID)
         return D_OUT;
 
     RETURN (Unliteralize(v));

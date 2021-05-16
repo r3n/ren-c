@@ -659,10 +659,8 @@ REBNATIVE(return)
     const REBPAR *param = ACT_PARAMS_HEAD(target_fun);
     assert(KEY_SYM(ACT_KEYS_HEAD(target_fun)) == SYM_RETURN);
 
-    if (
-        Is_Bad_Word_With_Sym(v, SYM_VOID)
-        and NOT_CELL_FLAG(v, ISOTOPE)  // RETURN with nothing following it
-    ){
+    if (Is_Void(v)) {  // signals RETURN with nothing after it
+        //
         // `do [return]` is a vanishing return.  If you have a "mean" void
         // then you can turn it into invisibility with DEVOID.
         //

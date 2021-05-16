@@ -325,7 +325,11 @@ REBARR *Typeset_To_Array(const REBVAL *tset)
                 // support in the 64-bit representation for individual
                 // custom types.  So all custom types typecheck together.
                 //
-                Init_Bad_Word(DS_PUSH(), SYM_CUSTOM_X);
+                Init_Bad_Word_Core(
+                    DS_PUSH(),
+                    Canon(SYM_CUSTOM_X),
+                    CELL_FLAG_ISOTOPE
+                );
             }
             else
                 Init_Builtin_Datatype(DS_PUSH(), cast(enum Reb_Kind, n));

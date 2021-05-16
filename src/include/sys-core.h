@@ -437,9 +437,8 @@ inline static void SET_SIGNAL(REBFLGS f) { // used in %sys-series.h
 #define CLR_SIGNAL(f) \
     cast(void, Eval_Signals &= ~(f))
 
-#if defined(DEBUG_UNREADABLE_TRASH)
-    inline static REBVAL *Init_Trash_Debug(RELVAL *out);  // forward decl
-#endif
+
+#include "sys-trash.h"
 
 #include "datatypes/sys-series.h"
 #include "datatypes/sys-array.h"  // REBARR used by UTF-8 string bookmarks

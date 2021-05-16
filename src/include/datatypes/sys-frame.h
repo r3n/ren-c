@@ -721,7 +721,7 @@ inline static void Push_Action(
   #endif
 
   #ifdef DEBUG_TERM_ARRAYS  // expects cell is trash (e.g. a cell) not poison
-    Init_Trash_Debug(Prep_Cell(ARR_TAIL(f->varlist)));
+    Init_Trash(Prep_Cell(ARR_TAIL(f->varlist)));
   #endif
 
     // Each layer of specialization of a function can only add specializations

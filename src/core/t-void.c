@@ -58,7 +58,7 @@ REB_R MAKE_Bad_word(
     assert(not parent);
     UNUSED(parent);
 
-    if (IS_WORD(arg))  // Functions do not return void isotopes, only literals
+    if (IS_WORD(arg))  // !!! Should this be an isotope or not?
         return Init_Bad_Word_Core(out, VAL_WORD_SYMBOL(arg), CELL_MASK_NONE);
 
     fail (Error_Bad_Make(kind, arg));

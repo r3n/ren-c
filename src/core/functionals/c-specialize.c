@@ -780,10 +780,7 @@ REBACT *Alloc_Action_From_Exemplar(
         // https://forum.rebol.info/t/default-values-and-make-frame/1412
         // https://forum.rebol.info/t/1413
         //
-        if (
-            Is_Bad_Word_With_Sym(arg, SYM_UNSET)
-            and NOT_CELL_FLAG(arg, VAR_MARKED_HIDDEN)
-        ){
+        if (Is_Unset(arg) and NOT_CELL_FLAG(arg, VAR_MARKED_HIDDEN)) {
             assert(IS_TYPESET(param));
             Copy_Cell(arg, param);
             continue;
