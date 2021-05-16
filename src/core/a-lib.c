@@ -789,7 +789,7 @@ const void *RL_rebArgR(unsigned char quotes, const void *p, va_list *vaptr)
     REBVAL *arg = FRM_ARGS_HEAD(f);
     for (; key != tail; ++key, ++arg) {
         if (Are_Synonyms(KEY_SYMBOL(key), symbol))
-            return arg;
+            return NULLIFY_NULLED(arg);
     }
 
     fail ("Unknown rebArg(...) name.");
