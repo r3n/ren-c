@@ -851,10 +851,10 @@ REB_R PD_Gob(
     }
 
     if (IS_INTEGER(picker))
-        return rebValueQ(
-            rebU(NATIVE_VAL(pick)),
-                SPECIFIC(ARR_AT(gob, IDX_GOB_PANE)),
-                SPECIFIC(picker)
+        return rebValue(
+            NATIVE_VAL(pick),
+                "@", SPECIFIC(ARR_AT(gob, IDX_GOB_PANE)),
+                "@", SPECIFIC(picker)
         );
 
     return R_UNHANDLED;
@@ -1048,9 +1048,9 @@ REBTYPE(Gob)
         return rebValue(
             "applique :take [",
                 "series: at", pane, rebI(index + 1),
-                "part:", rebQ(REF(part)),
-                "deep:", rebQ(REF(deep)),
-                "last:", rebQ(REF(last)),
+                "part:", REF(part),
+                "deep:", REF(deep),
+                "last:", REF(last),
             "]"
         ); }
 
@@ -1071,8 +1071,8 @@ REBTYPE(Gob)
         return nullptr;
 
     case SYM_REVERSE:
-        return rebValueQ(
-            "reverse", SPECIFIC(ARR_AT(gob, IDX_GOB_PANE))
+        return rebValue(
+            "reverse @", SPECIFIC(ARR_AT(gob, IDX_GOB_PANE))
         );
 
     default:

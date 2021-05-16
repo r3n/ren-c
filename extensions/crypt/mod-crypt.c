@@ -207,11 +207,13 @@ REBNATIVE(checksum)
     // builds in when you `#include "md.h"`.  How many entries are in this
     // table depend on the config settings (see %mbedtls-rebol-config.h)
     //
-    char *method_name = rebSpellQ(
-        "all [", REF(method), REF(settings), "] then [",
+    char *method_name = rebSpell(
+        "all [@", REF(method), "@", REF(settings), "] then [",
             "fail {Specify SETTINGS or /METHOD for CHECKSUM, not both}",
         "]",
-        "uppercase try to text! try any [", REF(method), REF(settings), "]"
+        "uppercase try to text! try any [",
+            "@", REF(method), "@", REF(settings),
+        "]"
     );
     if (method_name == nullptr)
         fail ("Must specify SETTINGS for CHECKSUM");
@@ -1074,17 +1076,17 @@ static const struct mbedtls_ecp_curve_info *Ecp_Curve_Info_From_Word(
 ){
     const struct mbedtls_ecp_curve_info *info;
 
-    if (rebDidQ("'curve25519 =", word))
+    if (rebDid("'curve25519 = @", word))
         info = &curve25519_info;
     else {
-        char *name = rebSpellQ("lowercase to text!", word);
+        char *name = rebSpell("lowercase to text! @", word);
         info = mbedtls_ecp_curve_info_from_name(name);
         rebFree(name);
     }
 
     if (not info)
-        rebJumpsQ (
-            "fail [{Unknown ECC curve specified:}", word, "]"
+        rebJumps (
+            "fail [{Unknown ECC curve specified:} @", word, "]"
         );
 
     return info;

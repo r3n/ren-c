@@ -838,9 +838,7 @@ REBVAL *RL_rebArg(unsigned char quotes, const void *p, va_list *vaptr)
 //
 // The default evaluators splice Rebol values "as-is" into the feed.  This
 // means that any evaluator active types (like WORD!, ACTION!, GROUP!...)
-// will run.  This can be mitigated with rebQ, but to make it easier for
-// some cases variants like `rebValueQ()` and `rebUnboxIntegerQ()` are provided
-// which default to splicing with quotes.
+// will run.  This can be mitigated with rebQ.
 //
 // (see `#define FLAG_QUOTING_BYTE` for why splice quoting is not the default)
 //
@@ -1699,11 +1697,10 @@ bool RL_rebWasHalting(void)
 //=////////////////////////////////////////////////////////////////////////=//
 
 
-// The rebQ instruction is designed to work so that `rebValue(rebQ(...))` would
-// be the same as rebValueQ(...).  Hence it doesn't mean "quote", it means
+// The rebQ instruction was designed such that it doesn't mean "quote", it means
 // "quote any value splices in this section".  And if you turned around and
-// said `rebValue(rebQ(rebU(...)))` that should undo your effect.  The two
-// operations share a mostly common implementation.
+// said `rebU(rebQ(...))` that should undo your effect.  The two operations
+// share a mostly common implementation.
 //
 // Note that `rebValue("print {One}", rebQ("print {Two}", ...), ...)` should not
 // execute rebQ()'s code right when C runs it.  If it did, then `Two` would

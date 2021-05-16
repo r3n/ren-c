@@ -189,7 +189,7 @@ REB_R Compose_To_Stack_Core(
         DECLARE_LOCAL (temp);
         Derelativize(temp, composee, specifier);
         PUSH_GC_GUARD(temp);
-        any_array = rebValueQ("as block!", temp);
+        any_array = rebValue("as block! @", temp);
         DROP_GC_GUARD(temp);
     }
     else

@@ -648,7 +648,7 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
         // as part of an overall vetting of "generic iteration" (which this
         // is a poor substitute for).
         //
-        REBVAL *block = rebValueQ("as block!", ARG(data));
+        REBVAL *block = rebValue("as block! @", ARG(data));
         Copy_Cell(ARG(data), block);
         rebRelease(block);
     }

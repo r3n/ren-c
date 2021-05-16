@@ -338,7 +338,7 @@ REBNATIVE(get_env)
   #ifdef TO_WINDOWS
     // Note: The Windows variant of this API is NOT case-sensitive
 
-    WCHAR *key = rebSpellWideQ(variable);
+    WCHAR *key = rebSpellWide("@", variable);
 
     DWORD val_len_plus_one = GetEnvironmentVariable(key, NULL, 0);
     if (val_len_plus_one == 0) { // some failure...
@@ -364,7 +364,7 @@ REBNATIVE(get_env)
   #else
     // Note: The Posix variant of this API is case-sensitive
 
-    char *key = rebSpellQ(variable);
+    char *key = rebSpell("@", variable);
 
     const char* val = getenv(key);
     if (val == NULL) // key not present in environment

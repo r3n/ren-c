@@ -44,8 +44,8 @@ enum Transport_Types {
 //
 static void Query_Net(REBVAL *out, REBVAL *port, struct devreq_net *sock)
 {
-    REBVAL *info = rebValueQ(
-        "copy ensure object! (", port, ")/scheme/info"
+    REBVAL *info = rebValue(
+        "copy ensure object! (@", port, ")/scheme/info"
     );  // shallow copy
 
     REBCTX *ctx = VAL_CONTEXT(info);
@@ -410,7 +410,7 @@ static REB_R Transport_Actor(
         //
         TRASH_POINTER_IF_DEBUG(req->common.data);
         req->common.binary = rebValue(
-            "as binary! copy/part", data, rebQ(REF(part))
+            "as binary! copy/part", data, REF(part)
         );
 
         // Because requests can be handled asynchronously, we won't
@@ -445,7 +445,7 @@ static REB_R Transport_Actor(
         if (not (req->modes & RST_LISTEN) or (req->modes & RST_UDP))
             fail ("TAKE is only available on TCP LISTEN ports");
 
-        return rebValueQ(
+        return rebValue(
             "take/part/(", REF(deep), ")/(", REF(last), ")",
                 CTX_VAR(ctx, STD_PORT_CONNECTIONS),
                 REF(part)

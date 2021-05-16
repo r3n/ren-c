@@ -295,21 +295,25 @@ REBNATIVE(console)
         // for the user (or on behalf of the console skin) are done in
         // Run_Sandboxed_Group().
         //
+        // !!! We use rebQ() here and not "@" due to the current behavior of
+        // @ which will make BAD-WORD!s into isotopes.  That behavior is to
+        // help with treatment of ~null~, but perhaps it should be exclusive
+        // to ~null~.  Either way, rebQ() would be needed if the distinction
+        // were to be important.
+        //
         REBVAL *trapped;  // Note: goto would cross initialization
-        trapped = rebValueQ(
-            "entrap [",
-                "ext-console-impl",  // action! that takes 2 args, run it
-                code,  // group! or block! executed prior (or blank!)
-                result,  // prior result quoted, or error (or blank!)
-                rebL(did REF(resumable)),
+        trapped = rebValue("entrap [",
+            "ext-console-impl",  // action! that takes 4 args, run it
+                rebQ(code),  // group! or block! executed prior (or blank!)
+                rebQ(result),  // prior result quoted, or error (or blank!)
+                "did", REF(resumable),
                 REF(skin),
-            "]"
-        );
+        "]");
 
         rebRelease(code);
         rebRelease(result);
 
-        if (rebDidQ("error?", trapped)) {
+        if (rebDid("error? @", trapped)) {
             //
             // If the HOST-CONSOLE function has any of its own implementation
             // that could raise an error (or act as an uncaught throw) it
@@ -321,35 +325,35 @@ REBNATIVE(console)
             // it might have generated (a BLOCK!) asking itself to crash.
 
             if (no_recover)
-                rebJumpsQ("panic", trapped);
+                rebJumps("panic @", trapped);
 
-            code = rebValueQ("[#host-console-error]");
+            code = rebValue("[#host-console-error]");
             result = trapped;
             no_recover = true;  // no second chances until user code runs
             goto recover;
         }
 
-        code = rebValueQ("first", trapped);  // entrap []'s the output
+        code = rebValue("first @", trapped);  // entrap []'s the output
         rebRelease(trapped); // don't need the outer block any more
 
       provoked:
 
-        if (rebDidQ("integer?", code))
+        if (rebDid("integer? @", code))
             break;  // when HOST-CONSOLE returns INTEGER! it means exit code
 
-        if (rebDidQ("match [sym-group! handle!]", code)) {
+        if (rebDid("match [sym-group! handle!] @", code)) {
             assert(REF(resumable));
             break;
         }
 
-        bool is_console_instruction = rebDidQ("block?", code);
+        bool is_console_instruction = rebDid("block? @", code);
         REBVAL *group;
 
         if (is_console_instruction) {
-            group = rebValueQ("as group!", code);  // to run without DO
+            group = rebValue("as group! @", code);  // to run without DO
         }
         else {
-            group = rebValueQ(code);  // rebRelease() w/o affecting code
+            group = rebValue("@", code);  // rebRelease() w/o affecting code
 
             // If they made it to a user mode instruction, the console skin
             // must not be broken beyond all repair.  So re-enable recovery.
@@ -373,7 +377,7 @@ REBNATIVE(console)
     if (was_halting_enabled)
         Enable_Halting();
 
-    rebElideQ("system/console:", rebR(old_console));
+    rebElide("system/console: @", rebR(old_console));
 
     return code;  // http://stackoverflow.com/q/1101957/
 }

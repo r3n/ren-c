@@ -886,7 +886,7 @@ REBNATIVE(enfixed)
             " https://forum.rebol.info/t/1156"
         );
 
-    REBVAL *copy = rebValueQ("copy", ARG(action));
+    REBVAL *copy = rebValue("copy @", ARG(action));
     SET_ACTION_FLAG(VAL_ACTION(copy), ENFIXED);
     return copy;
 }

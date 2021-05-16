@@ -142,10 +142,14 @@ STATIC_ASSERT(FEED_FLAG_1_IS_FALSE == NODE_FLAG_FREE);
 //     REBVAL *coordinate = rebValue("[", x, y, "]");
 //
 // You don't want to wind up with `['10 '20]` in that block.  So automatic
-// splicing with quotes is fraught with problems.  Still it might be useful
-// sometimes, so it is exposed via `rebValueQ()` and other `rebXxxQ()`.
+// splicing with quotes is fraught with problems.  Hence you should use the
+// rebQ() operator to add quoting levels when needed, or use the `@` operator
+// as part of a string:
 //
-// These facilities are generalized so that one may add and drop quoting from
+//     REBVAL *type = rebValue("type of", rebQ(word));
+//     REBVAL *type = rebValue("type of @", word);
+//
+// rebQ() and rebU()  are generalized so that one may add and drop quoting from
 // splices on a feed via ranges, countering any additions via rebQ() with a
 // corresponding rebU().  This is kept within reason at up to 255 levels
 // in a byte, and that byte is in the feed flags in the second byte (where

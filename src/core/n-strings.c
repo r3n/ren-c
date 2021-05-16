@@ -45,7 +45,7 @@ REBNATIVE(delimit)
 
     REBVAL *line = ARG(line);
     if (IS_TEXT(line) or IS_ISSUE(line))
-        return rebValueQ("copy", line);  // !!! Review performance
+        return rebValue("copy", line);  // !!! Review performance
 
     assert(IS_BLOCK(line));
 

@@ -599,7 +599,7 @@ REBNATIVE(encode_bmp)
     BITMAPFILEHEADER bmfh;
     BITMAPINFOHEADER bmih;
 
-    REBVAL *size = rebValueQ("pick", ARG(image), "'size");
+    REBVAL *size = rebValue("pick", ARG(image), "'size");
     int32_t w = rebUnboxInteger("pick", size, "'x");
     int32_t h = rebUnboxInteger("pick", size, "'y");
     rebRelease(size);

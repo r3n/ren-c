@@ -216,7 +216,7 @@ REBNATIVE(to)
             or CELL_CUSTOM_TYPE(type) == CELL_CUSTOM_TYPE(v)
         )
     ){
-        return rebValueQ("copy", v);
+        return rebValue("copy @", v);
     }
 
     TO_HOOK* hook = To_Hook_For_Type(type);
