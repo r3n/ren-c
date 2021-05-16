@@ -92,10 +92,9 @@ inline static REBVAL *Init_Vector(
 
     REBVAL *siw = RESET_CELL(
         PAIRING_KEY(paired),
-        REB_V_SIGN_INTEGRAL_WIDE,
+        REB_BYTES,
         CELL_MASK_NONE
     );
-    mutable_HEART_BYTE(siw) = REB_LOGIC;  // fools Is_Bindable()
     assert(bitsize == 8 or bitsize == 16 or bitsize == 32 or bitsize == 64);
     PAYLOAD(Any, siw).first.flag = sign;
     PAYLOAD(Any, siw).second.flag = integral;

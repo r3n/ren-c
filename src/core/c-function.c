@@ -513,7 +513,7 @@ REBARR *Pop_Paramlist_With_Meta_May_Fail(
                 param,
                 REB_P_RETURN,
                 TS_OPT_VALUE
-                    | FLAGIT_KIND(REB_TS_INVISIBLE)  // return/void ok
+                    | FLAGIT_KIND(REB_TS_ENDABLE)  // return/void ok
                     | FLAGIT_KIND(REB_TS_REFINEMENT)  // need slot for types
             );
 

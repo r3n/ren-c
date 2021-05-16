@@ -237,7 +237,7 @@ e-types/emit {
         /*** ALIASES FOR REB_0_END ***/
 
         REB_0 = REB_0_END,  /* REB_0 when used for signals besides ENDness */
-        REB_TS_ENDABLE = REB_0,  /* bit set in typesets for endability */
+        REB_TS_ENDABLE = REB_0,  /* in typesets for endability/invisibility */
 
         /*** PSEUDOTYPES ***/
 
@@ -254,7 +254,7 @@ e-types/emit {
 
         PSEUDOTYPE_THREE,
         REB_R_REDO = PSEUDOTYPE_THREE,
-        REB_TS_INVISIBLE = PSEUDOTYPE_THREE,
+        REB_TS_REFINEMENT = PSEUDOTYPE_THREE,
 
         PSEUDOTYPE_FOUR,
         REB_R_REFERENCE = PSEUDOTYPE_FOUR,
@@ -265,12 +265,7 @@ e-types/emit {
         REB_TS_NOOP_IF_BLANK = PSEUDOTYPE_FIVE,
 
         PSEUDOTYPE_SIX,
-        REB_G_XYF = PSEUDOTYPE_SIX,  /* used by GOB, compact 2xfloat */
         REB_TS_CONST = PSEUDOTYPE_SIX,
-
-        PSEUDOTYPE_SEVEN,
-        REB_V_SIGN_INTEGRAL_WIDE = PSEUDOTYPE_SEVEN,  /* used by VECTOR! */
-        REB_TS_REFINEMENT = PSEUDOTYPE_SEVEN,
 
         REB_MAX_PLUS_MAX
     };

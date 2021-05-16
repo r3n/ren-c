@@ -967,6 +967,6 @@ inline static void FAIL_IF_NO_INVISIBLE_RETURN(REBFRM *f) {
     if (ACT_DISPATCHER(phase) == &Opaque_Dispatcher)
         return;  // allow plain RETURN in <none> functions
 
-    if (not TYPE_CHECK(param, REB_TS_INVISIBLE))
+    if (not TYPE_CHECK(param, REB_TS_ENDABLE))
         fail (Error_Bad_Invisible(f));
 }
