@@ -455,3 +455,79 @@ REBTYPE(Lit)
 
     return R_UNHANDLED;
 }
+
+
+//
+//  MF_The: C
+//
+void MF_The(REB_MOLD *mo, REBCEL(const*) v, bool form)
+{
+    UNUSED(form);
+    UNUSED(v);
+
+    Append_Codepoint(mo->series, '@');
+}
+
+
+//
+//  CT_The: C
+//
+// Must have a comparison function, otherwise SORT would not work on arrays
+// with @ in them.
+//
+REBINT CT_The(REBCEL(const*) a, REBCEL(const*) b, bool strict)
+{
+    UNUSED(strict);  // no strict form of comparison
+    UNUSED(a);
+    UNUSED(b);
+
+    return 0;  // All ^ are equal
+}
+
+
+//
+//  REBTYPE: C
+//
+REBTYPE(The)
+{
+    switch (VAL_WORD_ID(verb)) {
+      case SYM_REFLECT: {
+        INCLUDE_PARAMS_OF_REFLECT;
+        UNUSED(ARG(value)); // taken care of by `unit` above.
+
+        // !!! REFLECT cannot use REB_TS_NOOP_IF_BLANK, because of the special
+        // case of TYPE OF...where a BLANK! in needs to provide BLANK! the
+        // datatype out.  Also, there currently exist "reflectors" that
+        // return LOGIC!, e.g. TAIL?...and logic cannot blindly return null:
+        //
+        // https://forum.rebol.info/t/954
+        //
+        // So for the moment, we just ad-hoc return nullptr for some that
+        // R3-Alpha returned NONE! for.  Review.
+        //
+        switch (VAL_WORD_ID(ARG(property))) {
+          case SYM_INDEX:
+          case SYM_LENGTH:
+            return nullptr;
+
+          default: break;
+        }
+        break; }
+
+      case SYM_COPY: { // since `copy/deep [1 @ 2]` is legal, allow `copy @`
+        INCLUDE_PARAMS_OF_COPY;
+        UNUSED(ARG(value));
+
+        if (REF(part))
+            fail (Error_Bad_Refines_Raw());
+
+        UNUSED(REF(deep));
+        UNUSED(REF(types));
+
+        return Init_The(D_OUT); }
+
+      default: break;
+    }
+
+    return R_UNHANDLED;
+}

@@ -302,6 +302,14 @@ lit         "quoting operator which distinguishes NULL and BAD-WORD! isotopes"
             lit         -       -       +       [unit]
 
 
+; THE! is the lone @ symbol, which acts like THE.  It's particularly nice to
+; have for use in the API, for writing `rebDid("action? @", var)` instead of
+; needing to say `rebDid("action?" rebQ(var))`.
+
+the         "as-is operator which suppresses evaluation on the next value"
+            the         -       -       +       [unit]
+
+
 ; COMMA! has a high number with bindable types it's evaluative, and the
 ; desire is to make the ANY_INERT() test fast with a single comparison.
 

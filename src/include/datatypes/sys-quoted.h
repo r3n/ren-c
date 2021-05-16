@@ -362,3 +362,15 @@ inline static REBVAL *Init_Lit(RELVAL *out) {
     mutable_BINDING(out) = nullptr;
     return cast(REBVAL*, out);
 }
+
+inline static REBVAL *Init_The(RELVAL *out) {
+    RESET_CELL(out, REB_THE, CELL_MASK_NONE);
+
+    // Although THE! carries no data, it is not inert.  To make ANY_INERT()
+    // fast, it's in the part of the list of bindable evaluative types.
+    // This means the binding has to be nulled out in the cell to keep the
+    // GC from crashing on it.
+    //
+    mutable_BINDING(out) = nullptr;
+    return cast(REBVAL*, out);
+}

@@ -1443,15 +1443,40 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
     //=//// LIT! ///////////////////////////////////////////////////////////=//
     //
-    // Like QUOTE, with the added feature that it will preserve the NULL-2
-    // status of the argument.  (QUOTE does not take its a `@literal` argument
-    // so it cannot detect this.)
+    // Like QUOTE, with the added feature that it will preserve the isotope
+    // status of BAD-WORD! arguments.  (QUOTE does not take a `^literal`
+    // argument so it cannot detect this distinction.)
 
       case REB_LIT:
         if (Rightward_Evaluate_Nonvoid_Into_Out_Throws(f, v))  // see notes
             goto return_thrown;
 
         Literalize(f->out);  // Note: allows END, e.g. (@) -> ~void~
+        break;
+
+
+    //=//// THE! ///////////////////////////////////////////////////////////=//
+    //
+    // Acts just like THE, useful in particular to put in API strings to
+    // indicate the coming variadic slot is to be taken as-is:
+    //
+    //    >> @ x
+    //    == x
+
+      case REB_THE:
+        if (IS_END(f_next))
+            fail ("@ hit end of input");
+        Inertly_Derelativize_Inheriting_Const(f->out, f_next, f->feed);
+        
+        // Particularly in the API, we want the case of `@ ~null~` to give
+        // something that can be operated on as if it were falsey/null.
+        // Consider if this distortion should apply to ~null~ only.  If people
+        // don't like this behavior they can use THE as a function.
+        //
+        if (IS_BAD_WORD(f->out))
+            CLEAR_CELL_FLAG(f->out, ISOTOPE);
+
+        Fetch_Next_Forget_Lookback(f);  // advances next
         break;
 
 

@@ -1053,6 +1053,10 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
         ss->end = cp + 1;
         return TOKEN_CARET;
     }
+    if (*cp == '@') {
+        ss->end = cp + 1;
+        return TOKEN_AT;
+    }
 
     enum Reb_Token token;  // only set if falling through to `scan_word`
 
@@ -1276,8 +1280,8 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
 
         switch (GET_LEX_VALUE(*cp)) {
           case LEX_SPECIAL_AT:  // the case where @ is actually at the head
-            //assert(false);  // already taken care of
-            fail ("@ dead end");
+            assert(false);  // already taken care of
+            panic ("@ dead end");
 
           case LEX_SPECIAL_PERCENT:  // %filename
             if (cp[1] == '%') {  // %% is WORD! exception
@@ -1933,6 +1937,13 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
             break;
         }
         goto token_prefixable_sigil;
+
+      case TOKEN_AT:
+        if (IS_LEX_ANY_SPACE(*ep) or *ep == ']' or *ep == ')') {
+            Init_The(DS_PUSH());
+            break;
+        }
+        fail (Error_Syntax(ss, token));
 
       case TOKEN_COLON:
         assert(*bp == ':');
