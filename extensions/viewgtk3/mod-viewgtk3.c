@@ -41,25 +41,6 @@
 // General functions
 
 //
-//  export gtk-init-plain: native [
-//
-//      {Call this function before using any other GTK+ functions in your GUI applications. 
-// It will initialize everything needed to operate the toolkit and parses some standard command line options.}
-//
-//      return: [void!]
-//  ]
-//
-REBNATIVE(gtk_init_plain)
-{
-    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_INIT_PLAIN;
-
-    int argc = 0;
-    gtk_init(&argc, nullptr);
-    
-    return rebVoid();
-}
-
-//
 //  export gtk-init: native [
 //
 //      {Call this function before using any other GTK+ functions in your GUI applications. 
@@ -71,6 +52,26 @@ REBNATIVE(gtk_init_plain)
 REBNATIVE(gtk_init)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_INIT;
+
+    int argc = 0;
+    gtk_init(&argc, nullptr);
+    
+    return rebVoid();
+}
+
+//
+//  export gtk-init-check: native [
+//
+//      {Call this function before using any other GTK+ functions in your GUI applications. 
+// It will initialize everything needed to operate the toolkit and parses some standard command line options.
+// With a check so will not crash the application if it does not succeed.}
+//
+//      return: [void!]
+//  ]
+//
+REBNATIVE(gtk_init_check)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_INIT_CHECK;
 
     int argc = 0;
     if (not gtk_init_check(&argc, nullptr))
@@ -90,7 +91,7 @@ REBNATIVE(gtk_init)
 //
 REBNATIVE(gtk_main)
 {
-    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_INIT;
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_MAIN;
 
     gtk_main();
 
@@ -153,9 +154,9 @@ REBNATIVE(gtk_main_quit)
 //      return: [integer!]
 //      instance [handle!]
 //      detailedsignal [text!]
-//      handler [handle!]
-//      data [handle! integer!]
-//      cleardata [integer!]
+//      handler [handle! action!]
+//      data [<opt> handle!]
+//      destroydata [<opt> handle!]
 //      flags [integer!]
 //  ]
 //
@@ -163,27 +164,42 @@ REBNATIVE(g_signal_connect_data)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_G_SIGNAL_CONNECT_DATA;
 
-    // instance is a gpointer type, handle, so integer
+    // instance is a gpointer type, handle
     GtkWidget *instance = VAL_HANDLE_POINTER(GtkWidget, ARG(instance));
 
     // detailedsignal is a text to hold the description of the action. For example "quit", "clicked"
     // signal names are to make distinction between the action to perform.
     const char * detailedsignal = cast(char*, VAL_STRING_AT(ARG(detailedsignal)));
 
-    // handler is an integer type for a g-callback
-    GCallback handler = (GCallback) rebUnboxInteger(ARG(handler));
+    // handler is handle that must be cast to a gcallback
+    REBVAL *value = ARG(handler);
+    GCallback handler = G_CALLBACK(value);
 
-    // data is a gpointer for a handle, so an integer
+    // data is a gpointer for data to pass to c_handler calls. 
+    //REBVAL *v = ARG(data);
+    //if (IS_TEXT(v)) {
+    //    data == NULL;
+    //} else {
     gpointer *data = VAL_HANDLE_POINTER(gpointer, ARG(data));
+    if (data == nullptr){
+        rebElide("print {data is a nullpointer}");
+    }
 
-    // cleardata is an integer for g-closure-notify, often value null is used
-    GClosureNotify cleardata = (GClosureNotify) rebUnboxInteger(ARG(cleardata));
+    // destroydata is handle for g-closure-notify, often a value of null is used in examples
+    REBVAL *value2 = ARG(destroydata);
+    //GClosureNotify destroydata = (GClosureNotify) rebUnboxInteger(ARG(destroydata));
+    GClosureNotify destroydata1 = (GClosureNotify) value2;
+    GtkWidget *destroydata2 = VAL_HANDLE_POINTER(GtkWidget, ARG(destroydata));
+    if (destroydata2 == nullptr) {
+        rebElide("print {destroydata2 is a nullpointer}");
+    }
 
     // flags is an integer value, 0 = normal signal connect, 1 = after, 2 = swapped
     GConnectFlags flags = (GConnectFlags) rebUnboxInteger(ARG(flags));
 
     // result is > 0 for success adding a signal
-    unsigned int result = g_signal_connect_data(instance, detailedsignal, handler, data, cleardata, flags);
+    unsigned int result = g_signal_connect_data(instance, detailedsignal, handler, data, destroydata1, flags);
+    // unsigned int result = g_signal_connect_data(instance, detailedsignal, handler, NULL, NULL, flags);
 
     return rebInteger(result);
 }
@@ -217,11 +233,7 @@ REBNATIVE(gtk_window_new)
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WINDOW_NEW;
 
     GtkWindowType type = (GtkWindowType) rebUnboxInteger(ARG(type));
-    // GtkWindowType type = cast(GtkWindowType, VAL_STRING_AT(ARG(type)));
     
-    if (type == GTK_WINDOW_TOPLEVEL) {
-        type = GTK_WINDOW_TOPLEVEL;
-    }
     GtkWidget *window = gtk_window_new(type);
 
     return rebHandle(window, 0, nullptr);
@@ -251,6 +263,64 @@ REBNATIVE(gtk_window_set_title)
     const char * title = cast(char*, VAL_STRING_AT(ARG(title)));
      
     gtk_window_set_title(window, title);
+
+    return rebVoid();
+}
+
+// Container add remove functions
+
+//
+//  export gtk-container-add: native [
+//
+//      {Adds widget to container. Typically used for simple containers such as GtkWindow, GtkFrame, or GtkButton; 
+// for more complicated layout containers such as GtkBox or GtkGrid, this function will pick 
+// default packing parameters that may not be correct. So consider functions such as gtk_box_pack_start() 
+// and gtk_grid_attach() as an alternative to gtk_container_add() in those cases. A widget may be added to 
+// only one container at a time; you can’t place the same widget inside two different containers.}
+//
+//      return: [void!]
+//      container [handle!]
+//      widget [handle!]
+//  ]
+//
+REBNATIVE(gtk_container_add)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_CONTAINER_ADD;
+
+    GtkContainer *container = VAL_HANDLE_POINTER(GtkContainer, ARG(container));
+
+    GtkWidget *widget = VAL_HANDLE_POINTER(GtkWidget, ARG(widget));
+     
+    gtk_container_add(container, widget);
+
+    return rebVoid();
+}
+
+//
+//  export gtk-container-remove: native [
+//
+//      {Removes widget from container. The widget must be inside container. 
+// Note that container will own a reference to widget, and that this may be the last reference held; 
+// so removing a widget from its container can destroy that widget. If you want to use widget again, 
+// you need to add a reference to it before removing it from a container, using g_object_ref(). 
+// If you don’t want to use widget again it’s usually more efficient to simply destroy it directly 
+// using gtk_widget_destroy() since this will remove it from the container and help break any circular 
+// reference count cycles.}
+//
+//      return: [void!]
+//      container [handle!]
+//      widget [handle!]
+//  ]
+//
+REBNATIVE(gtk_container_remove)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_CONTAINER_REMOVE;
+
+    GtkContainer *container = VAL_HANDLE_POINTER(GtkContainer, ARG(container));
+
+    GtkWidget *widget = VAL_HANDLE_POINTER(GtkWidget, ARG(widget));
+     
+    gtk_container_remove(container, widget);
 
     return rebVoid();
 }
@@ -986,7 +1056,7 @@ REBNATIVE(gtk_text_buffer_get_bounds)
 //      {Creates a new GtkBox with orientation and spacing.}
 //
 //      return: [handle! void!]
-//      orientation [handle!]
+//      orientation [integer!]
 //      spacing [integer!]
 //  ]
 //
@@ -994,11 +1064,11 @@ REBNATIVE(gtk_box_new)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_BOX_NEW;
 
-    GtkOrientation *orientation = VAL_HANDLE_POINTER(GtkOrientation, ARG(orientation));
+    GtkOrientation orientation = (GtkOrientation) rebUnboxInteger(ARG(orientation));
 
     unsigned int spacing = rebUnboxInteger(ARG(spacing));
 
-    GtkWidget *box = gtk_box_new(*orientation, spacing);
+    GtkWidget *box = gtk_box_new(orientation, spacing);
     
     return rebHandle(box, 0, nullptr);
 }
@@ -1208,7 +1278,6 @@ REBNATIVE(gtk_grid_insert_column)
 
     return rebVoid();
 }
-
 
 // Widget Show (and Hide) functions
 
