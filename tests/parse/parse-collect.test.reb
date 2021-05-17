@@ -16,11 +16,11 @@
     x = [1 2 3]
 ])
 (did all [
-    parse? [1 2 3] [x: collect [keep only [some integer!]]]
+    parse? [1 2 3] [x: collect [keep ^[some integer!]]]
     x = [[1 2 3]]
 ])
 (did all [
-    parse? [1 2 3] [x: collect [some [keep only integer!]]]
+    parse? [1 2 3] [x: collect [some [keep ^integer!]]]
     x = [[1] [2] [3]]
 ])
 
@@ -101,7 +101,7 @@
     pos: parse* [1 2 3] [
         x: collect [
             keep integer!
-            keep only (second [A [<pick> <me>] B])
+            keep ^(second [A [<pick> <me>] B])
             keep integer!
         ]
         here
@@ -110,7 +110,7 @@
     x = [1 [<pick> <me>] 2]
 ])
 (did all [
-    parse? [1 2 3] [x: collect [keep only ([a b c]) to end]]
+    parse? [1 2 3] [x: collect [keep ^([a b c]) to end]]
     x = [[a b c]]
 ])
 

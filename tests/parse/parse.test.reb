@@ -425,7 +425,7 @@
         sub: copy/part s n
         parse sub [while [
             remove skip
-            insert "-"
+            insert ("-")
         ]]
         if sub != copy/part t n [fail "Incorrect Replacement"]
     ]

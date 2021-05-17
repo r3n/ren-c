@@ -260,11 +260,9 @@
     (["a" "a" "a"] = uparse "aaa" [collect [some keep "a"]])
     (["a"] = uparse "aaa" [collect [keep some "a"]])
 
-    ; There is a KEEP/ONLY feature which is part of a half-baked attempt at
-    ; generic combinator refinements.
 (
     result: uparse "abbbbabbab" [collect [
-        some [keep "a", keep/only collect [some keep "b" keep (<hi>)]]
+        some [keep "a", keep ^[collect [some keep "b" keep (<hi>)]]]
     ]]
     result = ["a" ["b" "b" "b" "b" <hi>] "a" ["b" "b" <hi>] "a" ["b" <hi>]]
 )]
@@ -679,19 +677,23 @@
 ]
 
 
-; SYM-WORD!, SYM-GROUP!, and SYM-PATH! are all used for literal matching.
+; THE-WORD!, THE-GROUP!, and THE-PATH! are all used for literal matching.
 ; This means to match against the input but don't treat what's given as a rule.
-[(
-    x: [some rule]
-    data: [[some rule] [some rule]]
-    uparse? data [some ^x]
-)(
-    data: [[some rule] [some rule]]
-    uparse? data [some ^([some rule])]
-)(
-    obj: make object! [x: [some rule]]
-    uparse? data [some ^obj.x]
-)]
+;
+; !!! These @-types don't exist yet due to not enough type numbers, but will
+; be making a comeback.
+;
+; [(
+;    x: [some rule]
+;    data: [[some rule] [some rule]]
+;    uparse? data [some @x]
+;)(
+;    data: [[some rule] [some rule]]
+;    uparse? data [some @([some rule])]
+;)(
+;    obj: make object! [x: [some rule]]
+;    uparse? data [some @obj.x]
+;)]
 
 
 ; Invisibles are another aspect of UPARSE...where you can have a rule match

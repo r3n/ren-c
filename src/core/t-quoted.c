@@ -270,6 +270,24 @@ REBNATIVE(quote)
 
 
 //
+//  literalize: native [
+//
+//  {Like single quote, but keeps ordinary NULL as-is}
+//
+//      return: "Quoted value (if depth = 0, may not be quoted)"
+//          [<opt> any-value!]
+//      optional [<opt> <literal> any-value!]
+//  ]
+//
+REBNATIVE(literalize)
+{
+    INCLUDE_PARAMS_OF_LITERALIZE;
+
+    return Move_Cell(D_OUT, ARG(optional));  // argument is ^literal
+}
+
+
+//
 //  unquote: native [
 //
 //  {Remove quoting levels from the evaluated argument}

@@ -654,7 +654,6 @@ default-combinators: make map! reduce [
         return: "The kept value (same as input)"
             [<opt> any-value!]
         parser [action!]
-        /only "Keep blocks as BLOCK!"
         <local> result'
     ][
         if not state.collecting [
@@ -670,7 +669,7 @@ default-combinators: make map! reduce [
             '~null~ = result'  ; true null if and only if parser failed
             quoted? result'
         ]]
-        append/(if only ['only]) state.collecting unquote result'
+        append state.collecting unquote result'
         return unquote result'
     ]
 
@@ -1107,78 +1106,56 @@ default-combinators: make map! reduce [
         ]
     ]
 
-    === SYM-XXX! COMBINATORS ===
+    === LIT-XXX! COMBINATORS (Currently SYM-XXX!, but name will change) ===
 
-    ; The SYM-XXX! combinators are used when you want a variable or expression
-    ; to be used literally as the thing matched.
+    ; The LIT-XXX! combinators add a quoting level to their result.  This
+    ; is particularly important with functions like KEEP.
     ;
-    ;    x: [some rule]
-    ;    uparse [[some rule] [some rule]] [some ^x]
+    ; Note: These are NOT fixed as `[:block-combinator | :literalize]`, because
+    ; they want to inherit whatever combinator that is currently in use for
+    ; their un-lit'd type (by default).  This means dynamically reacting to
+    ; the set of combinators chosen for the particular parse.
     ;
-    ; The behavior is basically as if you had tried to match the thing quoted.
-    ;
-    ;    uparse [[some rule] [some rule]] [some '[some rule]]
-    ;
-    ; !!! What should be done in the case of NULL?
+    ; !!! These follow a simple pattern, could generate at a higher level.
 
     sym-word! combinator [
-        return: "Exact match"
-            [<opt> any-value!]
+        return: "Literalized" [<opt> any-value!]
         value [sym-word!]
+        <local> result' parser
     ][
-        if :input.1 = get value [
-            set remainder next input
-            return :input.1
-        ]
-        return null
+        value: as word! value
+        parser: :(state.combinators)/(word!)
+        ([result' (remainder)]: ^ parser state input value) then [result']
     ]
 
     sym-tuple! combinator [
-        return: "Exact match"
-            [<opt> any-value!]
+        return: "Literalized" [<opt> any-value!]
         value [sym-tuple!]
+        <local> result' parser
     ][
-        if :input.1 = get value [
-            set remainder next input
-            return :input.1
-        ]
-        return null
+        value: as tuple! value
+        parser: :(state.combinators)/(tuple!)
+        ([result' (remainder)]: ^ parser state input value) then [result']
     ]
 
     sym-group! combinator [
-        return: "Exact match"
-            [<opt> any-value!]
+        return: "Literalized" [<opt> any-value!]
         value [sym-group!]
+        <local> result' parser
     ][
-        if :input.1 = do value [
-            set remainder next input
-            return :input.1
-        ]
-        return null
+        value: as group! value
+        parser: :(state.combinators)/(group!)
+        ([result' (remainder)]: ^ parser state input value) then [result']
     ]
 
     sym-block! combinator [
-        {Literalize the result of a BLOCK! rule (detects invisibility, NULL-2)}
-        return: "Exact match"
-            [<opt> any-value!]
+        return: "Literalized" [<opt> any-value!]
         value [sym-block!]
         <local> result' parser
     ][
-        ; Borrows the implementation of the regular block combinator
-        ;
         value: as block! value
         parser: :(state.combinators)/(block!)
-
-        ([result' (remainder)]: ^ parser state input value) else [
-            return null
-        ]
-
-        ; Typically when you use the ^ convention to invoke a function, you
-        ; would `return unquote` it.  But since this combinator wants to add
-        ; the semantics of ^ to plain BLOCK!'s combinator, it achieves that
-        ; by simply not unquoting when it returns the literalized result.
-        ;
-        return result'
+        ([result' (remainder)]: ^ parser state input value) then [result']
     ]
 
     === INVISIBLE COMBINATORS ===
@@ -1819,6 +1796,23 @@ append redbol-combinators reduce [
         set remainder get value
         return ~seek~
     ]
+
+    === OLD-STYLE INSERT AND CHANGE (TBD) ===
+
+    ; !!! If you are going to make a parser combinator that can distinguish
+    ; between:
+    ;
+    ;     parse ... [insert ...]
+    ;     parse ... [insert only ...]
+    ;
+    ; The concept of skippable quoted WORD! arguments would mean that "..."
+    ; couldn't start with a WORD!, in the current framing of <skip>-pable
+    ; arguments.  You'd have to write a fully variadic combinator.  Or you
+    ; would make the rule that the ... had to be a GROUP! or a BLOCK!!, not
+    ; just a WORD!.
+    ;
+    ; At time of writing, variadic combinators don't exist, and this isn't
+    ; a sufficient priority to make them for.  Review later. 
 
     === OLD-STYLE INTO BEHAVIOR ===
 

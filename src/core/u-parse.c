@@ -1608,21 +1608,23 @@ REBNATIVE(subparse)
 
                 FETCH_NEXT_RULE(f);  // e.g. skip the KEEP word!
 
-                // !!! We follow the R3-Alpha principle of not using
-                // PATH! dispatch here, so it's `keep only` instead of
-                // `keep/only`.  But is that any good?  Review.
-                //
-                bool only;
-                if (IS_WORD(P_RULE) and VAL_WORD_ID(P_RULE) == SYM_ONLY) {
-                    only = true;
-                    FETCH_NEXT_RULE(f);
-                }
-                else
-                    only = false;
-
                 REBLEN pos_before = P_POS;
 
                 rule = Get_Parse_Value(P_SAVE, P_RULE, P_RULE_SPECIFIER);
+
+                // If you say KEEP ^(whatever) then that acts like /ONLY did
+                //
+                bool only;
+                if (ANY_SYM_KIND(VAL_TYPE(rule))) {
+                    if (rule != P_SAVE) {  // move to mutable location
+                        Derelativize(P_SAVE, rule, P_RULE_SPECIFIER);
+                        rule = P_SAVE;
+                    }
+                    Plainify(P_SAVE);  // take the ^ off
+                    only = true;
+                }
+                else
+                    only = false;
 
                 if (IS_GROUP(rule)) {
                     //
@@ -1661,6 +1663,10 @@ REBNATIVE(subparse)
                 else {  // Ordinary rule (may be block, may not be)
 
                     DECLARE_FRAME (subframe, f->feed, EVAL_MASK_DEFAULT);
+
+                    // Want the subframe to see the BLOCK!, not ^[...]
+                    //
+                    f->feed->value = rule;
 
                     bool interrupted;
                     assert(IS_END(D_OUT));  // invariant until finished
@@ -2510,58 +2516,47 @@ REBNATIVE(subparse)
 
             if (P_FLAGS & (PF_INSERT | PF_CHANGE)) {
                 count = (P_FLAGS & PF_INSERT) ? 0 : count;
-                bool only = false;
                 if (IS_END(P_RULE))
                     fail (Error_Parse_End());
-
-                if (IS_WORD(P_RULE)) {  // check for ONLY flag
-                    SYMID cmd = VAL_CMD(P_RULE);
-                    switch (cmd) {
-                      case SYM_ONLY:
-                        only = true;
-                        FETCH_NEXT_RULE(f);
-                        if (IS_END(P_RULE))
-                            fail (Error_Parse_End());
-                        break;
-
-                      case SYM_0: // not a "parse command" word, keep going
-                        break;
-
-                      default: // other commands invalid after INSERT/CHANGE
-                        fail (Error_Parse_Rule());
-                    }
-                }
 
                 // new value...comment said "CHECK FOR QUOTE!!"
                 rule = Get_Parse_Value(P_SAVE, P_RULE, P_RULE_SPECIFIER);
                 FETCH_NEXT_RULE(f);
 
-                // If a GROUP!, then execute it first.  See #1279
+                // If you say KEEP ^(whatever) then that acts like /ONLY did
                 //
-                DECLARE_LOCAL (evaluated);
-                if (IS_GROUP(rule)) {
-                    REBSPC *derived = Derive_Specifier(
-                        P_RULE_SPECIFIER,
-                        rule
-                    );
-                    if (Do_Any_Array_At_Throws(
-                        evaluated,
-                        rule,
-                        derived
-                    )){
-                        Copy_Cell(D_OUT, evaluated);
-                        goto return_thrown;
+                bool only;
+                if (ANY_SYM_KIND(VAL_TYPE(rule))) {
+                    if (rule != P_SAVE) {  // move to mutable location
+                        Derelativize(P_SAVE, rule, P_RULE_SPECIFIER);
+                        rule = P_SAVE;
                     }
+                    Plainify(P_SAVE);  // take the ^ off
+                    only = true;
+                }
+                else
+                    only = false;
 
-                    rule = evaluated;
+                if (not IS_GROUP(rule))
+                    fail ("Only (...) or ^(...) in old PARSE's CHANGE/INSERT");
+            
+                DECLARE_LOCAL (evaluated);
+                REBSPC *derived = Derive_Specifier(
+                    P_RULE_SPECIFIER,
+                    rule
+                );
+                if (Do_Any_Array_At_Throws(
+                    evaluated,
+                    rule,
+                    derived
+                )){
+                    Copy_Cell(D_OUT, evaluated);
+                    goto return_thrown;
                 }
 
                 if (IS_SER_ARRAY(P_INPUT)) {
-                    DECLARE_LOCAL (specified);
-                    Derelativize(specified, rule, P_RULE_SPECIFIER);
-
                     REBLEN mod_flags = (P_FLAGS & PF_INSERT) ? 0 : AM_PART;
-                    if (not only and ANY_ARRAY(specified))
+                    if (not only and ANY_ARRAY(evaluated))
                         mod_flags |= AM_SPLICE;
 
                     // Note: We could check for mutability at the start
@@ -2576,19 +2571,13 @@ REBNATIVE(subparse)
                         (P_FLAGS & PF_CHANGE)
                             ? SYM_CHANGE
                             : SYM_INSERT,
-                        specified,
+                        evaluated,
                         mod_flags,
                         count,
                         1
                     );
-
-                    if (IS_QUOTED(rule))
-                        Unquotify(ARR_AT(a, P_POS - 1), 1);
                 }
                 else {
-                    DECLARE_LOCAL (specified);
-                    Derelativize(specified, rule, P_RULE_SPECIFIER);
-
                     P_POS = begin;
 
                     REBLEN mod_flags = (P_FLAGS & PF_INSERT) ? 0 : AM_PART;
@@ -2598,7 +2587,7 @@ REBNATIVE(subparse)
                         (P_FLAGS & PF_CHANGE)
                             ? SYM_CHANGE
                             : SYM_INSERT,
-                        specified,
+                        evaluated,
                         mod_flags,
                         count,
                         1
