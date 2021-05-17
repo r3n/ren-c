@@ -9,7 +9,7 @@
     num: 0
     1 = while [num < 1] [num: num + 1]
 )]
-('~null~ = ^ while [false] [])
+((the ') = ^ while [false] [])
 ; zero repetition
 (
     success: true

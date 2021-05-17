@@ -148,26 +148,18 @@
     FLAG_LEFT_BIT(24)
 
 
-//=//// CELL_FLAG_TYPESPECIFIC_BIT /////////////////////////////////////////=//
+//=//// CELL_FLAG_ISOTOPE //////////////////////////////////////////////////=//
 //
-// This is a persistent flag that can mean different things for different
-// datatypes.  It will move with the value.
+// This flag is currently for BAD-WORD!.  If bad words like ~void~ or ~none~
+// do not carry the flag, then they act like normal values...and can appear
+// in blocks, and be handled like anything else.  But if the ISOTOPE flag is
+// set, then BAD-WORD! values in variables will return errors.  There will
+// also be other "mystery" properties of decaying or acting in ways that are
+// specific to particular BAD-WORD!s if it's an isotope.  e.g. ~null~ isotopes
+// will turn into NULL when assigned to variables, and are also falsey.
 //
-// For BAD-WORD! and NULL: CELL_FLAG_ISOTOPE
-//
-//     Isotope forms of void and null will "decay" when passed to RETURN to
-//     a common standard form of that value.  In the case of NULL, the NULL-2
-//     isotope is a special form of null that can triger a THEN? and will not
-//     trigger an ELSE.  For BAD-WORD! the non-isotope forms will cause an
-//     error when fetching via word/tuple/path access.
-//
-// For other types: TBD
-//
-// !!! Originally this was done with HEART_BYTE(), e.g. the isotope of NULL
-// had a heart of BLANK!.  That got trickier for void, since there was no type
-// that matched its marking exactly (having it say it was a REB_WORD and be
-// involved with binding is undesirable).  A type-specific-bit seems like it
-// would come in handy other places.
+// !!! Odds are that this should be unified with CELL_FLAG_UNEVALUATED, to
+// save a bit...although it's in the reverse sense.
 //
 // !!! Thought: Could FRAME! use this bit to encode when the frame is actually
 // a frame for the IDENTITY, and the value is just something that came from
@@ -176,10 +168,8 @@
 // lie, and that way you could make ACTION!s and FRAME!s which were really
 // just QUOTED!s under the hood.
 //
-#define CELL_FLAG_TYPESPECIFIC_BIT \
+#define CELL_FLAG_ISOTOPE \
     FLAG_LEFT_BIT(25)
-
-#define CELL_FLAG_ISOTOPE CELL_FLAG_TYPESPECIFIC_BIT
 
 
 //=//// CELL_FLAG_26 //////////////////////////////////////////////////////=//

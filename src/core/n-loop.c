@@ -593,7 +593,7 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
                 Init_Curse_Word(les->out, SYM_NULL);  // null signals break
             else if (
                 IS_BAD_WORD(les->out)
-                and NOT_CELL_FLAG(les->out, ISOTOPE)
+                and GET_CELL_FLAG(les->out, ISOTOPE)
             ){
                 fail (les->out);
             }
@@ -770,7 +770,7 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
         // any other value is the last body result, and is truthy
         // only illegal value here is void (would cause error if body gave it)
         //
-        if (IS_BAD_WORD(D_OUT) and NOT_CELL_FLAG(D_OUT, ISOTOPE))
+        if (IS_BAD_WORD(D_OUT) and GET_CELL_FLAG(D_OUT, ISOTOPE))
             assert(Is_Heavy_Nulled(D_OUT));
         return D_OUT;
 

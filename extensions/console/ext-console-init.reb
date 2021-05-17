@@ -119,7 +119,7 @@ console!: make object! [
         ^v "Value (done with literal parameter to discern isotope status)"
             [<opt> any-value!]
     ] [
-        last-result: unquote v  ; preserves isotope status of void (not null)
+        last-result: unquote v  ; keeps bad word isotope flag (except ~null~'s)
 
         === PLAIN BAD WORDS (typically would fail on WORD!/PATH! access) ===
 
@@ -187,7 +187,7 @@ console!: make object! [
             return
         ]
 
-        === NULL ===
+        === NULL ISOTOPES ===
 
         if v = null [  ; not an isotope, e.g. can trigger ELSE
             ;
@@ -208,6 +208,20 @@ console!: make object! [
             return
         ]
 
+        if v = the ' [
+            ;
+            ; Because ~null~ produces true NULL from evaluation (and not an
+            ; ~null~ isotope), the only way to get ~null~ isotopes is by
+            ; decaying a lone ' ("quoted null").  But due to the properties
+            ; of ~null~ isotopes, if you unquote this you'll be producing
+            ; something that non-literalizing routines would see as NULL.
+            ;
+            ; So handle this case now, before the UNQUOTE.
+            ;
+            print "== ~null~  ; isotope"
+            return
+        ]
+
         === ORDNARY RETURN VALUES (^ parameter convention passes as quoted) ===
 
         v: unquote v  ; Now handle everything else
@@ -216,9 +230,9 @@ console!: make object! [
             bad-word? :v [
                 ;
                 ; If the ^ processed a value into a ~quoted~ BAD-WORD!, that's
-                ; another "isotope" form.  These are friendlier than plain bad
-                ; words and can be accessed without triggering an error.  To
-                ; help build the intuition about the difference, label them.
+                ; the "friendly" form.  These can be accessed from variables
+                ; without triggering an error.  We don't label them since
+                ; they are the "normal" ones.
                 ;
                 print [result mold v]
             ]
@@ -580,7 +594,7 @@ ext-console-impl: func [
         result/id = 'no-catch
         :result/arg2 = :quit  ; throw's /NAME
     ] then [
-        return switch type of get* 'result/arg1 [
+        return switch type of friendly get* 'result/arg1 [
             bad-word! [0]  ; plain QUIT, no /WITH, call that success
 
             logic! [either :result/arg1 [0] [1]]  ; logic true is success
@@ -709,9 +723,7 @@ ext-console-impl: func [
         ; the invocation.  This is more pleasing than making PRINT-RESULT
         ; speak in a quoted protocol for the sake of sensing isotopes.
         ;
-        emit [system/console/print-result unquote (<*>
-            either bad-word? result [result] [quote result]
-        )]
+        emit [system/console/print-result unquote (<*> quote result)]
         return <prompt>
     ]
 

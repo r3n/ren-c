@@ -689,7 +689,7 @@ REBNATIVE(return)
     // take [<opt> any-value!] as its argument, and then report the error
     // itself...implicating the frame (in a way parallel to this native).
     //
-    if (IS_BAD_WORD(v) and NOT_CELL_FLAG(v, ISOTOPE)) {
+    if (IS_BAD_WORD(v) and GET_CELL_FLAG(v, ISOTOPE)) {
         //
         // allow, so that you can say `return ~none~` in functions whose spec
         // is written as `return: []`

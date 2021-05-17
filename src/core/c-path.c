@@ -695,12 +695,6 @@ bool Eval_Path_Throws_Core(
     Abort_Frame(pvs);
     assert(not Is_Evaluator_Throwing_Debug());
 
-    // !!! This should be the responsibility of the path dispatchers; it may
-    // be that a path wants to return an active bad-word?
-    //
-    if (IS_BAD_WORD(pvs->out))
-        SET_CELL_FLAG(pvs->out, ISOTOPE);
-
     return false; // not thrown
 
   return_thrown:;
@@ -884,13 +878,6 @@ REBNATIVE(pick)
       default:
         panic ("Unsupported return value in Path Dispatcher");
     }
-
-    // !!! This should be set up so that stable voids don't make it into
-    // blocks, but for the moment we'll have it so that picking takes the
-    // isotope off.
-    //
-    if (IS_BAD_WORD(pvs->out))
-        SET_CELL_FLAG(pvs->out, ISOTOPE);
 
     Drop_Frame(pvs);
     return r;

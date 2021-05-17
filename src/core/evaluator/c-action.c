@@ -349,7 +349,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 SET_CELL_FLAG(f->arg, UNEVALUATED);
 
                 if (IS_BAD_WORD(f->arg))  // source should only be isotope form
-                    SET_CELL_FLAG(f->arg, ISOTOPE);
+                    assert(NOT_CELL_FLAG(f->arg, ISOTOPE));
                 break;
 
               case REB_P_SOFT:
@@ -383,7 +383,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     SET_CELL_FLAG(f->arg, UNEVALUATED);
 
                     if (IS_BAD_WORD(f->arg))  // !!! source should only be isotope
-                        SET_CELL_FLAG(f->arg, ISOTOPE);
+                        assert(NOT_CELL_FLAG(f->arg, ISOTOPE));
                 }
                 break;
 
@@ -541,7 +541,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             }
 
             if (IS_BAD_WORD(f->arg))  // !!! Source should only be isotope form
-                SET_CELL_FLAG(f->arg, ISOTOPE);
+                assert(NOT_CELL_FLAG(f->arg, ISOTOPE));
 
             // Have to account for enfix deferrals in cases like:
             //
@@ -634,7 +634,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             }
             else {
                 if (IS_BAD_WORD(f->arg))  // !!! Source should only be isotope form
-                    SET_CELL_FLAG(f->arg, ISOTOPE);
+                    assert(NOT_CELL_FLAG(f->arg, ISOTOPE));
             }
             break;
 
@@ -850,8 +850,8 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 fail ("Literal arguments must be quoted!, bad-word!, or null");
             }
         }
-        else if (kind_byte == REB_BAD_WORD and NOT_CELL_FLAG(f->arg, ISOTOPE)) {
-            fail ("Only literal parameters allow non-isotope BAD-WORD!s");
+        else if (kind_byte == REB_BAD_WORD and GET_CELL_FLAG(f->arg, ISOTOPE)) {
+            fail ("Only literal parameters allow isotope BAD-WORD!s");
         }
 
         // Apply constness if requested.

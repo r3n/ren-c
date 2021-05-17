@@ -1912,7 +1912,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         // picking has to clear it or there's an invariant that blocks
         // never hold isotopes needs to be decided.
         //
-        Init_Bad_Word_Core(DS_PUSH(), label, CELL_FLAG_ISOTOPE);  // "friendly"
+        Init_Bad_Word_Core(DS_PUSH(), label, CELL_MASK_NONE);  // "friendly"
         break; }
 
       case TOKEN_COMMA:
@@ -2370,12 +2370,12 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
 
               case SYM_UNSET:  // !!! Should be under a LEGACY flag...
                 //
-                // BAD-WORD!s are put in blocks, are "friendly" isotopes.
+                // BAD-WORD!s are put in blocks, are "friendly" non-isotopes.
                 //
                 Init_Bad_Word_Core(
                     DS_PUSH(),
                     Canon(SYM_UNSET),
-                    CELL_FLAG_ISOTOPE
+                    CELL_MASK_NONE
                 );
                 break;
 

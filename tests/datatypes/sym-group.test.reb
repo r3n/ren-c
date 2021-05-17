@@ -17,6 +17,6 @@
 ((the '10) = ^(10 comment "hi"))
 
 (null = ^(null))
-('~null~ = ^(if true [null]))
+('' = ^(if true [null]))
 
 ((the '1020) = ^(1000 + 20))

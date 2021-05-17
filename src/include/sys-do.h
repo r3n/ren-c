@@ -234,18 +234,11 @@ inline static bool Do_Branch_Core_Throws(
       case REB_ACTION: {
         PUSH_GC_GUARD(branch);  // may be stored in `cell`, needs protection
 
-        // may be an END marker, if not Do_Branch_With() case, use KIND3Q_BYTE
-        bool is_unfriendly_bad_word =
-            (KIND3Q_BYTE_UNCHECKED(condition) == REB_BAD_WORD)
-            and NOT_CELL_FLAG(condition, ISOTOPE);  // propagate as bad
-
         bool threw = RunQ_Throws(
             out,
             false, // !fully, e.g. arity-0 functions can ignore condition
             rebU(branch),
-            is_unfriendly_bad_word
-                ? rebU(condition)
-                : cast(const REBNOD*, condition),  // can't use NOD() on REBVAL*
+            condition,
             rebEND
         );
         DROP_GC_GUARD(branch);

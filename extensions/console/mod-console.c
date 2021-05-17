@@ -289,6 +289,20 @@ REBNATIVE(console)
 
       recover: ;  // Note: semicolon needed as next statement is declaration
 
+        if (rebDid("'~void~ = ^", rebQ(result))) {
+            //
+            // If you get a ~void~ isotope even after literalization, that
+            // is distinct from the execution of the BAD-WORD! of ~void~.  It
+            // means "truly invisible", e.g. END...like the user hit return on
+            // a prompt with no evaluations.  We conflate that with as if you
+            // got regular ~void~ here as it otherwise means EXT-CONSOLE-IMPL
+            // would have to take its result literalized.  It could be another
+            // signal, like BLANK!...
+            //
+            rebRelease(result);
+            result = rebValue("'~void~");
+        }
+
         // This runs the HOST-CONSOLE, which returns *requests* to execute
         // arbitrary code by way of its return results.  The ENTRAP is thus
         // here to intercept bugs *in HOST-CONSOLE itself*.  Any evaluations

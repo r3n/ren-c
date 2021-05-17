@@ -57,10 +57,10 @@
         return
     ]
     outer: enclose :inner func [f] [
-        return unquote ^(devoid do f)  ; now try unquoting
+        return devoid do f  ; now try unquoting
     ]
     did all [
-        '~void~ = ^(outer)
+        '~void~ = ^ ^(outer)
         var = 1020
     ]
 )]

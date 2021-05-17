@@ -67,5 +67,7 @@
 )
 
 (
-    null = (' then [fail "shouldn't happen because ' produces light null"])
+    <isotope> = (' then [<isotope>])  ; ' decays to isotope null
 )
+
+(' then x -> [null = ^x])  ; isotope decays as argument to lambda

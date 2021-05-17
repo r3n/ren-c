@@ -257,10 +257,15 @@ REBNATIVE(quote)
     INCLUDE_PARAMS_OF_QUOTE;
 
     REBINT depth = REF(depth) ? VAL_INT32(ARG(depth)) : 1;
+
+    if (depth == 0)
+        RETURN (ARG(optional));  
+
     if (depth < 0)
         fail (PAR(depth));
 
-    return Quotify(Copy_Cell(D_OUT, ARG(optional)), depth);
+    Copy_Cell(D_OUT, ARG(optional));
+    return Isotopic_Quotify(D_OUT, depth);
 }
 
 
@@ -308,7 +313,39 @@ REBNATIVE(unquote)
 {
     INCLUDE_PARAMS_OF_UNQUOTE;
 
-    REBVAL *v = Unliteralize(ARG(value));  // remove ^value quoting level
+    REBVAL *v = ARG(value);
+
+    // !!! This needs to be handled more generally, but the idea is that if you
+    // are to write:
+    //
+    //      >> x: ^()
+    //      == ~void~  ; isotope
+    //
+    // Then you have captured the notion of invisibility by virtue of doing so.
+    // Had it been a void isotope inside the GROUP!, the literalization would
+    // have been a *non*-isotope ~void~.
+    //
+    // But since we take literalized parameter here, we get that isotope void
+    // as a non-isotope void.  If we were to try and "unquote" the intent of
+    // invisibility, then UNQUOTE would return invisibily...but that idea is
+    // being saved for DEVOID to keep UNQUOTE more predictable.
+    //
+    // So we just return a void isotope in this case that DEVOID can handle.
+    // This is not generalized to /DEPTH, and may need more thinking.  But
+    //
+    if (IS_BAD_WORD(v)) {
+        if (GET_CELL_FLAG(v, ISOTOPE))
+            fail ("Cannot UNQUOTE end of input");  // no <end>, shouldn't happen
+        Move_Cell(D_OUT, v);
+        SET_CELL_FLAG(D_OUT, ISOTOPE);
+        return D_OUT;
+    }
+
+    // The value we get in has been literalized, and we want to take that
+    // literalization into account while still being consistent isotopically.
+    // Add 1 to how much we're asked to unquote to account for that.
+
+    REBINT depth = 1 + (REF(depth) ? VAL_INT32(ARG(depth)) : 1);
 
     // Critical to the design of literalization is that ^(null) => null, and
     // not ' (if you want ' then use QUOTE instead).  And critical to reversing
@@ -317,31 +354,27 @@ REBNATIVE(unquote)
     if (IS_NULLED(v))
         return nullptr;
 
-    // Make sure any non-quoted void--isotope or not--becomes the stable/mean
-    // form of the void.  (Quoted voids will be unquoted to the isotope form.)
-    //
-    if (IS_BAD_WORD(v)) {
-        Move_Cell(D_OUT, v);
-        CLEAR_CELL_FLAG(D_OUT, ISOTOPE);
-        return D_OUT;
-    }
-
-    REBINT depth = REF(depth) ? VAL_INT32(ARG(depth)) : 1;
     if (depth < 0)
         fail (PAR(depth));
-    if (cast(REBLEN, depth) > VAL_NUM_QUOTES(v))
+
+    // Make sure there are at least depth - 1 steps of quoting to remove.
+    // (The last step may be isotopic, and not change a quoting level).
+    //
+    if (cast(REBLEN, depth - 1) > VAL_NUM_QUOTES(v))
         fail ("Value not quoted enough for unquote depth requested");
 
-    Unquotify(Copy_Cell(D_OUT, v), depth);
+    Unquotify(Copy_Cell(D_OUT, v), depth - 1);
 
-    // One of the big tools of the quoting with ^(...) is that it's possible
-    // to detect the isotope forms.  UNQUOTE should make sure an input quoted
-    // form comes back as an isotope.
+    // Now the last unquoting step is isotopic.  Accept true null, as UNQUOTE
+    // is used as UNLITERALIZE.  (Should it be UNQUOTE* or similar?)
     //
-    if (IS_BAD_WORD(D_OUT))
-        SET_CELL_FLAG(D_OUT, ISOTOPE);
+    if (IS_NULLED(D_OUT))
+        return nullptr;
 
-    return D_OUT;
+    if (IS_QUOTED(D_OUT) or IS_BAD_WORD(D_OUT))
+        return Isotopic_Unquote(D_OUT);
+
+    fail ("Final unquote level is not of QUOTED! or BAD-WORD!");
 }
 
 

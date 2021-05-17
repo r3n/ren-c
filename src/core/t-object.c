@@ -703,7 +703,7 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
             // isn't a good idea...depends on the whole block/object model.
             //
             if (IS_BAD_WORD(var)) {
-                if (GET_CELL_FLAG(var, ISOTOPE))
+                if (NOT_CELL_FLAG(var, ISOTOPE))
                     Append_Ascii(s, "'");
             }
             else if (not ANY_INERT(var)) {

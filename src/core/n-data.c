@@ -517,7 +517,7 @@ void Get_Var_May_Fail(
         fail (Error_Bad_Value_Core(source, specifier));
 
     if (IS_BAD_WORD(out)) {
-        if (NOT_CELL_FLAG(out, ISOTOPE)) {
+        if (GET_CELL_FLAG(out, ISOTOPE)) {
             if (not any)
                 fail (Error_Bad_Word_Get_Core(source, specifier, out));
         }
@@ -574,7 +574,7 @@ REBNATIVE(get)
             did REF(hard)
         );
         if (IS_NULLED(temp))  // blocks can't contain nulls
-            Init_Bad_Word_Core(dest, Canon(SYM_NULL), CELL_FLAG_ISOTOPE);
+            Init_Bad_Word_Core(dest, Canon(SYM_NULL), CELL_MASK_NONE);
         else
             Copy_Cell(dest, temp);
     }
@@ -1777,7 +1777,7 @@ REBNATIVE(friendly)
     Move_Cell(D_OUT, Unliteralize(ARG(optional)));
 
     if (IS_BAD_WORD(D_OUT))
-        SET_CELL_FLAG(D_OUT, ISOTOPE);
+        CLEAR_CELL_FLAG(D_OUT, ISOTOPE);
 
     return D_OUT;
 }
@@ -1799,7 +1799,7 @@ REBNATIVE(unfriendly)
     Move_Cell(D_OUT, Unliteralize(ARG(optional)));
 
     if (IS_BAD_WORD(D_OUT))
-        CLEAR_CELL_FLAG(D_OUT, ISOTOPE);
+        SET_CELL_FLAG(D_OUT, ISOTOPE);
 
     return D_OUT;
 }

@@ -392,28 +392,14 @@ static void Propagate_All_GC_Marks(void)
             if (KIND3Q_BYTE_UNCHECKED(v) == REB_NULL) {
                 if (not (IS_VARLIST(a) or IS_PATCH(a) or IS_PAIRLIST(a)))
                     panic (a);
-
-                // !!! Heavy nulls are an efficiency trick that keep the whole
-                // of the system from having to talk in terms of quoted values
-                // all the time--isolating to just those few cases that care
-                // about the distinction.  The state is packed into just the
-                // null so it doesn't cost a cell bit.  There needs to be a
-                // rigorous policy on exactly when heavy null decay is done.
-                // It used to be possible to store in variables and query but
-                // would be lost on variable fetch...now it's non-queryable,
-                // but still leaks around and decays on fetch.  If a better
-                // invariant is thought of, check it here.
-                //
-                /*if (Is_Heavy_Nulled(v))
-                    panic (a);*/
             }
 
             if (
                 KIND3Q_BYTE_UNCHECKED(v) == REB_BAD_WORD
-                and NOT_CELL_FLAG(v, ISOTOPE)
+                and GET_CELL_FLAG(v, ISOTOPE)
             ){
-                // Non isotope voids may not exist in blocks, they can only
-                // be in objects/frames.
+                // BAD-WORD! isotopes may not exist in blocks, they can only be
+                // in objects/frames.
                 //
                 assert(IS_VARLIST(a) or IS_PATCH(a));
             }

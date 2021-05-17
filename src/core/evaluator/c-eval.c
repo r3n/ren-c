@@ -702,7 +702,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
 
         if (
             IS_BAD_WORD(unwrap(gotten))
-            and NOT_CELL_FLAG(unwrap(gotten), ISOTOPE)
+            and GET_CELL_FLAG(unwrap(gotten), ISOTOPE)
         ){
             fail (Error_Bad_Word_Get_Core(v, v_specifier, unwrap(gotten)));
         }
@@ -768,7 +768,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (STATE_BYTE(f) == ST_EVALUATOR_SYM_WORD)
             Literalize(f->out);
         else {
-            if (IS_BAD_WORD(f->out) and NOT_CELL_FLAG(f->out, ISOTOPE))
+            if (IS_BAD_WORD(f->out) and GET_CELL_FLAG(f->out, ISOTOPE))
                 fail (Error_Bad_Word_Get_Core(v, v_specifier, f->out));
         }
 
@@ -997,7 +997,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             goto process_action;
         }
 
-        if (IS_BAD_WORD(f_spare) and NOT_CELL_FLAG(f_spare, ISOTOPE))
+        if (IS_BAD_WORD(f_spare) and GET_CELL_FLAG(f_spare, ISOTOPE))
             fail (Error_Bad_Word_Get_Core(v, v_specifier, f_spare));
 
         Copy_Cell(f->out, f_spare);  // won't move CELL_FLAG_UNEVALUATED
@@ -1103,7 +1103,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         if (STATE_BYTE(f) == ST_EVALUATOR_SYM_PATH_OR_SYM_TUPLE)
             Literalize(f->out);
         else {
-            if (IS_BAD_WORD(f->out) and NOT_CELL_FLAG(f->out, ISOTOPE))
+            if (IS_BAD_WORD(f->out) and GET_CELL_FLAG(f->out, ISOTOPE))
                 fail (Error_Bad_Word_Get_Core(v, v_specifier, f->out));
         }
 
@@ -1473,8 +1473,10 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // Consider if this distortion should apply to ~null~ only.  If people
         // don't like this behavior they can use THE as a function.
         //
-        if (IS_BAD_WORD(f->out))
-            CLEAR_CELL_FLAG(f->out, ISOTOPE);
+        if (IS_BAD_WORD(f->out)) {
+            assert(NOT_CELL_FLAG(f->out, ISOTOPE));
+            SET_CELL_FLAG(f->out, ISOTOPE);
+        }
 
         Fetch_Next_Forget_Lookback(f);  // advances next
         break;
@@ -1535,13 +1537,23 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     //     == ~unset~
 
       case REB_BAD_WORD:
-        Derelativize(f->out, v, v_specifier);
-
-        // !!! Guaranteed to be the isotope form?  How will this guarantee
-        // be made?  Still under consideration.
         //
-        /*assert(GET_CELL_FLAG(f->out, ISOTOPE));*/
-        CLEAR_CELL_FLAG(f->out, ISOTOPE);
+        // Source coming through the feed should be guaranteed to not be the
+        // isotope form of a BAD-WORD!.  Only objects/frames/etc. have them.
+        //
+        assert(NOT_CELL_FLAG(v, ISOTOPE));
+
+        if (VAL_BAD_WORD_ID(v) == REB_NULL) {
+            //
+            // ~null~ evaluating to NULL instead of the isotope form of ~null~
+            // is a "twist" but a useful one.
+            //
+            Init_Nulled(f->out);
+        }
+        else {
+            Derelativize(f->out, v, v_specifier);
+            SET_CELL_FLAG(f->out, ISOTOPE);
+        }
         break;
 
 
@@ -1588,6 +1600,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
       case REB_QUOTED:
         Derelativize(f->out, v, v_specifier);
         Unquotify(f->out, 1);  // take off one level of quoting
+        if (IS_BAD_WORD(f->out))
+            assert(NOT_CELL_FLAG(f->out, ISOTOPE));
         break;
 
 
@@ -1627,8 +1641,16 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // isotope form.  Since their quoted forms and unquoted forms can
         // both appear in blocks, it doesn't run into the same problems.
         //
-        if (IS_BAD_WORD(f->out))
-            SET_CELL_FLAG(f->out, ISOTOPE);
+        if (IS_BAD_WORD(f->out)) {
+            assert(NOT_CELL_FLAG(f->out, ISOTOPE));
+        }
+        else if (IS_NULLED(f->out)) {
+            //
+            // If we didn't decay ' to the isotopic form of ~null~, we would
+            // not have a way to *get* an isotopic null.
+            //
+            Init_Curse_Word(f->out, SYM_NULL);
+        } 
         break;
     }
 

@@ -1766,10 +1766,10 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
                 FLAG_FLAVOR(INSTRUCTION_ADJUST_QUOTING) | NODE_FLAG_MANAGED
             );
             CLEAR_SERIES_FLAG(a, MANAGED);  // see notes above on why we lied
-            Quotify(Copy_Cell(ARR_SINGLE(a), first), 1);
+            Isotopic_Quote(Copy_Cell(ARR_SINGLE(a), first));
         }
         else {  // no shortcut, push and keep going
-            Quotify(Copy_Cell(DS_PUSH(), first), 1);
+            Isotopic_Quote(Copy_Cell(DS_PUSH(), first));
             goto no_shortcut;
         }
     }
@@ -1780,7 +1780,7 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
         DECLARE_VA_FEED (feed, p, vaptr, feed_flags);
 
         while (NOT_END(feed->value)) {
-            Quotify(Copy_Cell(DS_PUSH(), SPECIFIC(unwrap(feed->value))), 1);
+            Isotopic_Quote(Copy_Cell(DS_PUSH(), SPECIFIC(unwrap(feed->value))));
             Fetch_Next_In_Feed(feed);
         }
 

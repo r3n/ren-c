@@ -83,7 +83,7 @@ inline static bool Is_Curse_Word(const RELVAL *v, enum Reb_Symbol_Id sym) {
     assert(sym != SYM_0);
     if (not IS_BAD_WORD(v))
         return false;
-    if (GET_CELL_FLAG(v, ISOTOPE))
+    if (NOT_CELL_FLAG(v, ISOTOPE))
         return false;  // friendly form of BAD-WORD!
     if (cast(REBLEN, sym) == cast(REBLEN, VAL_BAD_WORD_ID(v)))
         return true;
@@ -91,7 +91,7 @@ inline static bool Is_Curse_Word(const RELVAL *v, enum Reb_Symbol_Id sym) {
 }
 
 #define Init_Curse_Word(out,sym) \
-    Init_Bad_Word_Core((out), Canon(sym), CELL_MASK_NONE)
+    Init_Bad_Word_Core((out), Canon(sym), CELL_FLAG_ISOTOPE)
 
 
 // ~unset~ is chosen in particular by the system to represent variables that

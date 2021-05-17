@@ -438,18 +438,10 @@ REBNATIVE(then)  // see `tweak :then #defer on` in %base-defs.r
         return nullptr;  // left didn't run, so signal THEN didn't run either
 
     // We received the left hand side literalized, so it's quoted in order
-    // to tell the difference between the NULL and NULL-2.  Now that's tested
-    // we know it's not a stable NULL, so Unliteralize it.
+    // to tell the difference between the NULL and ~null~ isotope.  Now that's
+    // tested, unliteralize it.
     //
-    if (IS_BAD_WORD(optional)) {
-        Unliteralize(optional);
-        assert(NOT_CELL_FLAG(optional, ISOTOPE));
-    }
-    else {
-        Unliteralize(optional);
-        if (IS_BAD_WORD(optional))
-            assert(GET_CELL_FLAG(optional, ISOTOPE));
-    }
+    Unliteralize(optional);
 
     if (Do_Branch_With_Throws(D_OUT, ARG(branch), optional))
         return R_THROWN;

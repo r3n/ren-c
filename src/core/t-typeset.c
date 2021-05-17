@@ -328,7 +328,7 @@ REBARR *Typeset_To_Array(const REBVAL *tset)
                 Init_Bad_Word_Core(
                     DS_PUSH(),
                     Canon(SYM_CUSTOM_X),
-                    CELL_FLAG_ISOTOPE
+                    CELL_MASK_NONE
                 );
             }
             else

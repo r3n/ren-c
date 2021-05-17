@@ -80,7 +80,7 @@
 ; CYCLE once differentiated a STOP result from BREAK with ~stopped~, but now
 ; it uses NULL-2 for similar purposes.
 [
-    ('~null~ = ^ cycle [stop])
+    ('' = ^ cycle [stop])
     (null = cycle [break])
 ]
 
