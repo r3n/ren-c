@@ -90,7 +90,6 @@ for-each file [
 
     %../../scripts/make-file.r  ; Work in progress for FILE! conversion
     %../../scripts/shell.r  ; SHELL dialect (requires CALL, here for editing)
-    %../../scripts/uparse.reb  ; UPARSE dialect (will evolve into new PARSE)
 
     %main-startup.reb
 ][

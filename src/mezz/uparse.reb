@@ -486,6 +486,7 @@ default-combinators: make map! reduce [
         return: "What the delegated-to tag returned"
             [<opt> any-value!]
         value [tag!]
+        <local> parser
     ][
         if not parser: :(state.combinators)/(value) [
             fail ["No TAG! Combinator registered for" value]
@@ -1615,9 +1616,8 @@ parsify: func [
                     let f: binding of 'return
                     let n: 1
                     for-each param (parameters of :value) [
-                        cparam: as word! unspaced ["param" n]
                         if not path? param [
-                            append parsers ^f.(cparam)
+                            append parsers ^f.(as word! unspaced ["param" n])
                             n: n + 1
                         ]
                     ]
