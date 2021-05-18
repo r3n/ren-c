@@ -1196,14 +1196,66 @@ default-combinators: make map! reduce [
         ;
     ]
 
+    === ACTION! COMBINATOR ===
+
+    ; The ACTION! combinator is a new idea of letting you call a normal
+    ; function with parsers fulfilling the arguments.  At the Montreal
+    ; conference Carl said he was skeptical of PARSE getting any harder to read
+    ; than it was already, so the isolation of DO code to GROUP!s seemed like
+    ; it was a good idea, but maybe allowing calling zero-arity functions.
+    ;
+    ; With Ren-C it's easier to try these ideas out.  So the concept is that
+    ; you can make a PATH! that ends in / and that will be run as a normal
+    ; ACTION!, but whose arguments are fulfilled via PARSE.
+
+    action! combinator [
+        {Run an ordinary ACTION! with parse rule products as its arguments}
+        return: "The return value of the action"
+            [<opt> <invisible> any-value!]
+        value [action!]
+        ; AUGMENT is used to add param1, param2, param3, etc.
+        /parsers "Sneaky argument of parsers collected from arguments"
+            [block!]
+        <local> arg
+    ][
+        ; !!! We very inelegantly pass a block of PARSERS for the argument in
+        ; because we can't reach out to the augmented frame (rule of the
+        ; design) so the augmented function has to collect them into a block
+        ; and pass them in a refinement we know about.  This is the beginning
+        ; of a possible generic mechanism for variadic combinators, but it's
+        ; tricky because the variadic step is before this function actually
+        ; runs...review as the prototype evolves.
+
+        let f: make frame! :value
+        for-each param (parameters of action of f) [
+            if not path? param [
+                ensure action! :parsers/1
+                if sym-word? param [
+                    f.(to word! param): ([# input]: ^ parsers/1 input) else [
+                        return null
+                    ]
+                ] else [
+                    f.(param): ([# input]: parsers/1 input) else [
+                        return null
+                    ]
+                ]
+                parsers: next parsers
+            ]
+        ]
+        assert [tail? parsers]
+        set remainder input
+        return devoid do f
+    ]
+
     === BLOCK! COMBINATOR ===
 
-    ; Handling of BLOCK! is the most complex combinator.  It is processed as
-    ; a set of alternatives separated by `|`.  The bar is treated specially
-    ; and not an "OR combinator" due to semantics, because if arguments to
-    ; all the steps were captured in one giant ACTION! that would mean changes
-    ; to variables by a GROUP! would not be percieved by later steps...since
-    ; once a rule like SOME captures a variable it won't see changes:
+    ; Handling of BLOCK! is the central combinator.  The contents are processed
+    ; as a set of alternatives separated by `|`, with a higher-level sequence
+    ; operation indicated by `||`.  The bars are treated specially; e.g. | is
+    ; not an "OR combinator" due to semantics, because if arguments to all the
+    ; steps were captured in one giant ACTION! that would mean changes to
+    ; variables by a GROUP! would not be percieved by later steps...since once
+    ; a rule like SOME captures a variable it won't see changes:
     ;
     ; https://forum.rebol.info/t/when-should-parse-notice-changes/1528
     ;
@@ -1403,7 +1455,7 @@ combinatorize: func [
                 ; left unspecialized.
             ]
             param = 'value [
-                f.value: value
+                f.value: :value
             ]
             param = 'state [  ; the "state" is currently the UPARSE frame
                 f.state: state
@@ -1491,17 +1543,74 @@ parsify: func [
         ]
 
         path? :r [
-            let word: ensure word! first r
-            if let c: select state.combinators word [
-                let [f 'rules]: combinatorize rules state :c
-                for-each refinement next as block! r [
-                    f.(refinement): #
+            ;
+            ; !!! Wild new feature idea: if a PATH! ends in a slash, assume it
+            ; is an invocation of a normal function with the results of
+            ; combinators as its arguments.
+            ;
+            let f
+            if blank? last r [
+                if not action? let action: get :r [
+                    fail "In UPARSE PATH ending in / must resolve to ACTION!"
+                ]                
+                if not let c: select state.combinators action! [
+                    fail "No ACTION! combinator, can't use PATH ending in /"
                 ]
 
-                set advanced rules  ; !!! Should `[:advanced]: ...` be ok?
-                return make action! f
+                ; !!! The ACTION! combinator has to be variadic, because the
+                ; number of arguments it takes depends on the arguments of
+                ; the action.  This requires design.  :-/
+                ;
+                ; For the moment, do something weird and customize the
+                ; combinator with AUGMENT for each argument (parser1, parser2
+                ; parser3).
+                ;
+                c: adapt augment :c collect [
+                    let n: 1
+                    for-each param parameters of :action [
+                        if not path? param [
+                            keep compose [
+                                (to word! unspaced ["param" n]) [action!]
+                            ]
+                            n: n + 1
+                        ]
+                    ]
+                ][
+                    parsers: copy []
+                    let f: binding of 'return
+                    let n: 1
+                    for-each param (parameters of :value) [
+                        cparam: as word! unspaced ["param" n]
+                        if not path? param [
+                            append parsers ^f.(cparam)
+                            n: n + 1
+                        ]
+                    ]
+                ]
+
+                [f rules]: combinatorize/value rules state :c :action
             ]
-            fail ["Unknown combinator:" word]
+            else [
+                let word: ensure word! first r
+                if not let c: select state.combinators word [
+                    fail ["Unknown combinator:" word]
+                ]
+                [f rules]: combinatorize rules state :c
+
+                ; !!! This hack was added to make /ONLY work; it only works
+                ; for refinements with no arguments by looking at what's in
+                ; the path when it doesn't end in /.  Now /ONLY is not used.
+                ; Review general mechanisms for refinements on combinators.
+                ;
+                for-each refinement next as block! r [
+                    if not blank? refinement [
+                        f.(refinement): #
+                    ]
+                ]
+            ]
+
+            set advanced rules  ; !!! Should `[:advanced]: ...` be ok?
+            return make action! f
         ]
 
         ; !!! Here is where we would let GET-PATH! and GET-WORD! be used to
