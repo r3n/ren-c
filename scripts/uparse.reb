@@ -181,19 +181,6 @@ default-combinators: make map! reduce [
         return heavy null  ; succeed on parser failure, "heavy null" result
     ]
 
-    'end combinator [
-        {Only match if the input is at the end}
-        return: "End position of the parse input"
-            [<opt> any-series!]
-    ][
-        if tail? input [
-            set remainder input
-            return input
-        ]
-        set remainder null
-        return null
-    ]
-
     'not combinator [
         {Fail if the parser rule given succeeds, else continue}
         return: "~not~ if the rule fails, NULL if it succeeds"
@@ -432,15 +419,6 @@ default-combinators: make map! reduce [
         fail ~unreachable~
     ]
 
-    'here combinator [
-        {Get the current parse input position, without advancing input}
-        return: "parse position"
-            [any-series!]
-    ][
-        set remainder input
-        return input
-    ]
-
     'seek combinator [
         return: "seeked position"
             [any-series!]
@@ -493,19 +471,64 @@ default-combinators: make map! reduce [
         fail ~unreachable~
     ]
 
-    === VALUE-BEARING KEYWORDS ===
+    === TAG! SUB-DISPATCHING COMBINATOR ===
 
-    ; Historically SKIP was used to match one item of input.  But the word
-    ; wasn't a great fit, as it could be used with assignment to actually
-    ; capture the value...which is the opposite of skipping.  You might call
-    ; it ACCEPT or MATCH or something more in that vein, but every choice has
-    ; some downsides.
+    ; Historical PARSE matched tags literally, while UPARSE pushes to the idea
+    ; that they are better leveraged as "special nouns" to avoid interfering
+    ; with the user variables in wordspace.
     ;
-    ; This is under scrutiny.  `*` was chosen in Topaz, but that means "match
-    ; any number of" in RegEx and wildcarding.  So it's a poor choice.  Other
-    ; candidates are ?, _, etc.
+    ; There is an overall TAG! combinator which looks in the combinator map for
+    ; specific tags.  You can replace individual tag combinators or change the
+    ; behavior of tags overall completely.
 
-    'skip combinator [
+    tag! combinator [
+        {Special noun-like keyword subdispatcher for TAG!s}
+        return: "What the delegated-to tag returned"
+            [<opt> any-value!]
+        value [tag!]
+    ][
+        if not parser: :(state.combinators)/(value) [
+            fail ["No TAG! Combinator registered for" value]
+        ]
+
+        return [# (remainder)]: parser state input
+    ]
+
+    <here> combinator [
+        {Get the current parse input position, without advancing input}
+        return: "parse position"
+            [any-series!]
+    ][
+        set remainder input
+        return input
+    ]
+
+    <end> combinator [
+        {Only match if the input is at the end}
+        return: "End position of the parse input"
+            [<opt> any-series!]
+    ][
+        if tail? input [
+            set remainder input
+            return input
+        ]
+        set remainder null
+        return null
+    ]
+
+    <input> combinator [
+        {Get the original input of the PARSE operation}
+        return: "parse position"
+            [any-series!]
+    ][
+        if not same? (head input) (head state.series) [
+            fail "<input> behavior with INTO not currently defined"
+        ]
+        set remainder input
+        return state.series
+    ]
+
+    <any> combinator [  ; historically called "SKIP"
         {Match one series item in input, succeeding so long as it's not at END}
         return: "One atom of series input"
             [<opt> any-value!]
@@ -516,6 +539,8 @@ default-combinators: make map! reduce [
         set remainder next input
         return input.1
     ]
+
+    === ACROSS (COPY?) ===
 
     ; Historically Rebol used COPY to mean "match across a span of rules and
     ; then copy from the first position to the tail of the match".  That could
@@ -1396,6 +1421,16 @@ default-combinators: make map! reduce [
         return unquote result'
     ]
 ]
+
+
+=== COMPATIBILITY FOR NON-TAG KEYWORD FORMS ===
+
+; For now, bridge to what people are used to; but these aliases will likely
+; not be included by default.
+
+default-combinators.('here): :default-combinators.<here>
+default-combinators.('end): :default-combinators.<end>
+default-combinators.('skip): :default-combinators.<any>
 
 
 non-comma: func [

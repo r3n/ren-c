@@ -201,7 +201,7 @@
 ; needed for capturing the current position.
 [(
     did all [
-        uparse? "aaabbb" [some "a", pos: here, some "b"]
+        uparse? "aaabbb" [some "a", pos: <here>, some "b"]
         pos = "bbb"
     ]
 )(
@@ -209,7 +209,7 @@
         uparse? "<<<stuff>>>" [
             left: across some "<"
             (n: length of left)
-            x: between here n ">"
+            x: between <here> n ">"
         ]
         x = "stuff"
     ]
@@ -248,7 +248,7 @@
     did all [
         uparse? "aaa" [x: collect [some [
             keep (try if false [<not kept>])
-            keep skip
+            keep <any>
             keep (try if true [<kept>])
         ]]]
         x = [#a <kept> #a <kept> #a <kept>]
@@ -323,8 +323,8 @@
     if true [
        let filename: "demo.txt"
        using uparse filename [
-            emit base: between here "."
-            emit extension: across [thru end]
+            emit base: between <here> "."
+            emit extension: across [thru <end>]
         ] else [
             fail "Not a file with an extension"
         ]
@@ -348,7 +348,7 @@
     ]
 )(
     did all [
-        uparse? ["aaa"] [into skip [x: across some "a"]]
+        uparse? ["aaa"] [into <any> [x: across some "a"]]
         x = "aaa"
     ]
 )(
@@ -384,7 +384,7 @@
             "("
             change [to ")"] [
                 collect [
-                    some ["a" keep ("A") | skip]
+                    some ["a" keep ("A") | <any>]
                 ]
             ]
             ")"
@@ -503,20 +503,20 @@
     ("at least 1" = uparse "a" [further [opt "a" opt "b"] ("at least 1")])
     ("at least 1" = uparse "ab" [further [opt "a" opt "b"] ("at least 1")])
 
-    (uparse? "" [while further [to end]])
+    (uparse? "" [while further [to <end>]])
 ]
 
 
 [(
-    uparse? "baaabccc" [into [between "b" "b"] [some "a" end] to end]
+    uparse? "baaabccc" [into [between "b" "b"] [some "a" <end>] to <end>]
 )(
-    not uparse? "baaabccc" [into [between "b" "b"] ["a" end] to end]
+    not uparse? "baaabccc" [into [between "b" "b"] ["a" <end>] to <end>]
 )(
-    not uparse? "baaabccc" [into [between "b" "b"] ["a"] to end]
+    not uparse? "baaabccc" [into [between "b" "b"] ["a"] to <end>]
 )(
-    uparse? "baaabccc" [into [between "b" "b"] ["a" to end] "c" to end]
+    uparse? "baaabccc" [into [between "b" "b"] ["a" to <end>] "c" to <end>]
 )(
-    uparse? "aaabccc" [into [across to "b"] [some "a"] to end]
+    uparse? "aaabccc" [into [across to "b"] [some "a"] to <end>]
 )]
 
 
@@ -524,7 +524,7 @@
 [(
     x: match-uparse "aaabbb" [
         some "a"
-        into here ["bbb" (b: "yep, Bs")]
+        into <here> ["bbb" (b: "yep, Bs")]
         "bbb" (bb: "Bs again")
     ]
     did all [
@@ -535,7 +535,7 @@
 )(
     x: match-uparse "aaabbbccc" [
         some "a"
-        into here ["bbb" to end (b: "yep, Bs")]
+        into <here> ["bbb" to <end> (b: "yep, Bs")]
         "bbb" (bb: "Bs again")
         "ccc" (c: "Here be Cs")
     ]
@@ -553,7 +553,7 @@
 ; out in terms of how to make [2 4 rule] range between 2 and 4 occurrences,
 ; as that breaks the combinator pattern at this time.
 [
-    (uparse? "" [0 skip])
+    (uparse? "" [0 <any>])
     (uparse? "a" [1 "a"])
     (uparse? "aa" [2 "a"])
 ]
@@ -562,13 +562,13 @@
 ; TO and THRU would be too costly to be implicitly value bearing by making
 ; copies; you need to use ACROSS.
 [(
-    "" = uparse "abc" [to end]
+    "" = uparse "abc" [to <end>]
 )(
-    '~void~ = ^(uparse "abc" [elide to end])  ; ornery void
+    '~void~ = ^(uparse "abc" [elide to <end>])  ; ornery void
 )(
-    "b" = uparse "aaabbb" [thru "b" elide to end]
+    "b" = uparse "aaabbb" [thru "b" elide to <end>]
 )(
-    "b" = uparse "aaabbb" [to "b" elide to end]
+    "b" = uparse "aaabbb" [to "b" elide to <end>]
 )]
 
 
@@ -618,13 +618,13 @@
     (3 = uparse "aaa" [tally "a"])
 
     (null = uparse "aaa" [tally "b"])  ; doesn't finish parse
-    (0 = uparse "aaa" [tally "b" elide to end])  ; must be at end
+    (0 = uparse "aaa" [tally "b" elide to <end>])  ; must be at end
     (0 = uparse* "aaa" [tally "b"])  ; alternately, use non-force-completion
 
     (did all [
         uparse "<<<stuff>>>" [
             n: tally "<"
-            inner: between here n ">"
+            inner: between <here> n ">"
         ]
         inner = "stuff"
     ])
@@ -643,10 +643,10 @@
         let arg
         uparse args [while [
             "-a", access-dir: [
-                end (true)
+                <end> (true)
                 | "true" (true)
                 | "false" (false)
-                | dir: skip, (to-file dir)
+                | dir: <any>, (to-file dir)
             ]
             |
             ["-h" | "-help" | "--help" || (-help, quit)]
@@ -656,9 +656,9 @@
                 | "-v" (2)
             ]
             |
-            port: into skip integer!
+            port: into <any> integer!
             |
-            arg: skip (root-dir: to-file arg)
+            arg: <any> (root-dir: to-file arg)
         ]]
         else [
             return null
@@ -794,7 +794,7 @@
     (
         x: null
         did all [
-            true = uparse2 "aaabbbccc" [to "b" set x some "b" thru end]
+            true = uparse2 "aaabbbccc" [to "b" set x some "b" thru <end>]
             x = #"b"
         ]
     )

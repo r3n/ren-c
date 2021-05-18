@@ -5,11 +5,11 @@
         let capturing
         let inner
         return uparse text [collect [while [
-            not end
+            not <end>
             (capturing: false)
-            keep opt between here ["$(" (capturing: true) | end]
+            keep opt between <here> ["$(" (capturing: true) | <end>]
             :(if capturing '[
-                inner: between here ")"
+                inner: between <here> ")"
                 keep (^ as word! inner)
             ])
         ]]]
