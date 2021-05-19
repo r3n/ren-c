@@ -99,7 +99,7 @@ REBNATIVE(gtk_main)
 }
 
 //
-//  export gtk_main_level: native [
+//  export gtk-main-level: native [
 //
 //      {Asks for the current nesting level of the main loop.}
 //
