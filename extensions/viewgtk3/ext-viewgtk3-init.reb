@@ -7,4 +7,15 @@ REBOL [
     License: {LGPL 3.0}
 ]
 
-; Basically empty
+; Functions for viewGTK3 extension coded with Ren-C.
+view: function [][
+    print "Not implemented yet!"
+]
+
+layout: function [][
+    print "Not implemented yet!"
+]
+
+
+; Sum up all functions that should be known in Ren-C.
+export [layout view]

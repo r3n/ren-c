@@ -687,8 +687,9 @@ REBNATIVE(gtk_container_get_children)
 
     for (l = list; l != NULL; l = l->next)
     {
+        rebElide("print {list processing}");
         gpointer element_data = l->data;
-        rebElide("append", block, element_data);
+        rebElide("append", block, rebValue(element_data));
     }
 
     return block;
@@ -1467,7 +1468,7 @@ REBNATIVE(gtk_text_buffer_get_text)
 //
 //      {Retrieves the first and last iterators in the buffer, i.e. the entire buffer lies within the range [start ,end ).}
 //
-//      return: [void!]
+//      return: [block!]
 //      buffer [handle!]
 //      start [handle!]
 //      end [handle!]
@@ -1485,7 +1486,12 @@ REBNATIVE(gtk_text_buffer_get_bounds)
 
     gtk_text_buffer_get_bounds(buffer, start, end);
 
-    return rebVoid();
+    REBVAL *block = rebValue("[]");
+
+    rebElide("append", block, rebI((long)start));
+    rebElide("append", block, rebI((long)end));
+
+    return block;
 }
 
 // Widget Layout functions
@@ -1634,7 +1640,7 @@ REBNATIVE(gtk_box_get_homogeneous)
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_BOX_GET_HOMOGENEOUS;
 
     GtkBox *box = VAL_HANDLE_POINTER(GtkBox, ARG(box));
-     
+
     bool result = gtk_box_get_homogeneous(box);
     REBVAL *logic = rebValue("TO LOGIC!", result);
 
