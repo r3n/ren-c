@@ -99,6 +99,24 @@ REBNATIVE(gtk_main)
 }
 
 //
+//  export gtk_main_level: native [
+//
+//      {Asks for the current nesting level of the main loop.}
+//
+//      return: [integer!]
+//  ]
+//
+REBNATIVE(gtk_main_level)
+// Convenience function for debugging purposes
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_MAIN_LEVEL;
+
+    unsigned int result = gtk_main_level();
+
+    return rebInteger(result);
+}
+
+//
 //  export gtk-main-quit: native [
 //
 //      {Makes the innermost invocation of the main loop return when it regains control.}
@@ -155,7 +173,7 @@ REBNATIVE(gtk_main_quit)
 //      instance [handle!]
 //      detailedsignal [text!]
 //      handler [handle! action!]
-//      data [<opt> handle!]
+//      data [<opt> handle! block!]
 //      destroydata [<opt> handle!]
 //      flags [integer!]
 //  ]
@@ -181,25 +199,25 @@ REBNATIVE(g_signal_connect_data)
     //    data == NULL;
     //} else {
     gpointer *data = VAL_HANDLE_POINTER(gpointer, ARG(data));
-    if (data == nullptr){
-        rebElide("print {data is a nullpointer}");
-    }
+    //if (data == nullptr){
+    //    rebElide("print {data is a nullpointer}");
+    //}
 
     // destroydata is handle for g-closure-notify, often a value of null is used in examples
     REBVAL *value2 = ARG(destroydata);
     //GClosureNotify destroydata = (GClosureNotify) rebUnboxInteger(ARG(destroydata));
     GClosureNotify destroydata1 = (GClosureNotify) value2;
     GtkWidget *destroydata2 = VAL_HANDLE_POINTER(GtkWidget, ARG(destroydata));
-    if (destroydata2 == nullptr) {
-        rebElide("print {destroydata2 is a nullpointer}");
-    }
+    //if (destroydata2 == nullptr) {
+    //    rebElide("print {destroydata2 is a nullpointer}");
+    //}
 
     // flags is an integer value, 0 = normal signal connect, 1 = after, 2 = swapped
     GConnectFlags flags = (GConnectFlags) rebUnboxInteger(ARG(flags));
 
     // result is > 0 for success adding a signal
-    unsigned int result = g_signal_connect_data(instance, detailedsignal, handler, data, destroydata1, flags);
-    // unsigned int result = g_signal_connect_data(instance, detailedsignal, handler, NULL, NULL, flags);
+    //unsigned int result = g_signal_connect_data(instance, detailedsignal, handler, data, destroydata1, flags);
+    unsigned int result = g_signal_connect_data(instance, detailedsignal, handler, NULL, NULL, flags);
 
     return rebInteger(result);
 }
@@ -263,6 +281,338 @@ REBNATIVE(gtk_window_set_title)
     const char * title = cast(char*, VAL_STRING_AT(ARG(title)));
      
     gtk_window_set_title(window, title);
+
+    return rebVoid();
+}
+
+// Window placement functions
+
+//
+//  export gtk-window-set-position: native [
+//
+//      {Sets a position constraint for this window. If the old or new constraint is GTK_WIN_POS_CENTER_ALWAYS, 
+// this will also cause the window to be repositioned to satisfy the new constraint.
+// enum GtkWindowPosition
+// Window placement can be influenced using this enumeration. 
+// Note that using GTK_WIN_POS_CENTER_ALWAYS is almost always a bad idea. 
+// It won’t necessarily work well with all window managers or on all windowing systems.
+// Members:
+// GTK_WIN_POS_NONE             No influence is made on placement.
+// GTK_WIN_POS_CENTER           Windows should be placed in the center of the screen.
+// GTK_WIN_POS_MOUSE            Windows should be placed at the current mouse position.
+// GTK_WIN_POS_CENTER_ALWAYS    Keep window centered as it changes size, etc.
+// GTK_WIN_POS_CENTER_ON_PARENT Center the window on its transient parent (see gtk_window_set_transient_for()).}
+//
+//      return: [void!]
+//      window [handle!]
+//      position [integer!]
+//  ]
+//
+REBNATIVE(gtk_window_set_position)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WINDOW_SET_POSITION;
+
+    GtkWindow *window = VAL_HANDLE_POINTER(GtkWindow, ARG(window));
+
+    GtkWindowPosition position = (GtkWindowPosition) rebUnboxInteger(ARG(position));
+    
+    gtk_window_set_position(window, position);
+
+    return rebVoid();
+}
+
+//
+//  export gtk-window-get-position: native [
+//
+//      {This function returns the position you need to pass to gtk_window_move() 
+// to keep window in its current position. This means that the meaning of the returned value 
+// varies with window gravity. See gtk_window_move() for more details.)}
+//
+//      return: [pair!]
+//      window [handle!]
+//  ]
+//
+REBNATIVE(gtk_window_get_position)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WINDOW_GET_POSITION;
+
+    GtkWindow *window = VAL_HANDLE_POINTER(GtkWindow, ARG(window));
+
+    gint x;
+    gint y;
+
+    gtk_window_get_position(window, &x, &y);
+
+    REBVAL *pair = rebValue("make pair! [", rebI(x), rebI(y), "]");
+
+    return pair;
+}
+
+//
+//  export gtk-window-move: native [
+//
+//      {Asks the window manager to move window to the given position. 
+// Window managers are free to ignore this; most window managers ignore requests for initial window positions
+// (instead using a user-defined placement algorithm) and honor requests after the window has already been shown.}
+//
+//      return: [void!]
+//      window [handle!]
+//      x [integer!]
+//      y [integer!]
+//  ]
+//
+REBNATIVE(gtk_window_move)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WINDOW_MOVE;
+
+    GtkWindow *window = VAL_HANDLE_POINTER(GtkWindow, ARG(window));
+   
+    unsigned int x = rebUnboxInteger(ARG(x));
+
+    unsigned int y = rebUnboxInteger(ARG(y));
+
+    gtk_window_move(window, x, y);
+
+    return rebVoid();
+}
+
+//
+//  export gtk-window-set-resizable: native [
+//
+//      {Sets whether the user can resize a window. Windows are user resizable by default.}
+//
+//      return: [void!]
+//      window [handle!]
+//      resizable [logic!]
+//  ]
+//
+REBNATIVE(gtk_window_set_resizable)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WINDOW_SET_RESIZABLE;
+
+    GtkWindow *window = VAL_HANDLE_POINTER(GtkWindow, ARG(window));
+
+    bool resizable = rebDid(ARG(resizable));
+
+    gtk_window_set_resizable(window, resizable);
+
+    return rebVoid();
+}
+
+//
+//  export gtk-window-set-default-size: native [
+//
+//      {Sets the default size of a window. If the window’s “natural” size (its size request) is larger than the default,
+// the default will be ignored. More generally, if the default size does not obey the geometry hints for the window
+// (gtk_window_set_geometry_hints() can be used to set these explicitly), the default size will be clamped to the nearest permitted size.}
+//
+//      return: [void!]
+//      window [handle!]
+//      width [integer!]
+//      height [integer!]
+//  ]
+//
+REBNATIVE(gtk_window_set_default_size)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WINDOW_SET_DEFAULT_SIZE;
+
+    GtkWindow *window = VAL_HANDLE_POINTER(GtkWindow, ARG(window));
+
+    unsigned int width = rebUnboxInteger(ARG(width));
+
+    unsigned int height = rebUnboxInteger(ARG(height));
+
+    gtk_window_set_default_size(window, width, height);
+
+    return rebVoid();
+}
+
+//
+//  export gtk-window-resize: native [
+//
+//      {Resizes the window as if the user had done so, obeying geometry constraints.
+// The default geometry constraint is that windows may not be smaller than their size request; 
+// to override this constraint, call gtk_widget_set_size_request() to set the window s request to a smaller value.
+// If gtk_window_resize() is called before showing a window for the first time, 
+// it overrides any default size set with gtk_window_set_default_size().}
+//
+//      return: [void!]
+//      window [handle!]
+//      width [integer!]
+//      height [integer!]
+//  ]
+//
+REBNATIVE(gtk_window_resize)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WINDOW_RESIZE;
+
+    GtkWindow *window = VAL_HANDLE_POINTER(GtkWindow, ARG(window));
+
+    unsigned int width = rebUnboxInteger(ARG(width));
+
+    unsigned int height = rebUnboxInteger(ARG(height));
+
+    gtk_window_resize(window, width, height);
+
+    return rebVoid();
+}
+
+//
+//  export gtk-window-get-size: native [
+//
+//      {Obtains the current size of window.}
+//
+//      return: [pair!]
+//      window [handle!]
+//  ]
+//
+REBNATIVE(gtk_window_get_size)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WINDOW_GET_SIZE;
+
+    GtkWindow *window = VAL_HANDLE_POINTER(GtkWindow, ARG(window));
+
+    gint x, y;
+
+    gtk_window_get_size(window, &x, &y);
+
+    REBVAL *pair = rebValue("make pair! [", rebI(x), rebI(y), "]");
+
+    return pair;
+}
+
+//
+//  export gtk-window-maximize: native [
+//
+//      {Asks to maximize window , so that it becomes full-screen. Note that you shouldn’t assume the window is
+// definitely maximized afterward, because other entities (e.g. the user or window manager) could unmaximize it again,
+// and not all window managers support maximization. But normally the window will end up maximized.
+// Just don’t write code that crashes if not.
+// It’s permitted to call this function before showing a window, in which case the window will be maximized when it appears onscreen initially.
+// You can track maximization via the “window-state-event” signal on GtkWidget, or by listening to notifications on the “is-maximized” property.}
+//
+//      return: [void!]
+//      window [handle!]
+//  ]
+//
+REBNATIVE(gtk_window_maximize)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WINDOW_MAXIMIZE;
+
+    GtkWindow *window = VAL_HANDLE_POINTER(GtkWindow, ARG(window));
+
+    gtk_window_maximize(window);
+
+    return rebVoid();
+}
+
+//
+//  export gtk-window-unmaximize: native [
+//
+//      {Asks to unmaximize window. Note that you shouldn’t assume the window is definitely unmaximized afterward,
+// because other entities (e.g. the user or window manager) could maximize it again, and not all window managers honor
+// requests to unmaximize. But normally the window will end up unmaximized. Just don’t write code that crashes if not.}
+//
+//      return: [void!]
+//      window [handle!]
+//  ]
+//
+REBNATIVE(gtk_window_unmaximize)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WINDOW_UNMAXIMIZE;
+
+    GtkWindow *window = VAL_HANDLE_POINTER(GtkWindow, ARG(window));
+
+    gtk_window_unmaximize(window);
+
+    return rebVoid();
+}
+
+//
+//  export gtk-window-fullscreen: native [
+//
+//      {Asks to place window in the fullscreen state. Note that you shouldn’t assume the window is definitely full screen afterward,
+// because other entities (e.g. the user or window manager) could unfullscreen it again, and not all window managers honor requests 
+// to fullscreen windows. But normally the window will end up fullscreen. Just don’t write code that crashes if not.
+// You can track the fullscreen state via the “window-state-event” signal on GtkWidget.}
+//
+//      return: [void!]
+//      window [handle!]
+//  ]
+//
+REBNATIVE(gtk_window_fullscreen)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WINDOW_FULLSCREEN;
+
+    GtkWindow *window = VAL_HANDLE_POINTER(GtkWindow, ARG(window));
+
+    gtk_window_fullscreen(window);
+
+    return rebVoid();
+}
+
+//
+//  export gtk-window-unfullscreen: native [
+//
+//      {Asks to toggle off the fullscreen state for window.
+// Note that you shouldn’t assume the window is definitely not full screen afterward, because other entities 
+// (e.g. the user or window manager) could fullscreen it again, and not all window managers honor requests to unfullscreen windows.
+// But normally the window will end up restored to its normal state. Just don’t write code that crashes if not.}
+//
+//      return: [void!]
+//      window [handle!]
+//  ]
+//
+REBNATIVE(gtk_window_unfullscreen)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WINDOW_UNFULLSCREEN;
+
+    GtkWindow *window = VAL_HANDLE_POINTER(GtkWindow, ARG(window));
+
+    gtk_window_unfullscreen(window);
+
+    return rebVoid();
+}
+
+//
+//  export gtk-window-get-screen: native [
+//
+//      {Returns the GdkScreen associated with window.}
+//
+//      return: [handle! void!]
+//      window [handle!]
+//  ]
+//
+REBNATIVE(gtk_window_get_screen)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WINDOW_GET_SCREEN;
+
+    GtkWindow *window = VAL_HANDLE_POINTER(GtkWindow, ARG(window));
+
+    GdkScreen *screen = gtk_window_get_screen(window);
+
+    return rebHandle(screen, 0, nullptr);
+}
+
+//
+//  export gtk-window-set-screen: native [
+//
+//      {Sets the GdkScreen where the window is displayed; if the window is already mapped, it will be unmapped, and then remapped on the new screen.}
+//
+//      return: [void!]
+//      window [handle!]
+//      screen [handle!]
+//  ]
+//
+REBNATIVE(gtk_window_set_screen)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WINDOW_SET_SCREEN;
+
+    GtkWindow *window = VAL_HANDLE_POINTER(GtkWindow, ARG(window));
+
+    GdkScreen *screen = VAL_HANDLE_POINTER(GdkScreen, ARG(screen));
+
+    gtk_window_set_screen(window, screen);
 
     return rebVoid();
 }

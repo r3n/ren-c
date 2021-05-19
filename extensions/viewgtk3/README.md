@@ -19,6 +19,7 @@ like added in the rebmake.r file.
 The example compile string from the developer.gnome.org site is:
 gcc `pkg-config --cflags gtk+-3.0` -o example example.c `pkg-config --libs gtk+-3.0`
 
+See the example code below for the most recent status of development.
 ## Implemented functions
 
 Basic functions
@@ -28,42 +29,6 @@ First want to experiment in how all works and how for example
 the callback functionality works like when a button is clicked and
 because of that a block of Rebol code is to be evaluated/run.
   
-    gtk3-window
-    gtk_application_window_new (app);
-  gtk_window_set_title (GTK_WINDOW (window), "Window");
-  gtk_window_set_default_size (GTK_WINDOW (window), 200, 200);
-  gtk_widget_show_all (window);
-  gtk_box_new
-  gtk_box_pack_start
-  gtk_grid_new 
-  gtk_grid_attach
-  gtk_grid_insert_row ()
-  gtk_grid_insert_column (
-
-gtk_label_new ()
-gtk_label_set_text ()
-gtk_label_get_text ()
-gtk_label_get_label ()
-
-gtk_image_new ()
-gtk_image_new_from_file ()
-gtk_image_clear ()
-
-https://developer.gnome.org/gtk3/stable/ButtonWidgets.html
-gtk_button_new ()
-gtk_button_new_with_label ()
-gtk_button_pressed ()
-gtk_button_released ()
-gtk_button_clicked ()
-gtk_button_get_label ()
-gtk_button_set_label ()
-
-And do not forget 
-gtk_widget_show_all ()
-gtk_widget_show ()
-gtk_widget_hide ()
-gtk_widget_show_now ()
-
 
 ## Typical use of RENC in combination with GTK3
 
@@ -71,3 +36,22 @@ The use of the GTK3 interface is straightforward and best illustrated with some 
 
 ### Example code 
 
+gtk-init
+window: gtk-window-new 0
+gtk-window-set-title window "Ren-C"
+g-signal-connect-data window "destroy" :gtk-main-quit null null 2
+box1: gtk-box-new 0 6
+gtk-container-add window box1
+label1: gtk-label-new "Label!"
+blok: [print "Hello"]
+button1: gtk-button-new-with-label "Impressive!"
+g-signal-connect-data button1 "clicked" :do blok null 0
+gtk-container-add box1 label1
+gtk-container-add box1 button1
+gtk-widget-show-all window
+gtk-main
+
+At the moment both pressing the window close and pressing the button result in the window closing 
+with a segfault.
+
+Good ideas are very welcome, help appreciated.
