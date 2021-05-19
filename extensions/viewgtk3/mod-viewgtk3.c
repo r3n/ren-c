@@ -148,7 +148,7 @@ REBNATIVE(gtk_main_quit)
 //    g_signal_connect_data ((instance), (detailed_signal), (c_handler), (data), NULL, (GConnectFlags) 0)
 // #define g_signal_connect_after(instance, detailed_signal, c_handler, data) \
 //    g_signal_connect_data ((instance), (detailed_signal), (c_handler), (data), NULL, G_CONNECT_AFTER)
-//#define g_signal_connect_swapped(instance, detailed_signal, c_handler, data) \
+// #define g_signal_connect_swapped(instance, detailed_signal, c_handler, data) \
 //    g_signal_connect_data ((instance), (detailed_signal), (c_handler), (data), NULL, G_CONNECT_SWAPPED)
 // Where the connectflags are defined to be
 // typedef enum
@@ -172,7 +172,7 @@ REBNATIVE(gtk_main_quit)
 //      return: [integer!]
 //      instance [handle!]
 //      detailedsignal [text!]
-//      handler [handle! action!]
+//      chandler [handle! action!]
 //      data [<opt> handle! block!]
 //      destroydata [<opt> handle!]
 //      flags [integer!]
@@ -183,41 +183,28 @@ REBNATIVE(g_signal_connect_data)
     VIEWGTK3_INCLUDE_PARAMS_OF_G_SIGNAL_CONNECT_DATA;
 
     // instance is a gpointer type, handle
-    GtkWidget *instance = VAL_HANDLE_POINTER(GtkWidget, ARG(instance));
+    gpointer *instance = VAL_HANDLE_POINTER(gpointer, ARG(instance));
 
     // detailedsignal is a text to hold the description of the action. For example "quit", "clicked"
     // signal names are to make distinction between the action to perform.
     const char * detailedsignal = cast(char*, VAL_STRING_AT(ARG(detailedsignal)));
 
-    // handler is handle that must be cast to a gcallback
-    REBVAL *value = ARG(handler);
-    GCallback handler = G_CALLBACK(value);
+    // chandler is handle that must be cast to a gcallback
+    REBVAL *value = ARG(chandler);
+    GCallback chandler = G_CALLBACK(value);
 
     // data is a gpointer for data to pass to c_handler calls. 
-    //REBVAL *v = ARG(data);
-    //if (IS_TEXT(v)) {
-    //    data == NULL;
-    //} else {
     gpointer *data = VAL_HANDLE_POINTER(gpointer, ARG(data));
-    //if (data == nullptr){
-    //    rebElide("print {data is a nullpointer}");
-    //}
 
     // destroydata is handle for g-closure-notify, often a value of null is used in examples
-    REBVAL *value2 = ARG(destroydata);
-    //GClosureNotify destroydata = (GClosureNotify) rebUnboxInteger(ARG(destroydata));
-    GClosureNotify destroydata1 = (GClosureNotify) value2;
-    GtkWidget *destroydata2 = VAL_HANDLE_POINTER(GtkWidget, ARG(destroydata));
-    //if (destroydata2 == nullptr) {
-    //    rebElide("print {destroydata2 is a nullpointer}");
-    //}
+    GClosureNotify *destroydata = VAL_HANDLE_POINTER(GClosureNotify, ARG(destroydata));
 
     // flags is an integer value, 0 = normal signal connect, 1 = after, 2 = swapped
     GConnectFlags flags = (GConnectFlags) rebUnboxInteger(ARG(flags));
 
     // result is > 0 for success adding a signal
-    //unsigned int result = g_signal_connect_data(instance, detailedsignal, handler, data, destroydata1, flags);
-    unsigned int result = g_signal_connect_data(instance, detailedsignal, handler, NULL, NULL, flags);
+    //unsigned int result = g_signal_connect_data(instance, detailedsignal, chandler, data, destroydata, flags);
+    unsigned int result = g_signal_connect_data(instance, detailedsignal, chandler, NULL, NULL, flags);
 
     return rebInteger(result);
 }
@@ -617,7 +604,9 @@ REBNATIVE(gtk_window_set_screen)
     return rebVoid();
 }
 
-// Container add remove functions
+// Other Widget functions
+
+// Container functions
 
 //
 //  export gtk-container-add: native [
@@ -675,7 +664,110 @@ REBNATIVE(gtk_container_remove)
     return rebVoid();
 }
 
-// Other Widget functions
+//
+//  export gtk-container-get-children: native [
+//
+//      {Returns the container’s non-internal children. See gtk_container_forall() for details on what constitutes an "internal" child.}
+//
+//      return: [block!]
+//      container [handle!]
+//  ]
+//
+REBNATIVE(gtk_container_get_children)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_CONTAINER_GET_CHILDREN;
+
+    GtkContainer *container = VAL_HANDLE_POINTER(GtkContainer, ARG(container));
+
+    GList *list = gtk_container_get_children(container);
+
+    REBVAL *block = rebValue("[]");
+
+    GList *l;
+
+    for (l = list; l != NULL; l = l->next)
+    {
+        gpointer element_data = l->data;
+        rebElide("append", block, element_data);
+    }
+
+    return block;
+}
+
+//
+//  export gtk-container-set-border-width: native [
+//
+//      {Sets the border width of the container.
+// 
+// The border width of a container is the amount of space to leave around the outside of the container. 
+// The only exception to this is GtkWindow; because toplevel windows can’t leave space outside,
+// they leave the space inside. The border is added on all sides of the container.
+// To add space to only one side, use a specific “margin” property on the child widget, for example “margin-top”.}
+//
+//      return: [void!]
+//      container [handle!]
+//      border_width [integer!]
+//  ]
+//
+REBNATIVE(gtk_container_set_border_width)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_CONTAINER_SET_BORDER_WIDTH;
+
+    GtkContainer *container = VAL_HANDLE_POINTER(GtkContainer, ARG(container));
+
+    unsigned int border_width = rebUnboxInteger(ARG(border_width));
+     
+    gtk_container_set_border_width(container, border_width);
+
+    return rebVoid();
+}
+
+// Editable functions
+
+//
+//  export gtk-editable-set-editable: native [
+//
+//      {Determines if the user can edit the text in the editable widget or not.}
+//
+//      return: [void!]
+//      editable [handle!]
+//      is_editable [logic!]
+//  ]
+//
+REBNATIVE(gtk_editable_set_editable)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_EDITABLE_SET_EDITABLE;
+
+    GtkEditable *editable = VAL_HANDLE_POINTER(GtkEditable, ARG(editable));
+ 
+    bool is_editable = rebDid(ARG(is_editable));
+
+    gtk_editable_set_editable(editable, is_editable);
+
+    return rebVoid();
+}
+
+//
+//  export gtk-editable-get-editable: native [
+//
+//      {Retrieves whether editable is editable. See gtk_editable_set_editable().}
+//
+//      return: [logic!]
+//      editable [handle!]
+//  ]
+//
+REBNATIVE(gtk_editable_get_editable)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_EDITABLE_GET_EDITABLE;
+
+    GtkEditable *editable = VAL_HANDLE_POINTER(GtkEditable, ARG(editable));
+     
+    bool result = gtk_editable_get_editable(editable);
+    REBVAL *logic = rebValue("TO LOGIC!", result);
+
+    return rebValue(logic);
+}
+
 
 // Widget Label functions
 
@@ -1506,7 +1598,7 @@ REBNATIVE(gtk_box_get_spacing)
 }
 
 //
-//  export gtk-box-set_spacing: native [
+//  export gtk-box-set-spacing: native [
 //
 //      {Sets the spacing property of box, which is the number of pixels to place between children of box.}
 //
@@ -1524,6 +1616,50 @@ REBNATIVE(gtk_box_set_spacing)
     unsigned int spacing = rebUnboxInteger(ARG(spacing));
 
     gtk_box_set_spacing(box, spacing);
+
+    return rebVoid();
+}
+
+//
+//  export gtk-box-get-homogeneous: native [
+//
+//      {Returns whether the box is homogeneous (all children are the same size). See gtk_box_set_homogeneous().}
+//
+//      return: [logic!]
+//      box [handle!]
+//  ]
+//
+REBNATIVE(gtk_box_get_homogeneous)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_BOX_GET_HOMOGENEOUS;
+
+    GtkBox *box = VAL_HANDLE_POINTER(GtkBox, ARG(box));
+     
+    bool result = gtk_box_get_homogeneous(box);
+    REBVAL *logic = rebValue("TO LOGIC!", result);
+
+    return rebValue(logic);
+}
+
+//
+//  export gtk-box-set-homogeneous: native [
+//
+//      {Sets the “homogeneous” property of box, controlling whether or not all children of box are given equal space in the box.}
+//
+//      return: [void!]
+//      box [handle!]
+//      homogeneous [logic!]
+//  ]
+//
+REBNATIVE(gtk_box_set_homogeneous)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_BOX_SET_HOMOGENEOUS;
+
+    GtkBox *box = VAL_HANDLE_POINTER(GtkBox, ARG(box));
+ 
+    bool homogeneous = rebDid(ARG(homogeneous));
+
+    gtk_box_set_homogeneous(box, homogeneous);
 
     return rebVoid();
 }
