@@ -764,9 +764,8 @@ REBNATIVE(gtk_editable_get_editable)
     GtkEditable *editable = VAL_HANDLE_POINTER(GtkEditable, ARG(editable));
      
     bool result = gtk_editable_get_editable(editable);
-    REBVAL *logic = rebValue("TO LOGIC!", result);
 
-    return rebValue(logic);
+    return rebLogic(result);
 }
 
 
@@ -1241,9 +1240,8 @@ REBNATIVE(gtk_entry_get_visibility)
     GtkEntry *field = VAL_HANDLE_POINTER(GtkEntry, ARG(field));
      
     bool result = gtk_entry_get_visibility(field);
-    REBVAL *logic = rebValue("TO LOGIC!", result);
 
-    return rebValue(logic);
+    return rebLogic(result);
 }
 
 // Widget Text View (Multi line text field) functions
@@ -1353,9 +1351,8 @@ REBNATIVE(gtk_text_view_get_editable)
     GtkTextView *textview = VAL_HANDLE_POINTER(GtkTextView, ARG(textview));
      
     bool result = gtk_text_view_get_editable(textview);
-    REBVAL *logic = rebValue("TO LOGIC!", result);
 
-    return rebValue(logic);
+    return rebLogic(result);
 }
 
 //
@@ -1398,9 +1395,8 @@ REBNATIVE(gtk_text_view_get_cursor_visible)
     GtkTextView *textview = VAL_HANDLE_POINTER(GtkTextView, ARG(textview));
      
     bool result = gtk_text_view_get_cursor_visible(textview);
-    REBVAL *logic = rebValue("TO LOGIC!", result);
 
-    return rebValue(logic);
+    return rebLogic(result);
 }
 
 //
@@ -1642,9 +1638,8 @@ REBNATIVE(gtk_box_get_homogeneous)
     GtkBox *box = VAL_HANDLE_POINTER(GtkBox, ARG(box));
 
     bool result = gtk_box_get_homogeneous(box);
-    REBVAL *logic = rebValue("TO LOGIC!", result);
 
-    return rebValue(logic);
+    return rebLogic(result);
 }
 
 //
