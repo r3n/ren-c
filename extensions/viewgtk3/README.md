@@ -20,6 +20,23 @@ The example compile string from the developer.gnome.org site is:
 gcc `pkg-config --cflags gtk+-3.0` -o example example.c `pkg-config --libs gtk+-3.0`
 
 See the example code below for the most recent status of development.
+
+## How this should work
+
+The Rebol scripter creates the block with the view specification (layout-block). 
+This block is translated into the window structure consisting of all elements represented
+by faces or GOB!s.
+From the window structure the various GUI functions are called.
+This is not done from the layout-block as when user actions lead to adaptations in elements like 
+ * radiobuttons selected
+ * labeltexts edited
+ * other contents edited
+ * fields hidden or shown now
+then these changes are overridden every time a new show would be needed, which clearly cannot be the
+wanted behaviour.
+So changes resulting from called functions must be reflected inside the created faces / gobs.
+
+
 ## Implemented functions
 
 Basic functions
