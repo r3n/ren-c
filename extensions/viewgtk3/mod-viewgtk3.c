@@ -34,9 +34,45 @@
 
 // Helper functions
 
+
 // End Helper Functions
 
 // "warning: implicit declaration of function"
+
+//
+//  export get-handle: native [
+//
+//      {Get the handle! of an item. experimental function}
+//
+//      return: [handle! void!]
+//      type [integer! text! block! action! handle!]
+//  ]
+//
+REBNATIVE(get_handle)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GET_HANDLE;
+
+    REBVAL *v = ARG(type);
+
+    if (IS_INTEGER(v)) {
+        // rebElide("print {Input type is integer!}");
+        return rebHandle(&v, 0, nullptr);
+    }
+    if (IS_ACTION(v)) {
+        // rebElide("print {Input type is action!}");
+        return rebHandle(v, 0, nullptr);
+    }
+    if (IS_BLOCK(v)) {
+        // rebElide("print {Input type is block!}");
+        return rebHandle(&v, 0, nullptr);
+    }
+    if (IS_HANDLE(v)){
+        // rebElide("print {Input type is handle!}");
+        return rebHandle(&v, 0, nullptr);
+    }
+ 
+    return rebVoid();
+}
 
 // General functions
 
@@ -95,7 +131,8 @@ REBNATIVE(gtk_main)
 
     gtk_main();
 
-    return rebVoid();
+    // return rebVoid();
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 //
@@ -112,6 +149,12 @@ REBNATIVE(gtk_main_level)
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_MAIN_LEVEL;
 
     unsigned int result = gtk_main_level();
+    rebElide("print {na gtk_main_level call}");
+    REBVAL *text = rebValue("{}");
+    rebElide("append", text , rebI(result));
+    rebElide("print {na append}");
+    rebElide("print", text);
+    rebRelease(text);
 
     return rebInteger(result);
 }
@@ -127,13 +170,26 @@ REBNATIVE(gtk_main_level)
 REBNATIVE(gtk_main_quit)
 {
     VIEWGTK3_INCLUDE_PARAMS_OF_GTK_MAIN_QUIT;
-
+    rebElide("print {Voor gtk_main_quit call}");
     gtk_main_quit();
-
-    return rebVoid();
+    rebElide("print {Na gtk_main_quit call}");
+    // return rebVoid();
+    return Init_Void(D_OUT, SYM_VOID);
 }
 
 // Signal function(s)
+
+// Signal helper C
+static void self_signal_connect_helper(GtkWidget *widget,
+                                       gpointer   user_data){
+    rebElide("print {Inside self_signal_connect_helper}");
+    unsigned int level = gtk_main_level();
+    rebElide("print spaced [{main level is}", rebI(level), "{HIGH}]");
+    rebElide("print {before rebElide of user_data}");
+    rebElide(user_data);
+    rebElide("print {After rebElide of user_data}");
+    return;
+}
 
 // g_signal_connect, g_signal_connect_after and g_signal_connect_swapped
 // are convenience wrappers (macro/define) around the actual function 
@@ -190,8 +246,7 @@ REBNATIVE(g_signal_connect_data)
     const char * detailedsignal = cast(char*, VAL_STRING_AT(ARG(detailedsignal)));
 
     // chandler is handle that must be cast to a gcallback
-    REBVAL *value = ARG(chandler);
-    GCallback chandler = G_CALLBACK(value);
+    GCallback chandler = G_CALLBACK(ARG(chandler));
 
     // data is a gpointer for data to pass to c_handler calls. 
     gpointer *data = VAL_HANDLE_POINTER(gpointer, ARG(data));
@@ -202,9 +257,37 @@ REBNATIVE(g_signal_connect_data)
     // flags is an integer value, 0 = normal signal connect, 1 = after, 2 = swapped
     GConnectFlags flags = (GConnectFlags) rebUnboxInteger(ARG(flags));
 
+    rebElide("print {Before g_signal_connect_data}");
+
     // result is > 0 for success adding a signal
     //unsigned int result = g_signal_connect_data(instance, detailedsignal, chandler, data, destroydata, flags);
-    unsigned int result = g_signal_connect_data(instance, detailedsignal, chandler, NULL, NULL, flags);
+    //unsigned int result = g_signal_connect_data(instance, detailedsignal, G_CALLBACK(gtk_main_quit), NULL, NULL, flags);
+    unsigned int result;
+    if (flags == 2){
+        result = g_signal_connect_data(instance, detailedsignal, G_CALLBACK(gtk_main_quit), instance, NULL, flags);
+    } else {
+
+        REBVAL *v = ARG(chandler);
+
+        if (IS_INTEGER(v)) {
+            rebElide("print {chandler type is integer!}");
+        }
+        if (IS_ACTION(v)) {
+            rebElide("print {chandler type is action!}");
+        }
+        if (IS_BLOCK(v)) {
+            rebElide("print {chandler type is block!}");
+        }
+        if (IS_HANDLE(v)){
+            rebElide("print {chandler type is handle!}");
+        }
+
+        // result = g_signal_connect_data(instance, detailedsignal, chandler, NULL, NULL, flags);
+        result = g_signal_connect_data(instance, detailedsignal, G_CALLBACK(self_signal_connect_helper), chandler, NULL, flags);
+    }
+    //unsigned int result = g_signal_connect_data(instance, detailedsignal, G_CALLBACK(self_signal_connect_helper), NULL, NULL, flags);
+
+    rebElide("print {Returning the integer result.}");
 
     return rebInteger(result);
 }
