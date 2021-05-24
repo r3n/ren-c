@@ -110,7 +110,7 @@ elf-format: context [
     handler: func [name [word!] num-bytes [integer!]] [
         assert [
             binary? begin, num-bytes <= length of begin,
-            find [read write] mode
+            find [read write] ^mode
         ]
 
         either mode = 'read [
