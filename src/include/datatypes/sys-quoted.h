@@ -286,7 +286,7 @@ inline static RELVAL *Unquotify_Core(RELVAL *v, REBLEN unquotes) {
 // to deal with this problem.  But rebQ() in the API does, as does the idea
 // of "literalization".
 
-inline static REBVAL *Isotopic_Quote(REBVAL *v) {
+inline static RELVAL *Isotopic_Quote(RELVAL *v) {
     if (IS_BAD_WORD(v) and GET_CELL_FLAG(v, ISOTOPE)) {
         if (VAL_BAD_WORD_ID(v) == SYM_NULL) {
             //
@@ -304,7 +304,7 @@ inline static REBVAL *Isotopic_Quote(REBVAL *v) {
     return Quotify(v, 1);  // a non-isotope BAD-WORD! winds up quoted
 }
 
-inline static REBVAL *Isotopic_Unquote(REBVAL *v) {
+inline static RELVAL *Isotopic_Unquote(RELVAL *v) {
     assert(not IS_NULLED(v));  // use Unliteralize
     if (KIND3Q_BYTE(v) == REB_NULL + REB_64) {  // plain '
         Init_Curse_Word(v, SYM_NULL);  // ' <=> ~null~ isotope
@@ -322,7 +322,7 @@ inline static REBVAL *Isotopic_Unquote(REBVAL *v) {
 // It's easiest to write the isotopic general forms by doing a single isotopic
 // step, and then N - 1 non-isotopic steps.
 
-inline static REBVAL *Isotopic_Quotify(REBVAL *v, REBLEN depth) {
+inline static RELVAL *Isotopic_Quotify(RELVAL *v, REBLEN depth) {
     if (depth == 0) {
         if (IS_NULLED(v))  // !!! should this be handled here?
             Init_Bad_Word_Core(v, Canon(SYM_NULL), CELL_MASK_NONE);
@@ -332,13 +332,27 @@ inline static REBVAL *Isotopic_Quotify(REBVAL *v, REBLEN depth) {
     return Quotify(v, depth - 1);
 }
 
-inline static REBVAL *Isotopic_Unquotify(REBVAL *v, REBLEN depth) {
+inline static RELVAL *Isotopic_Unquotify(RELVAL *v, REBLEN depth) {
     assert(not IS_NULLED(v));  // see Unliteralize
     if (depth == 0)
         return v;
     Unquotify(v, depth - 1);
     return Isotopic_Unquote(v);
 }
+
+#ifdef __cplusplus
+    inline static REBVAL *Isotopic_Quote(REBVAL *v)
+      { return SPECIFIC(Isotopic_Quote(cast(RELVAL*, v))); }
+
+    inline static REBVAL *Isotopic_Unquote(REBVAL *v)
+      { return SPECIFIC(Isotopic_Unquote(cast(RELVAL*, v))); }
+
+    inline static REBVAL *Isotopic_Quotify(REBVAL *v, REBLEN depth)
+      { return SPECIFIC(Isotopic_Quotify(cast(RELVAL*, v), depth)); }
+
+    inline static REBVAL *Isotopic_Unquotify(REBVAL *v, REBLEN depth)
+      { return SPECIFIC(Isotopic_Unquotify(cast(RELVAL*, v), depth)); }
+#endif
 
 
 //=//// LITERALIZATION /////////////////////////////////////////////////////=//
@@ -348,7 +362,7 @@ inline static REBVAL *Isotopic_Unquotify(REBVAL *v, REBLEN depth) {
 // NULL.  It also translates emptiness (e.g. an END marker) into an isotope
 // BAD-WORD! of ~void~.  It is done by ^ and the the REB_LIT_XXX family.
 
-inline static REBVAL *Literalize(REBVAL *v) {
+inline static RELVAL *Literalize(RELVAL *v) {
     if (IS_END(v))
         return Init_Void(v);  // *unfriendly*
     if (IS_NULLED(v))
@@ -356,11 +370,19 @@ inline static REBVAL *Literalize(REBVAL *v) {
     return Isotopic_Quote(v);
 }
 
-inline static REBVAL *Unliteralize(REBVAL *v) {
+inline static RELVAL *Unliteralize(RELVAL *v) {
     if (IS_NULLED(v))
         return v;  // do nothing
     return Isotopic_Unquote(v);
 }
+
+#ifdef __cplusplus
+    inline static REBVAL *Literalize(REBVAL *v)
+        { return SPECIFIC(Literalize(cast(RELVAL*, v))); }
+
+    inline static REBVAL *Unliteralize(REBVAL *v)
+        { return SPECIFIC(Unliteralize(cast(RELVAL*, v))); }
+#endif
 
 
 inline static REBCEL(const*) VAL_UNESCAPED(const RELVAL *v) {
