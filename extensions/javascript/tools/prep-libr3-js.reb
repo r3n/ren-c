@@ -287,7 +287,7 @@ to-js-type: func [
         ; The differences between undefined and null are subtle and easy to
         ; get wrong, but a void-returning function should map to undefined.
         ;
-        parse s ["void" while space] ["undefined"]
+        parse? s ["void" while space] ["undefined"]
     ]
 ]
 
@@ -353,7 +353,7 @@ if false [  ; Only used if DEBUG_JAVASCRIPT_SILENT_TRACE (how to know here?)
 ]
 
 
-map-each-api [
+for-each-api [
     any [
         find name "_internal"  ; called as _RL_rebXXX(), don't need reb.XXX()
         name = "rebStartup"  ; the reb.Startup() is offered by load_r3.js
@@ -894,7 +894,7 @@ json-collect: function [body [block!]] [
 ]
 
 write make-file [(output-dir) libr3.exports.json] json-collect [
-    map-each-api [keep unspaced ["RL_" name]]
+    for-each-api [keep unspaced ["RL_" name]]
 ]
 
 

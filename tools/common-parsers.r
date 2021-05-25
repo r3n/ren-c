@@ -95,16 +95,16 @@ load-until-blank: function [
         opt wsp opt [1 2 newline] position: here to end
     ]
 
-    either parse text rule [
+    parse text rule then [
         values: load copy/part text position
         reduce [values position]
-    ][
+    ] else [
         blank
     ]
 ]
 
 
-collapse-whitespace: [some [change some white-space space | skip] end]
+collapse-whitespace: [some [change some white-space (space) | skip] end]
 bind collapse-whitespace c-lexical/grammar
 
 
@@ -209,7 +209,7 @@ proto-parser: context [
         is-fileheader: parsing-at position [
             try all [
                 lines: attempt [decode-lines lines {//} { }]
-                parse lines [copy data to {=///} to end]
+                parse? lines [copy data to {=///} to end]
                 data: attempt [load-until-blank trim/auto data]
                 data: attempt [
                     if set-word? first data/1 [data/1]
@@ -293,9 +293,9 @@ rewrite-if-directives: function [
             (rewritten: false)
             some [
                 [
-                    change ["#if" thru newline "#endif" thru newline] ""
-                    | change ["#elif" thru newline "#endif"] "#endif"
-                    | change ["#else" thru newline "#endif"] "#endif"
+                    change ["#if" thru newline "#endif" thru newline] ("")
+                    | change ["#elif" thru newline "#endif"] ("#endif")
+                    | change ["#else" thru newline "#endif"] ("#endif")
                 ] (rewritten: true)
                 seek :position  ; GET-WORD! for bootstrap (SEEK is no-op)
 

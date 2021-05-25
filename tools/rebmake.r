@@ -508,7 +508,7 @@ gcc: make compiler-class [
                     ; This is a stopgap workaround that ultimately would
                     ; permit cross-platform {MBEDTLS_CONFIG_FILE="filename.h"}
                     ;
-                    if find [gcc g++ cl] name [
+                    if find/only [gcc g++ cl] name [
                         flg: replace/all copy flg {"} {\"}
                     ]
 
@@ -538,7 +538,7 @@ gcc: make compiler-class [
             ]
             if F [
                 for-each flg F [
-                    keep filter-flag flg id
+                    keep try filter-flag flg id
                 ]
             ]
 
@@ -638,7 +638,7 @@ cl: make compiler-class [
             ]
             if F [
                 for-each flg F [
-                    keep filter-flag flg id
+                    keep try filter-flag flg id
                 ]
             ]
 
@@ -733,7 +733,7 @@ ld: make linker-class [
             ]
 
             for-each flg ldflags [
-                keep filter-flag flg id
+                keep try filter-flag flg id
             ]
 
             for-each dep depends [
@@ -837,7 +837,7 @@ llvm-link: make linker-class [
             ]
 
             for-each flg ldflags [
-                keep filter-flag flg id
+                keep try filter-flag flg id
             ]
 
             for-each dep depends [
@@ -923,7 +923,7 @@ link: make linker-class [
             ]
 
             for-each flg ldflags [
-                keep filter-flag flg id
+                keep try filter-flag flg id
             ]
 
             for-each dep depends [
@@ -1213,7 +1213,7 @@ generator-class: make object! [
                             val: localize select vars name
                             stop: false
                         )
-                    ] val
+                    ] (val)
                     | skip
                 ]
                 end
@@ -1228,12 +1228,12 @@ generator-class: make object! [
         return: <none>
         solution [object!]
     ][
-        if find words-of solution 'output [
+        if find/only words-of solution 'output [
             setup-outputs solution
         ]
         flip-flag solution false
 
-        if find words-of solution 'depends [
+        if find/only words-of solution 'depends [
             for-each dep solution/depends [
                 if dep/class = #variable [
                     append vars reduce [
@@ -1254,11 +1254,11 @@ generator-class: make object! [
         to [logic!]
     ][
         all [
-            find words-of project 'generated?
+            find/only words-of project 'generated?
             to != project/generated?
         ] then [
             project/generated?: to
-            if find words-of project 'depends [
+            if find/only words-of project 'depends [
                 for-each dep project/depends [
                     flip-flag dep to
                 ]

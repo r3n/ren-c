@@ -56,25 +56,25 @@ cscape: function [
             [
                 (prefix: _ suffix: _) finish: here
 
-                "${" change [copy expr: [to "}"]] num-text skip (
+                "${" change [copy expr: [to "}"]] (num-text) skip (
                     mode: #cname
                     pattern: unspaced ["${" num "}"]
                 )
                     |
-                "$<" change [copy expr: [to ">"]] num-text skip (
+                "$<" change [copy expr: [to ">"]] (num-text) skip (
                     mode: #unspaced
                     pattern: unspaced ["$<" num ">"]
                 )
                     |
                 (prefix: copy/part start finish)
-                "$[" change [copy expr: [to "]"]] num-text skip (
+                "$[" change [copy expr: [to "]"]] (num-text) skip (
                     mode: #delimit
                     pattern: unspaced ["$[" num "]"]
                 )
                 copy suffix: to newline
                     |
                 (prefix: copy/part start finish)
-                "$(" change [copy expr: [to ")"]] num-text skip (
+                "$(" change [copy expr: [to ")"]] (num-text) skip (
                     mode: #delimit
                     pattern: unspaced ["$(" num ")"]
                 )
@@ -243,7 +243,7 @@ make-emitter: function [
 
     temporary: did any [
         temporary
-        parse stem ["tmp-" to end]
+        parse? stem ["tmp-" to end]
     ]
 
     is-c: parse? stem [thru [".c" | ".h" | ".inc"] end]

@@ -25,7 +25,7 @@ emit-native-proto: func [
     let [spec name]
     all [
         block? proto-parser/data
-        parse proto-parser/data [
+        parse? proto-parser/data [
             opt 'export
             set name: set-word!
             opt 'enfix

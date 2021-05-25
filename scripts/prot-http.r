@@ -576,7 +576,7 @@ check-data: function [
             ]
             out: port/data
 
-            while [parse data [
+            while [parse? data [
                 copy chunk-size: some hex-digits, thru crlfbin
                 mk1: here, to end
             ]][

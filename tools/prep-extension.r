@@ -164,7 +164,7 @@ for-each native native-defs [
         for-each plat native/platforms [
             case [
                 word? plat [; could be os-base or os-name
-                    if find reduce [config/os-name config/os-base] plat [
+                    if find/only reduce [config/os-name config/os-base] plat [
                         throw true
                     ]
                 ]
@@ -292,10 +292,10 @@ e1/write-emitted
 script-name: copy c-src
 parse script-name [
     some [thru "/"]
-    change "mod-" "ext-"
+    change "mod-" ("ext-")
     to "."
-    change "." "-init."
-    change ["c" end | "cpp" end] "reb"
+    change "." ("-init.")
+    change ["c" end | "cpp" end] ("reb")
 ] else [
     fail [
         "Extension main file should have naming pattern %mod-xxx.c(pp),"
@@ -309,10 +309,10 @@ parse script-name [
 inc-name: second split-path c-src
 is-cpp: false
 parse inc-name [
-    change "mod-" "tmp-mod-"
+    change "mod-" ("tmp-mod-")
     to "."
-    change "." "-init."
-    change ["c" end | "cpp" end] "c"  ; !!! Keep as .cpp if it is?
+    change "." ("-init.")
+    change ["c" end | "cpp" end] ("c")  ; !!! Keep as .cpp if it is?
 ] else [
     fail [
         "Extension main file should have naming pattern %mod-xxx.c(pp),"

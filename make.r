@@ -85,7 +85,7 @@ args: parse-args system/script/args  ; either from command line or DO/ARGS
 ; now args are ordered and separated by bar:
 ; [NAME VALUE ... '| COMMAND ...]
 ;
-if commands: try find args '| [
+if commands: try find/only args '| [
     options: copy/part args commands
     commands: next commands
 ]
@@ -143,7 +143,7 @@ for-each [name value] options [
                 ]
                 all [
                     not empty? user-ext
-                    find [+ - *] user-ext/1
+                    find/only [+ - *] user-ext/1
                 ] then [
                     value: take user-ext
                 ]
@@ -385,7 +385,7 @@ gen-obj: func [
                 ; warnings unless you're at c99 or higher, or C++.
                 ;
                 (
-                    if not find [c gnu89] standard [
+                    if not find/only [c gnu89] standard [
                         <gnu:--pedantic>
                     ]
                 )
@@ -1765,7 +1765,7 @@ add-new-obj-folders ext-objs folders
 ; files and explain why those files are together.
 ;
 for-each [category entries] file-base [
-    if find [generated made] category [
+    if find/only [generated made] category [
         continue  ; these categories are taken care of elsewhere
     ]
     switch type of entries [

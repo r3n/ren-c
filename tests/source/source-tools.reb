@@ -194,9 +194,9 @@ rebsource: context [
                     do in c-parser-extension [
                         if last-func-end [
                             all [
-                                parse last-func-end [
+                                parse? last-func-end [
                                     function-spacing-rule
-                                    position:
+                                    position: here
                                     to end
                                 ]
                                 same? position proto-parser/parse-position

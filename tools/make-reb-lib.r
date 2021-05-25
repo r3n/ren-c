@@ -51,6 +51,12 @@ map-each-api: func [code [block!]] [
     ]
 ]
 
+for-each-api: func [code [block!]] [
+    for-each api api-objects compose/only [
+        do in api (code)  ; want API variable visible to `code` while running
+    ]
+]
+
 emit-proto: func [return: <none> proto] [
     header: proto-parser/data
 
@@ -109,7 +115,7 @@ emit-proto: func [return: <none> proto] [
         ]
     ]
 
-    if is-variadic: did find paramlist 'vaptr [
+    if is-variadic: did find/only paramlist 'vaptr [
         parse paramlist [
             ;
             ; `quotes` is first to facilitate C99 macros that want two places
@@ -298,13 +304,13 @@ for-each api api-objects [do in api [
     ]
 ]]
 
-c89-macros: collect [ map-each-api [
+c89-macros: map-each-api [
     if is-variadic [
-        keep cscape/with {#define $<Name> $<Name>_inline} api
+        cscape/with {#define $<Name> $<Name>_inline} api
     ]
-] ]
+]
 
-c99-or-c++11-macros: collect [ map-each-api [
+c99-or-c++11-macros: map-each-api [
     ;
     ; C99/C++11 have the ability to do variadic macros, giving the power to
     ; implicitly slip a rebEND signal at the end of the parameter list.  This
@@ -312,10 +318,10 @@ c99-or-c++11-macros: collect [ map-each-api [
     ; able to implicitly know the number of variadic parameters used.
     ;
     if is-variadic [
-        keep cscape/with
+        cscape/with
             {#define $<Name>(...) $<Name>_inline(__VA_ARGS__, rebEND)} api
     ]
-] ]
+]
 
 
 === GENERATE REBOL.H ===

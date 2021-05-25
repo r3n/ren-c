@@ -40,7 +40,7 @@ e: (make-emitter
         make-file [(output-dir) tmp-librebol-symbols.inc]
 )
 
-map-each-api [
+for-each-api [
     e/emit [name] {
         Add_API_Symbol_Helper(state, "RL_$<Name>", cast(CFUNC*, &RL_$<Name>));
     }

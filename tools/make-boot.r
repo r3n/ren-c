@@ -161,7 +161,7 @@ add-sym: function [
     /exists "return ID of existing SYM_XXX constant if already exists"
     <with> sym-n
 ][
-    if pos: find boot-words word [
+    if pos: find/only boot-words word [
         if exists [return index of pos]
         fail ["Duplicate word specified" word]
     ]
@@ -480,7 +480,7 @@ e-hooks/write-emitted
 ; Add SYM_XXX constants for the words in %words.r
 
 wordlist: load %words.r
-replace wordlist '*port-modes* load %modes.r
+replace wordlist [*port-modes*] load %modes.r
 for-each word wordlist [
     add-sym word  ; Note, may actually be a BAR! w/older boot
 ]
@@ -508,7 +508,7 @@ for-each item boot-generics [
 (e-sysobj: make-emitter "System Object"
     make-file [(prep-dir) include/tmp-sysobj.h])
 
-at-value: func ['field] [next find boot-sysobj to-set-word field]
+at-value: func ['field] [next find/only boot-sysobj to-set-word field]
 
 boot-sysobj: load %sysobj.r
 change/only at-value version version

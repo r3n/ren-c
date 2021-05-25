@@ -490,10 +490,9 @@ collect-lines: redescribe [
     body: compose [
         keep: adapt* specialize* :keep [
             line: #
-            only: #
             part: null
         ][
-            value: spaced try :value
+            value: try spaced :value
         ]
         (as group! body)
     ]
@@ -507,10 +506,9 @@ collect-text: redescribe [
         body: compose [
             keep: adapt* specialize* :keep [
                 line: null
-                only: null
                 part: null
             ][
-                value: unspaced try :value
+                value: try unspaced :value
             ]
             (as group! body)
         ]
