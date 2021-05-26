@@ -333,7 +333,7 @@ REBNATIVE(to_text)
         );
     }
 
-    return rebValueQ("to text!", ARG(value));
+    return rebValue("to text! @", ARG(value));
 }
 
 
@@ -863,10 +863,7 @@ REBTYPE(String)
       case SYM_CHANGE: {
         INCLUDE_PARAMS_OF_INSERT;
 
-        UNUSED(PAR(series));
-        UNUSED(PAR(value));
-
-        UNUSED(REF(only)); // all strings appends are /ONLY...currently unused
+        UNUSED(PAR(series));  // is v
 
         REBLEN len; // length of target
         if (VAL_WORD_ID(verb) == SYM_CHANGE)
@@ -877,10 +874,13 @@ REBTYPE(String)
         // Note that while inserting or appending NULL is a no-op, CHANGE with
         // a /PART can actually erase data.
         //
-        if (IS_NULLED(ARG(value)) and len == 0) {  // only nulls bypass
-            if (sym == SYM_APPEND) // append always returns head
-                VAL_INDEX_RAW(v) = 0;
-            RETURN (v); // don't fail on read only if it would be a no-op
+        if (IS_BLANK(ARG(value))) {  // only blanks bypass
+            if (len == 0) {
+                if (sym == SYM_APPEND) // append always returns head
+                    VAL_INDEX_RAW(v) = 0;
+                RETURN (v); // don't fail on read only if it would be a no-op
+            }
+            Init_Nulled(ARG(value));  // low-level code treats NULL as nothing
         }
 
         REBFLGS flags = 0;
@@ -888,6 +888,21 @@ REBTYPE(String)
             flags |= AM_PART;
         if (REF(line))
             flags |= AM_LINE;
+
+        // !!! This mimics the historical behavior for now:
+        //
+        //     rebol2>> append "abc" quote 'd
+        //     == "abcd"
+        //
+        //     rebol2>> append/only "abc" [d e]  ; like appending (the '[d e])
+        //     == "abcde"
+        //
+        // But for consistency, it would seem that if the incoming value is
+        // quoted that should give molding semantics, so quoted blocks include
+        // their brackets.  Review.
+        //
+        if (IS_QUOTED(ARG(value)))
+            Unquotify(ARG(value), 1);
 
         VAL_INDEX_RAW(v) = Modify_String_Or_Binary(  // does read-only check
             v,
@@ -912,8 +927,7 @@ REBTYPE(String)
         // !!! R3-Alpha FIND/MATCH historically implied /TAIL.  Should it?
         //
         REBFLGS flags = (
-            (REF(only) ? AM_FIND_ONLY : 0)
-            | (REF(match) ? AM_FIND_MATCH : 0)
+            (REF(match) ? AM_FIND_MATCH : 0)
             | (REF(case) ? AM_FIND_CASE : 0)
         );
 
@@ -1141,7 +1155,7 @@ REBTYPE(String)
             REBSIZ utf8_size;
             REBCHR(const*) utf8 = VAL_UTF8_SIZE_AT(&utf8_size, v);
             Set_Random(crc32_z(0L, utf8, utf8_size));
-            return Init_Void(D_OUT, SYM_VOID);
+            return Init_None(D_OUT);
         }
 
         if (REF(only)) {

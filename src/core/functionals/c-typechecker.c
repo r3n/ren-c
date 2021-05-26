@@ -47,6 +47,25 @@ enum {
 
 
 //
+//  typecheck-internal?: native [
+//
+//      return: [logic!]
+//      optional [<opt> any-value!]
+//  ]
+//
+REBNATIVE(typecheck_internal_q)
+//
+// Note: This prototype is used by all TYPECHECKER instances.  (It steals the
+// paramlist from this native.)
+{
+    INCLUDE_PARAMS_OF_TYPECHECK_INTERNAL_Q;
+
+    UNUSED(ARG(optional));
+    panic (nullptr);
+}
+
+
+//
 //  Datatype_Checker_Dispatcher: C
 //
 // Dispatcher used by TYPECHECKER generator for when argument is a datatype.
@@ -113,7 +132,7 @@ REBNATIVE(typechecker)
     REBVAL *type = ARG(type);
 
     REBACT *typechecker = Make_Action(
-        ACT_SPECIALTY(NATIVE_ACT(null_q)),  // same frame as NULL?
+        ACT_SPECIALTY(NATIVE_ACT(typecheck_internal_q)),
         IS_DATATYPE(type)
             ? &Datatype_Checker_Dispatcher
             : &Typeset_Checker_Dispatcher,

@@ -53,7 +53,7 @@
 //=//// REBOL INCLUDES + HELPERS //////////////////////////////////////////=//
 
 #define xrebWord(cstr) \
-    rebValue("just", cstr)
+    rebValue("the", cstr)
 
 
 //=//// CONFIGURATION /////////////////////////////////////////////////////=//
@@ -654,7 +654,7 @@ REBVAL *Try_Get_One_Console_Event(STD_TERM *t, bool buffered)
             return e_buffered;  // pass anything we gathered so far first
 
         if (Read_Input_Records_Interrupted(t))
-            return rebVoid();  // signal a HALT
+            return rebValue("~halt~");  // !!! Is BAD-WORD! a good choice?
 
         assert(t->in != t->in_tail);
     }

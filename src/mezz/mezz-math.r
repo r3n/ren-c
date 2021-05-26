@@ -133,7 +133,7 @@ math: func [
 
     <static>
 
-    slash (just /)
+    slash (the /)
 
     expr-val (_)
 
@@ -141,7 +141,7 @@ math: func [
 
     expression  ([
         term (expr-val: term-val)
-        any [
+        while [
             ['+ (expr-op: 'add) | '- (expr-op: 'subtract)]
             term (expr-val: compose [(expr-op) (expr-val) (term-val)])
         ]
@@ -154,7 +154,7 @@ math: func [
 
     term ([
         pow (term-val: power-val)
-        any [
+        while [
             ['* (term-op: 'multiply) | slash (term-op: 'divide)]
             pow (term-val: compose [(term-op) (term-val) (power-val)])
         ]
@@ -187,10 +187,10 @@ math: func [
         set prim-val any-number!
         | set prim-val [word! | path!] (prim-val: reduce [prim-val])
             ; might be a funtion call, looking for arguments
-            any [
+            while [
                 nested-expression (append prim-val take nested-expr-val)
             ]
-        | and group! into nested-expression (prim-val: take nested-expr-val)
+        | ahead group! into nested-expression (prim-val: take nested-expr-val)
     ])
 
     p-recursion (_)
@@ -218,7 +218,7 @@ math: func [
             (
                 ; This rule can be recursively called as well,
                 ; so result has to be passed via a stack
-                insert/only nested-expr-val expr-val
+                insert nested-expr-val ^expr-val
                 restore-vars
             )
             ; vars could be changed even it failed, so restore them and fail

@@ -189,17 +189,17 @@ REBNATIVE(shove)
     // into may want it evaluative.  (Enfix handling itself does soft quoting)
     //
   #if !defined(NDEBUG)
-    Init_Unreadable_Void(D_OUT); // make sure we reassign it
+    Init_Trash(D_OUT); // make sure we reassign it
   #endif
 
     if (REF(set)) {
         if (IS_SET_WORD(left)) {
             Copy_Cell(D_OUT, Lookup_Word_May_Fail(left, SPECIFIED));
         }
-        else if (IS_SET_PATH(left)) {
+        else if (IS_SET_PATH(left) or IS_SET_TUPLE(left)) {
             f->feed->gotten = nullptr;  // calling arbitrary code, may disrupt
-            composed_set_path = rebValueQ("compose", left);
-            REBVAL *temp = rebValueQ("get/hard", composed_set_path);
+            composed_set_path = rebValue("compose @", left);
+            REBVAL *temp = rebValue("get/hard @", composed_set_path);
             Copy_Cell(D_OUT, temp);
             rebRelease(temp);
         }
@@ -242,9 +242,9 @@ REBNATIVE(shove)
         if (IS_SET_WORD(left)) {
             Copy_Cell(Sink_Word_May_Fail(left, SPECIFIED), D_OUT);
         }
-        else if (IS_SET_PATH(left)) {
+        else if (IS_SET_PATH(left) or IS_SET_TUPLE(left)) {
             f->feed->gotten = nullptr;  // calling arbitrary code, may disrupt
-            rebElideQ("set/hard", composed_set_path, NULLIFY_NULLED(D_OUT));
+            rebElide("set/hard @", composed_set_path, "@", NULLIFY_NULLED(D_OUT));
             rebRelease(composed_set_path);
         }
         else
@@ -256,9 +256,9 @@ REBNATIVE(shove)
 
 
 //
-//  Do_Frame_Throws: C
+//  Do_Frame_Maybe_Stale_Throws: C
 //
-bool Do_Frame_Throws(REBVAL *out, REBVAL *frame) {
+bool Do_Frame_Maybe_Stale_Throws(REBVAL *out, REBVAL *frame) {
     if (IS_FRAME_PHASED(frame))  // see REDO for tail-call recursion
         fail ("Use REDO to restart a running FRAME! (not DO)");
 
@@ -284,7 +284,7 @@ bool Do_Frame_Throws(REBVAL *out, REBVAL *frame) {
 
     Begin_Prefix_Action(f, VAL_FRAME_LABEL(frame));
 
-    bool threw = Process_Action_Throws(f);
+    bool threw = Process_Action_Maybe_Stale_Throws(f);
     assert(threw or IS_END(f->feed->value));  // we started at END_FLAG
 
     Drop_Frame(f);
@@ -300,10 +300,10 @@ bool Do_Frame_Throws(REBVAL *out, REBVAL *frame) {
 //      return: [<opt> <invisible> any-value!]
 //      source [
 //          <blank>  ; opts out of the DO, returns null
-//          block!  ; source code in block form, will be void if empty
+//          block!  ; source code in block form
 //          get-block!  ; same
 //          sym-block!  ; same
-//          group!  ; source code in group form, will vanish if empty
+//          group!  ; same
 //          get-group!  ; same
 //          sym-group!  ; same
 //          text!  ; source code in text form
@@ -325,8 +325,17 @@ bool Do_Frame_Throws(REBVAL *out, REBVAL *frame) {
 REBNATIVE(do)
 {
     INCLUDE_PARAMS_OF_DO;
+    assert(ACT_HAS_RETURN(FRM_PHASE(frame_)));
 
     REBVAL *source = ARG(source);
+
+    // Due to the mechanics of true invisibility, `1 + 2 do [comment "hi"]`
+    // cannot rely on OUT_NOTE_STALE...because it clears the stale flag.  This
+    // may be a bug or bad mechanic overall, but getting the right information
+    // in this case (stale vs. invisible) requires making a note and starting
+    // from end.
+    //
+    SET_END(D_OUT);  // !!! need to defeat enfix invisibles, review
 
     // If `source` is not const, tweak it to be explicitly mutable--because
     // otherwise, it would wind up inheriting the FEED_MASK_CONST of our
@@ -347,14 +356,10 @@ REBNATIVE(do)
     switch (VAL_TYPE(source)) {
       case REB_BLOCK:
       case REB_SYM_BLOCK:
-      case REB_GET_BLOCK: {  // `do []` and `do [comment "hi"]` return void
-        if (Do_Any_Array_At_Throws(D_OUT, source, SPECIFIED))
-            return R_THROWN;
-        return D_OUT; }
-
+      case REB_GET_BLOCK:
       case REB_GROUP:
       case REB_SYM_GROUP:
-      case REB_GET_GROUP: {  // `do '()` and `do '(comment "hi")` vanish
+      case REB_GET_GROUP: {
         DECLARE_FEED_AT_CORE (feed, source, SPECIFIED);
         if (Do_Feed_To_End_Maybe_Stale_Throws(
             D_OUT,
@@ -363,7 +368,7 @@ REBNATIVE(do)
         )){
             return R_THROWN;
         }
-        return D_OUT; }  // may be stale, which would mean invisible
+        goto handle_void; }  // may be stale, which would mean invisible
 
       case REB_VARARGS: {
         REBVAL *position;
@@ -383,7 +388,7 @@ REBNATIVE(do)
                 // varargs does.  This will cause an assert if reused, and
                 // having BLANK! mean "thrown" may evolve into a convention.
                 //
-                Init_Unreadable_Void(position);
+                Init_Trash(position);
                 return R_THROWN;
             }
 
@@ -399,7 +404,7 @@ REBNATIVE(do)
         // the varargs came from.  It's still on the stack, and we don't want
         // to disrupt its state.  Use a subframe.
 
-        Init_Void(D_OUT, SYM_VOID);
+        Init_Void(D_OUT);
         if (IS_END(f->feed->value))
             return D_OUT;
 
@@ -463,25 +468,30 @@ REBNATIVE(do)
         if (First_Unspecialized_Param(nullptr, VAL_ACTION(source)))
             fail (Error_Do_Arity_Non_Zero_Raw());
 
-        if (Eval_Value_Throws(D_OUT, source, SPECIFIED))
+        if (Eval_Value_Maybe_Stale_Throws(D_OUT, source, SPECIFIED))
             return R_THROWN;
-        return D_OUT; }
+        break; }
 
       case REB_FRAME: {
-        if (Do_Frame_Throws(D_OUT, source))
+        if (Do_Frame_Maybe_Stale_Throws(D_OUT, source))
             return R_THROWN; // prohibits recovery from exits
 
-        return D_OUT; }
+        goto handle_void; }
 
       case REB_QUOTED:
         Copy_Cell(D_OUT, ARG(source));
         return Unquotify(D_OUT, 1);
 
       default:
-        break;
+        fail (Error_Do_Arity_Non_Zero_Raw());  // https://trello.com/c/YMAb89dv
     }
 
-    fail (Error_Do_Arity_Non_Zero_Raw());  // https://trello.com/c/YMAb89dv
+  handle_void:
+
+    if (IS_END(D_OUT))  // didn't make new result (non-/VOID forced END)
+        Init_Void(D_OUT);  // may be overridden by Init_Stale()
+
+    return D_OUT;
 }
 
 
@@ -522,7 +532,7 @@ REBNATIVE(evaluate)
       case REB_GROUP: {
         if (VAL_LEN_AT(source) == 0) {  // `evaluate []` should return null
             Init_Nulled(D_OUT);
-            Init_Empty_Nulled(D_SPARE);
+            Init_Void(D_SPARE);
         }
         else {
             DECLARE_FEED_AT_CORE (feed, source, SPECIFIED);
@@ -578,7 +588,7 @@ REBNATIVE(evaluate)
                 //
                 // https://forum.rebol.info/t/1173/
                 //
-                Init_Empty_Nulled(D_SPARE);
+                Init_Void(D_SPARE);
                 Quotify(D_OUT, 1);  // void-is-invisible signal on array
             }
         }
@@ -608,7 +618,7 @@ REBNATIVE(evaluate)
                 // varargs does.  This will cause an assert if reused, and
                 // having BLANK! mean "thrown" may evolve into a convention.
                 //
-                Init_Unreadable_Void(position);
+                Init_Trash(position);
                 Move_Cell(D_OUT, D_SPARE);
                 return R_THROWN;
             }
@@ -798,7 +808,7 @@ REBNATIVE(applique)
         // !!! This is another case where if you want to literaly apply
         // with ~unset~ you have to manually hide the frame key.
         //
-        if (Is_Void_With_Sym(var, SYM_UNSET))
+        if (Is_Unset(var))
             Init_Nulled(var);
 
         Remove_Binder_Index(&binder, KEY_SYMBOL(key));

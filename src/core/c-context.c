@@ -177,7 +177,7 @@ REBVAL *Append_Context(
     //
     EXPAND_SERIES_TAIL(CTX_VARLIST(context), 1);
 
-    REBVAL *value = Init_Void(ARR_LAST(CTX_VARLIST(context)), SYM_UNSET);
+    REBVAL *value = Init_Unset(ARR_LAST(CTX_VARLIST(context)));
 
     if (not any_word)
         assert(symbol);
@@ -849,9 +849,9 @@ void Resolve_Context(
         if (m != 0) {
             // "the remove succeeded, so it's marked as set now" (old comment)
 
-            if (NOT_CELL_FLAG(var, PROTECTED) and (all or IS_VOID(var))) {
+            if (NOT_CELL_FLAG(var, PROTECTED) and (all or IS_BAD_WORD(var))) {
                 if (m < 0)
-                    Init_Void(var, SYM_UNSET);  // not in source context
+                    Init_Unset(var);  // not in source context
                 else
                     Copy_Cell_Core(  // Need to preserve context flags
                         var,
@@ -1073,7 +1073,7 @@ void Assert_Context_Core(REBCTX *c)
             panic (*key);
 
       #ifdef DEBUG_TERM_ARRAYS
-        if (IS_TRASH_DEBUG(var)) {
+        if (IS_TRASH(var)) {
             printf("** Early var end at index: %d\n", cast(int, n));
             panic (c);
         }
@@ -1081,7 +1081,7 @@ void Assert_Context_Core(REBCTX *c)
     }
 
   #ifdef DEBUG_TERM_ARRAYS
-    if (not IS_TRASH_DEBUG(var)) {
+    if (not IS_TRASH(var)) {
         printf("** Missing var end at index: %d\n", cast(int, n));
         panic (var);
     }

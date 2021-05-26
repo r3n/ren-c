@@ -8,7 +8,7 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2012 REBOL Technologies
-// Copyright 2012-2017 Ren-C Open Source Contributors
+// Copyright 2012-2021 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -46,8 +46,8 @@
 //
 // This can be triggered via the macros panic() and panic_at(), which are
 // unsalvageable situations in the core code.  It can also be triggered by
-// the PANIC and PANIC-VALUE natives.  (Since PANIC and PANIC-VALUE may be
-// hijacked, this offers hookability for "recoverable" forms of PANIC.)
+// the PANIC native, and since it can be hijacked that offers hookability for
+// "recoverable" forms of PANIC.
 //
 // coverity[+kill]
 //
@@ -197,66 +197,83 @@ ATTRIBUTE_NO_RETURN void Panic_Core(
 //
 //  panic: native [
 //
-//  "Cause abnormal termination of Rebol (dumps debug info in debug builds)"
+//  "Terminate abnormally with a message, optionally diagnosing a value cell"
 //
-//      reason [text! error!]
-//          "Message to report (evaluation not counted in ticks)"
+//      reason [<opt> <literal> any-value!]
+//          "Cause of the panic"
+//      /value "Interpret reason as a value cell to debug dump, vs. a message"
 //  ]
 //
 REBNATIVE(panic)
+//
+// Note: The @reason parameter is literalized so that `panic ~bad-word~` won't
+// cause a parameter type check error, but actually runs this panic() code.
+// Since it allows bad-word!, we treat it as a message if /VALUE is not used.
 {
     INCLUDE_PARAMS_OF_PANIC;
 
-    REBVAL *v = ARG(reason);
+    REBVAL *v = Unliteralize(ARG(reason));  // remove quote level from @reason
+
+    // Use frame tick (if available) instead of TG_Tick, so tick count dumped
+    // is the exact moment before the PANIC ACTION! was invoked.
+    //
+    const REBTCK tick = 0;
+  #ifdef DEBUG_TRACK_TICKS
+    tick = frame_->tick;
+  #endif
+
+    // panic() on the string value itself will report information about the
+    // string cell...but panic() on UTF-8 character data assumes you mean to
+    // report the contained message.  PANIC/VALUE for the latter intent.
+
     const void *p;
 
-    // panic() on the string value itself would report information about the
-    // string cell...but panic() on UTF-8 character data assumes you mean to
-    // report the contained message.  PANIC-VALUE for the latter intent.
-    //
-    if (IS_TEXT(v)) {
-        p = VAL_UTF8_AT(v);
+    if (REF(value)) {  // interpret reason as value to diagnose
+        p = v;
     }
-    else {
-        assert(IS_ERROR(v));
-        p = VAL_CONTEXT(v);
+    else {  // interpret reason as a message
+        if (IS_TEXT(v)) {
+            p = VAL_UTF8_AT(v);
+        }
+        else if (IS_ERROR(v)) {
+            p = VAL_CONTEXT(v);
+        }
+        else if (IS_BAD_WORD(v)) {
+            p = STR_UTF8(VAL_BAD_WORD_LABEL(v));
+        }
+        else {
+            assert(!"Called PANIC without /VALUE on non-TEXT!, non-ERROR!");
+            p = v;
+        }
     }
 
-    // Uses frame_->tick instead of TG_Tick to identify the tick when PANIC
-    // began its frame, not including later ticks for fulfilling ARG(value).
-    //
-  #ifdef DEBUG_COUNT_TICKS
-    Panic_Core(p, frame_->tick, FRM_FILE_UTF8(frame_), FRM_LINE(frame_));
-  #else
-    const REBTCK tick = 0;
     Panic_Core(p, tick, FRM_FILE_UTF8(frame_), FRM_LINE(frame_));
-  #endif
 }
 
 
 //
-//  panic-value: native [
+//  fail: native [
 //
-//  "Cause abnormal termination of Rebol, with diagnostics on a value cell"
+//  {Early-boot version of FAIL (overridden by more complex usermode version)}
 //
-//      value [any-value!]
-//          "Suspicious value to panic on (debug build shows diagnostics)"
-//  ]
+//      'blame [<skip> sym-word! sym-path!]
+//       reason [<end> <opt> any-value!]  ; permissive to avoid callsite error
+//       /where [frame! any-word!]
+//   ]
 //
-REBNATIVE(panic_value)
+REBNATIVE(fail)
 {
-    INCLUDE_PARAMS_OF_PANIC_VALUE;
+    INCLUDE_PARAMS_OF_FAIL;
 
-  #ifdef DEBUG_TRACK_TICKS
-    //
-    // Use frame tick (if available) instead of TG_Tick, so tick count dumped
-    // is the exact moment before the PANIC-VALUE ACTION! was invoked.
-    //
-    Panic_Core(
-        ARG(value), frame_->tick, FRM_FILE_UTF8(frame_), FRM_LINE(frame_)
-    );
+  #if defined(NDEBUG)
+    UNUSED(ARG(blame));
+    UNUSED(ARG(where));
   #else
-    const REBTCK tick = 0;
-    Panic_Core(ARG(value), tick, FRM_FILE_UTF8(frame_), FRM_LINE(frame_));
+    printf("!!! Early-Boot FAIL, called fail: native [], not fail: func []\n");
+    PROBE(ARG(reason));
+    PROBE(ARG(blame));
+    PROBE(ARG(where));
   #endif
+
+    panic (ARG(reason));
 }

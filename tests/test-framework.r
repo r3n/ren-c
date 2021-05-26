@@ -32,7 +32,7 @@ make object! compose [
     allowed-flags: _
 
     process-vector: func [
-        return: <void>
+        return: <none>
         flags [block!]
         source [text!]
         <with> test-failures successes skipped
@@ -86,12 +86,12 @@ make object! compose [
     total-tests: 0
 
     process-tests: function [
-        return: <void>
+        return: <none>
         test-sources [block!]
         emit-test [action!]
     ][
         parse test-sources [
-            any [
+            while [
                 set flags: block! set value: skip (
                     emit-test flags to text! value
                 )
@@ -161,10 +161,10 @@ make object! compose [
                         last-vector: _
                         guard: [end skip]
                     )
-                    any [
-                        any whitespace
+                    while [
+                        while whitespace
                         [
-                            position:
+                            position: here
 
                             ; Test filenames appear in the log, %x.test.reb
                             "%" (
@@ -219,7 +219,6 @@ make object! compose [
                             mold/limit as text! position 240
                         ])
                     ]
-                    end
                 ] else [
                     fail "do-recover log file parsing problem"
                 ]

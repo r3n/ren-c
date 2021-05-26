@@ -111,10 +111,7 @@ static REB_R Clipboard_Actor(
         GlobalUnlock(h);
         CloseClipboard();
 
-        REBVAL *binary = rebValueQ("as binary!", str);  // READ -> UTF-8
-        rebRelease(str);
-
-        return binary; }
+        return rebValue("as binary!", rebR(str)); }  // READ -> UTF-8
 
       case SYM_WRITE: {
         INCLUDE_PARAMS_OF_WRITE;
@@ -148,7 +145,7 @@ static REB_R Clipboard_Actor(
         // sufficienctly sized handle, decode Rebol STRING! into it, transfer
         // ownership of that handle to the clipboard.
 
-        unsigned int num_wchars = rebSpellIntoWideQ(nullptr, 0, data);
+        unsigned int num_wchars = rebSpellIntoWide(nullptr, 0, data);
 
         HANDLE h = GlobalAlloc(GHND, sizeof(WCHAR) * (num_wchars + 1));
         if (h == NULL) // per documentation, not INVALID_HANDLE_VALUE
@@ -160,7 +157,7 @@ static REB_R Clipboard_Actor(
 
         // Extract text as UTF-16
         //
-        REBINT check = rebSpellIntoWideQ(wide, num_wchars, data);
+        REBINT check = rebSpellIntoWide(wide, num_wchars, data);
         assert(check == cast(REBINT, num_wchars));
         assert(len <= check); // may only be writing /PART of the string
         UNUSED(check);

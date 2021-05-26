@@ -90,7 +90,7 @@
 //
 
 inline static bool ANY_INERT_KIND(REBYTE k) {
-    assert(k >= REB_BLANK);  // can't call on end/null/void
+    assert(k >= REB_BLANK);  // can't call on end/null
     return k <= REB_BLOCK;
 }
 
@@ -107,7 +107,7 @@ inline static bool ANY_INERT_KIND(REBYTE k) {
 // to raise errors.  Rather than saying:
 //
 //     if (IS_END(v)) { fail ("end"); }
-//     if (IS_VOID(v)) { fail ("void"); }
+//     if (IS_BAD_WORD(v)) { fail ("void"); }
 //     if (IS_NULL(v)) { fail ("null"); }
 //     CommonCaseStuff(v);
 //
@@ -115,24 +115,10 @@ inline static bool ANY_INERT_KIND(REBYTE k) {
 //
 //     if (IS_NULLED_OR_VOID_OR_END(v)) {
 //        if (IS_END(v)) { fail ("end"); }
-//        if (IS_VOID(v)) { fail {"void"); }
+//        if (IS_BAD_WORD(v)) { fail {"void"); }
 //        fail ("null");
 //     }
 //     CommonCaseStuff(v);
-
-inline static bool IS_NULLED_OR_VOID_KIND(REBYTE k) {
-    assert(k != REB_0_END);
-    return k <= REB_VOID;
-}
-
-#define IS_NULLED_OR_VOID(v) \
-    IS_NULLED_OR_VOID_KIND(KIND3Q_BYTE(v))
-
-inline static bool IS_NULLED_OR_VOID_OR_END_KIND(REBYTE k)
-    { return k <= REB_VOID; }
-
-#define IS_NULLED_OR_VOID_OR_END(v) \
-    IS_NULLED_OR_VOID_OR_END_KIND(KIND3Q_BYTE_UNCHECKED(v))
 
 inline static bool IS_NULLED_OR_BLANK_KIND(REBYTE k)
     { return k == REB_NULL or k == REB_BLANK; }
@@ -319,7 +305,7 @@ inline static enum Reb_Kind PLAINIFY_ANY_SET_KIND(REBYTE k) {
 
 inline static enum Reb_Kind PLAINIFY_ANY_SYM_KIND(REBYTE k) {
     assert(ANY_SYM_KIND(k));
-    return cast(enum Reb_Kind, k + 5);
+    return cast(enum Reb_Kind, k - 15);
 }
 
 inline static enum Reb_Kind SETIFY_ANY_PLAIN_KIND(REBYTE k) {
@@ -334,13 +320,13 @@ inline static enum Reb_Kind GETIFY_ANY_PLAIN_KIND(REBYTE k) {
 
 inline static enum Reb_Kind SYMIFY_ANY_PLAIN_KIND(REBYTE k) {
     assert(ANY_PLAIN_KIND(k));
-    return cast(enum Reb_Kind, k - 5);
+    return cast(enum Reb_Kind, k + 15);
 }
 
 
 inline static bool IS_ANY_SIGIL_KIND(REBYTE k) {
     assert(k < REB_64);  // can't do `@''x`
-    return k >= REB_SYM_BLOCK and k < REB_GET_WORD;
+    return k >= REB_SET_BLOCK and k <= REB_SYM_WORD;
 }
 
 

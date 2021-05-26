@@ -50,7 +50,7 @@ export: lib/func [
 ]
 
 helper: enfixed lib/func [
-    return: <void>
+    return: <none>
     :set-word [set-word!]
     code [block!]
 ] lib/in lib [
@@ -363,7 +363,7 @@ apply: emulate [
                 arg: block/1
                 try next block
             ] else [
-                try evaluate/result block (just arg:)
+                try evaluate/result block (the arg:)
             ]
 
             if refinement? params/1 [
@@ -408,16 +408,13 @@ null: emulate [
     make char! 0  ; NUL in Ren-C https://en.wikipedia.org/wiki/Null_character
 ]
 
-; Ren-C's VOID! is nearly identical to UNSET!, but the concept is that
-; *variables* are "unset", not *values*.  So the name is different.  An
-; "unset" value is one that holds VOID!.
+; We use the case of Ren-C's "stable" variant of the BAD-WORD! ~unset~ as a
+; parallel of historical Rebol's UNSET!.  It cannot be retrieved via a
+; GET-WORD! (as in R3-Alpha or Red), but only with a special access function
+; (like in Rebol2).
 ;
-; https://forum.rebol.info/t/947
-;
-; VOID! is also a more capable and interesting type, able to hold a symbol.
-;
-unset!: void!
-unset?: emulate [:void?]
+unset!: bad-word!
+unset?: emulate [:bad-word?]
 
 ; Note: Ren-C once reserved NONE for `if none [x = 1, y = 2] [...]`
 ; Currently that is covered by `ALL .NOT [...]`, but a specialization may
@@ -451,7 +448,7 @@ false?: emulate [:not]  ; better name https://trello.com/c/Cz0qs5d7
 
 comment: emulate [
     func [
-        return: <void> {Not invisible: https://trello.com/c/dWQnsspG}
+        return: <none> {Not invisible: https://trello.com/c/dWQnsspG}
         :discarded [block! any-string! binary! any-scalar!]
     ][
     ]
@@ -739,13 +736,13 @@ compose: emulate [
             ; The predicate is a function that runs on whatever is generated
             ; in the COMPOSE'd slot.  If you put it in a block, that will
             ; splice but protect its contents from splicing (the default).
-            ; We add the twist that VOID!s ("unset") won't compose in Rebol2.
+            ; We add the twist that ~unset~ won't compose in Rebol2.
             ;
             ;    rebol2> type? either true [] []
             ;    == unset!
             ;
             ;    rebol2> compose [(either true [] [])]
-            ;    == []  ; would be a ~void~ in Ren-C
+            ;    == []  ; would be [~void~] in Ren-C
             ;
             predicate: either only [:enblock-devoid] [:devoid]
         ]
@@ -895,7 +892,7 @@ redbol-form: form: emulate [
 
 print: emulate [
     func [
-        return: <void>
+        return: <none>
         value [any-value!]  ; Ren-C only takes TEXT!, BLOCK!, BLANK!, CHAR!
     ][
         write-stdout case [
@@ -974,7 +971,7 @@ break: emulate [
 
 ++: emulate [
     func [] [
-        fail @return [
+        fail ^return [
             {++ and -- are not in the Redbol layer by default, as they were}
             {not terribly popular to begin with...but also because `--` is}
             {a very useful and easy-to-type dumping construct in Ren-C, that}
@@ -1088,8 +1085,8 @@ denuller: helper [
         chain [
             :action
                 |
-            func [x [<opt> any-value!]] [
-                either-match any-value! get/any 'x [blank]
+            func [x] [
+                get/any 'x else '_
             ]
         ]
     ]
@@ -1164,7 +1161,21 @@ forskip: emulate [denuller :iterate-skip]
 any: emulate [denuller :any]
 all: emulate [denuller :all]
 
-find: emulate [denuller :find]
+; Historically Rebol/Red consider `find "abc" ""` to be NONE.  While it could
+; be argued what this "should" be, the fact that BLANK! (or NULL) could be
+; used to opt out of the search suggests the opportunity is being lost to have
+; a way of opting into a match unconditionally.
+;
+find: emulate [
+    enclose :find func [f] [
+        all [
+            any-series? f.pattern
+            empty? f.pattern
+        ] then [return _]
+
+        do f else '_  ; NULL -> BLANK!
+    ]
+]
 select: emulate [denuller :select]
 pick: emulate [denuller :pick]
 
@@ -1244,7 +1255,7 @@ append: emulate [oldsplicer :append]
 insert: emulate [oldsplicer :insert]
 change: emulate [oldsplicer :change]
 
-quote: emulate [:just]
+quote: emulate [:the]
 
 cloaker: helper [function [  ; specialized as CLOAK and DECLOAK
     {Simple and insecure data scrambler, was native C code in Rebol2/R3-Alpha}
@@ -1482,13 +1493,13 @@ load: emulate [
 ]
 
 
-=== LEAVE VOID AS LAST LINE ===
+=== LEAVE NONE AS LAST LINE ===
 ;
 ; So that `do <redbol>` doesn't show any output.  While the console displays
-; most voids, by default it won't display ones specifically labeled ~void~
+; most voids, by default it won't display ones specifically labeled ~none~
 ;
 ; !!! This may not be the last word on what signals the console's silence.
 ;
 ; https://forum.rebol.info/t/1413
 
-'~void~
+~none~

@@ -47,4 +47,4 @@
     ]
 )
 
-(null-2? every x [] [<unused>])
+((the ') = ^ every x [] [fail ~unreachable~])

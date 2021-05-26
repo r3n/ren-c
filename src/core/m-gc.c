@@ -42,7 +42,7 @@
 // structures could quickly wind up overflowing the C stack.  Consider:
 //
 //     a: copy []
-//     loop 200'000 [a: append/only copy [] a]
+//     loop 200'000 [a: append copy [] ^a]
 //     recycle
 //
 // The simple solution is that when an unmarked array is hit that it is
@@ -389,11 +389,19 @@ static void Propagate_All_GC_Marks(void)
             // Nulls are illegal in most arrays, but context varlists use
             // "nulled cells" to denote that the variable is not set.
             //
+            if (KIND3Q_BYTE_UNCHECKED(v) == REB_NULL) {
+                if (not (IS_VARLIST(a) or IS_PATCH(a) or IS_PAIRLIST(a)))
+                    panic (a);
+            }
+
             if (
-                KIND3Q_BYTE_UNCHECKED(v) == REB_NULL
-                and not (IS_VARLIST(a) or IS_PATCH(a) or IS_PAIRLIST(a))
+                KIND3Q_BYTE_UNCHECKED(v) == REB_BAD_WORD
+                and GET_CELL_FLAG(v, ISOTOPE)
             ){
-                panic (a);
+                // BAD-WORD! isotopes may not exist in blocks, they can only be
+                // in objects/frames.
+                //
+                assert(IS_VARLIST(a) or IS_PATCH(a));
             }
           #endif
         }
@@ -619,7 +627,7 @@ static void Mark_Root_Series(void)
 static void Mark_Data_Stack(void)
 {
     const RELVAL *head = ARR_HEAD(DS_Array);
-    ASSERT_UNREADABLE_IF_DEBUG(head);  // DS_AT(0) is deliberately invalid
+    assert(IS_TRASH(head));  // DS_AT(0) is deliberately invalid
 
     REBVAL *stackval = DS_Movable_Top;
     for (; stackval != head; --stackval)  // stop before DS_AT(0)

@@ -164,7 +164,7 @@ standard: make object! [
         ] #BODY
     ]
 
-    proc-return-type: [void!]
+    proc-return-type: []  ; was once [bad-word!], now just []
 
     elider-return-type: [<invisible>]
 

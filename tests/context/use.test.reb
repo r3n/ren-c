@@ -13,7 +13,7 @@
 )
 
 ; initialization (lack of)
-(a: 10 all [use [a] [void? get/any 'a] a = 10])
+(a: 10 did all [use [a] ['~unset~ = ^ get/any 'a] a = 10])
 (use [a] [undefined? 'a])
 
 ; BREAK out of USE

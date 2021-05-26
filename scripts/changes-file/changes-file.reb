@@ -112,7 +112,7 @@ parse-credits-for-authors: function [  ; used as switch in github-user-name
 
         parse to-text read credits-file [
             thru {Code Contributors}
-            any [
+            while [
                 {**} copy author: to {**} {**} newline
                 [{-} | {*}] space {[} copy github-name: to {](https://github.com/} (
                     keep compose/deep [(author) [(github-name)]]
@@ -159,7 +159,7 @@ notable?: function [
     ; record any bug#NNNN or CC (CureCode) found
     cc: make block! 0
     parse text [
-        any [
+        while [
               "bug#" copy cc-num: some numbers (
                 append c [type: 'Fixed]  ; it's a bug fix!
                 append cc to-integer cc-num
@@ -213,7 +213,7 @@ notable?: function [
 
 make-changes-file: function [
     {Make CHANGES.md file using Changes-block and template-CHANGES.md}
-    return: <void>
+    return: <none>
     changes-file  [file!]  {CHANGES file to create/overwrite}
     credits-file  [file!]  {CREDITS file to lookup github usernames}
     changes-block [block!] {Changes-block of release/category objects}
@@ -227,7 +227,7 @@ make-changes-file: function [
         return: "If not found, returns input author text as-is"
             [text!]
         author "Author name in commit log"
-            [text!] 
+            [text!]
     ][
         any [
             switch author authors
@@ -236,7 +236,7 @@ make-changes-file: function [
         ]
     ]
 
-    write-line: func [return: <void> s] [
+    write-line: func [return: <none> s] [
         write changes join-all s
         write changes to-text newline
     ]
@@ -297,7 +297,7 @@ make-changes-file: function [
         ]
     ]
 
-    write-example: function [return: <void> co] [
+    write-example: function [return: <none> co] [
         if eg: select co 'example [
             write-line [{```rebol}]
             write-line [eg]
@@ -305,7 +305,7 @@ make-changes-file: function [
         ]
     ]
 
-    write-change-text: func [return: <void> co] [
+    write-change-text: func [return: <none> co] [
         write-line [{- } make-summary-text co]
         write-example co
     ]

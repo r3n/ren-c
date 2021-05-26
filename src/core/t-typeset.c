@@ -145,7 +145,7 @@ bool Add_Typeset_Bits_Core(
 
         if (IS_TUPLE(item)) {
             //
-            // !!! This previously called rebDidQ() with "equal?" to check for
+            // !!! This previously called rebDid() with "equal?" to check for
             // the <...> signal for variadics, which is now an odd tuple.
             // The problem is that you can't call the evaluator while pushing
             // parameters and typesets to the stack, since the typeset is
@@ -180,7 +180,7 @@ bool Add_Typeset_Bits_Core(
                 TYPE_SET(typeset, REB_NULL);
             }
             else if (0 == CT_String(item, Root_Invisible_Tag, strict)) {
-                TYPE_SET(typeset, REB_TS_INVISIBLE);  // !!! REB_BYTES hack
+                TYPE_SET(typeset, REB_TS_ENDABLE);  // !!! REB_BYTES hack
             }
             else if (0 == CT_String(item, Root_Skip_Tag, strict)) {
                 if (VAL_PARAM_CLASS(typeset) != REB_P_HARD)
@@ -193,19 +193,13 @@ bool Add_Typeset_Bits_Core(
             else if (0 == CT_String(item, Root_Const_Tag, strict)) {
                 TYPE_SET(typeset, REB_TS_CONST);
             }
-            else if (0 == CT_String(item, Root_In_Out_Tag, strict)) {
-                if (VAL_PARAM_CLASS(typeset) != REB_P_OUTPUT)
-                    fail ("Only output parameters can be marked <in-out>");
-
-                TYPE_SET(typeset, REB_TS_IN_OUT);
-            }
-            else if (0 == CT_String(item, Root_Modal_Tag, strict)) {
+            else if (0 == CT_String(item, Root_Literal_Tag, strict)) {
                 //
-                // !!! <modal> is not the general way to make modal args (the
-                // `@arg` notation is used), but the native specs are loaded
+                // !!! <literal> is not the general way to make literal args
+                // (`@arg` notation is used), but the native specs are loaded
                 // by a boostrap r3 that can't read them.
                 //
-                VAL_TYPESET_PARAM_CLASS_U32(typeset) = REB_P_MODAL;
+                VAL_TYPESET_PARAM_CLASS_U32(typeset) = REB_P_LITERAL;
             }
         }
         else if (IS_DATATYPE(item)) {
@@ -331,7 +325,11 @@ REBARR *Typeset_To_Array(const REBVAL *tset)
                 // support in the 64-bit representation for individual
                 // custom types.  So all custom types typecheck together.
                 //
-                Init_Void(DS_PUSH(), SYM_CUSTOM_X);
+                Init_Bad_Word_Core(
+                    DS_PUSH(),
+                    Canon(SYM_CUSTOM_X),
+                    CELL_MASK_NONE
+                );
             }
             else
                 Init_Builtin_Datatype(DS_PUSH(), cast(enum Reb_Kind, n));
@@ -406,7 +404,6 @@ REBTYPE(Typeset)
         INCLUDE_PARAMS_OF_FIND;
         UNUSED(ARG(series));  // covered by `v`
 
-        UNUSED(REF(only));  // !!! tolerate, even though ignored?
         UNUSED(REF(case));  // !!! tolerate, even though ignored?
 
         if (
@@ -444,7 +441,7 @@ REBTYPE(Typeset)
             VAL_TYPESET_LOW_BITS(v) |= VAL_TYPESET_LOW_BITS(arg);
             VAL_TYPESET_HIGH_BITS(v) |= VAL_TYPESET_HIGH_BITS(arg);
             break;
-        
+
           case SYM_INTERSECT:
             VAL_TYPESET_LOW_BITS(v) &= VAL_TYPESET_LOW_BITS(arg);
             VAL_TYPESET_HIGH_BITS(v) &= VAL_TYPESET_HIGH_BITS(arg);

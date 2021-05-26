@@ -110,7 +110,7 @@ elf-format: context [
     handler: func [name [word!] num-bytes [integer!]] [
         assert [
             binary? begin, num-bytes <= length of begin,
-            find [read write] mode
+            find [read write] ^mode
         ]
 
         either mode = 'read [
@@ -258,7 +258,7 @@ elf-format: context [
     update-offsets: meth [
         {Adjust headers to account for insertion or removal of data @ offset}
 
-        return: <void>
+        return: <none>
         executable [binary!]
         offset [integer!]
         delta [integer!]
@@ -292,7 +292,7 @@ elf-format: context [
     ]
 
     update-embedding: meth [
-        return: <void>
+        return: <none>
         executable [binary!]
             {Executable to be mutated to either add or update an embedding}
         embedding [binary!]
@@ -575,13 +575,14 @@ pe-format: context [
 
         let def: make block! 1
         let find-a-word: func [
-            return: <void>
+            return: <none>
             word [any-word!]
         ][
             any [
-                find words to word! word
-                find def to set-word! word
-                append def to set-word! word
+                find words ^ to word! word
+                find def ^ to set-word! word
+            ] then [
+                append def ^ to set-word! word
             ]
         ]
 
@@ -602,20 +603,20 @@ pe-format: context [
         let group-rule: [
             set word set-word!
             (find-a-word word)
-            | and block! into block-rule ;recursively look into the array
+            | ahead block! into block-rule ;recursively look into the array
             | skip
         ]
         block-rule: [
-            and group! into [any group-rule]
-            | and block! into [any block-rule]
+            ahead group! into [while group-rule]
+            | ahead block! into [while block-rule]
             | ['copy | 'set] set word word! (find-a-word word)
             | skip
         ]
 
-        parse rule [any block-rule end]
+        parse rule [while block-rule end]
 
         ;dump def
-        set name make object! append def _
+        set name make object! append def [_]
         bind rule get name
     ]
 
@@ -829,7 +830,7 @@ pe-format: context [
     ]
 
     update-section-header: func [
-        return: <void>
+        return: <none>
         pos [binary!]
         section [object!]
     ][
@@ -1162,7 +1163,7 @@ generic-format: context [
     sig-length: length of signature
 
     update-embedding: meth [
-        return: <void>
+        return: <none>
         executable [binary!]
             {Executable to be mutated to either add or update an embedding}
         embedding [binary!]

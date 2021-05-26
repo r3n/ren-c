@@ -37,7 +37,7 @@ print "------ Building headers"
 prototypes: make block! 10000 ; MAP! is buggy in R3-Alpha
 
 emit-proto: func [
-    return: <void>
+    return: <none>
     proto
 ][
     any [
@@ -54,7 +54,7 @@ emit-proto: func [
     header: proto-parser/data
 
     all [
-        block? header 
+        block? header
         2 <= length of header
         set-word? header/1
     ] else [
@@ -98,7 +98,7 @@ emit-proto: func [
 ]
 
 process-conditional: function [
-    return: <void>
+    return: <none>
     directive
     dir-position
     emitter [object!]
@@ -119,7 +119,7 @@ process-conditional: function [
     ]
 ]
 
-emit-directive: function [return: <void> directive] [
+emit-directive: function [return: <none> directive] [
     process-conditional directive proto-parser/parse-position e-funcs
 ]
 
@@ -239,14 +239,14 @@ sys-globals-parser: context [
     parse-position: _
     id: _
 
-    process: func [return: <void> text] [
+    process: func [return: <none> text] [
         parse text grammar/rule  ; Review: no END (return result unused?)
     ]
 
     grammar: context bind [
 
         rule: [
-            any [
+            while [
                 parse-position: here
                 segment
             ]
@@ -255,7 +255,7 @@ sys-globals-parser: context [
         segment: [
             (id: _)
             span-comment
-            | line-comment any [newline line-comment] newline
+            | line-comment while [newline line-comment] newline
             | opt wsp directive
             | declaration
             | other-segment
@@ -277,7 +277,7 @@ sys-globals-parser: context [
         directive: [
             copy data [
                 ["#ifndef" | "#ifdef" | "#if" | "#else" | "#elif" | "#endif"]
-                any [not newline c-pp-token]
+                while [not newline c-pp-token]
             ] eol
             (
                 ; Here is where it would call processing of conditional data
@@ -354,11 +354,11 @@ e-strings/emit {
 }
 for-each line read/lines %a-constants.c [
     case [
-        parse line ["#define" to end] [
+        parse? line ["#define" to end] [
             e-strings/emit line
             e-strings/emit newline
         ]
-        parse line [to {const } copy constd to { =} to end] [
+        parse? line [to {const } copy constd to { =} to end] [
             e-strings/emit {
                 extern $<Constd>;
             }

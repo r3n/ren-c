@@ -51,7 +51,7 @@ description-of: function [
     v [<blank> any-value!]
 ][
     switch type of get/any 'v [
-        void! [null]
+        bad-word! [null]
         any-array! [spaced ["array of length:" length of v]]
         image! [spaced ["size:" v/size]]
         datatype! [
@@ -73,7 +73,7 @@ description-of: function [
 browse: function [
     "stub function for browse* in extensions/process/ext-process-init.reb"
 
-    return: <void>
+    return: <none>
     location [<blank> url! file!]
 ][
     print "Browse needs redefining"
@@ -82,18 +82,18 @@ browse: function [
 help: function [
     "Prints information about words and values (if no args, general help)."
 
-    return: [void!]
+    return: []
     'topic [<end> any-value!]
         "WORD! whose value to explain, or other HELP target (try HELP HELP)"
     /doc "Open web browser to related documentation."
 ][
-    if undefined? 'topic [
+    if bad-word? ^topic [
         ;
         ; !!! This should lead to a web page that offers help on the nature
         ; of specific void usages.
         ;
-        print [mold get/any 'topic "is a literal VOID! value"]
-        return
+        print [mold get/any 'topic "is an error-inducing BAD-WORD! value"]
+        return none
     ]
 
     if null? :topic [
@@ -153,7 +153,7 @@ help: function [
                 upgrade - check for newer versions
                 usage - program cmd line options
         }
-        return
+        return none
     ]
 
     ; !!! R3-Alpha permitted "multiple inheritance" in objects, in the sense
@@ -180,7 +180,7 @@ help: function [
 
             browse join-all [https://r3n.github.io/topics/ as text! topic]
             print newline
-            return
+            return none
         ]
 
         text! [
@@ -194,7 +194,7 @@ help: function [
             ] else [
                 print ["No information on" topic]
             ]
-            return
+            return none
         ]
 
         path! word! [
@@ -205,18 +205,18 @@ help: function [
                 null? binding of topic
             ] then [
                 print [topic "is an unbound WORD!"]
-                return
+                return none
             ]
 
-            switch type of value: get/any topic [
+            switch type of value: friendly get/any topic [
                 null [
                     print [topic "is null"]
                 ]
-                void! [
-                    print [topic "is not defined (e.g. has a VOID! value)"]
+                bad-word! [
+                    print [topic "is not defined (e.g. has a BAD-WORD! value)"]
                 ]
             ] then [
-                return
+                return none
             ]
             enfixed: did all [action? :value, enfixed? :value]
         ]
@@ -231,7 +231,7 @@ help: function [
         ] else [
             print [mold topic "is" an mold type of :topic]
         ]
-        return
+        return none
     ]
 
     ; Open the web page for it?
@@ -282,7 +282,7 @@ help: function [
         ] else [
             print [topic {is a datatype}]
         ]
-        return
+        return none
     ]
 
     if not action? :value [
@@ -303,7 +303,7 @@ help: function [
                 ]
             ]
         ]
-        return
+        return none
     ]
 
     ; The HELP mechanics for ACTION! are more complex in Ren-C due to the
@@ -322,9 +322,8 @@ help: function [
     refinements: _  ; refinements and refinement arguments
 
     parse parameters of :value [
-        copy args any [word! | get-word! | lit-word! | issue!]
-        copy refinements any path!  ; !!! Refinements may become intermixed!
-        end
+        copy args while [word! | get-word! | lit-word! | issue!]
+        copy refinements while path!  ; !!! Refinements may become intermixed!
     ]
 
     ; Output exemplar calling string, e.g. LEFT + RIGHT or FOO A B C
@@ -387,14 +386,14 @@ help: function [
         print-args/indent-words refinements
     ]
 
-    return  ; use overridden return vs. fallout so void is unlabeled
+    return none  ; use overridden return vs. fallout so void is unlabeled
 ]
 
 
 source: function [
     "Prints the source code for an ACTION! (if available)"
 
-    return: <void>
+    return: <none>
     'arg [word! path! action! tag!]
 ][
     switch type of :arg [
@@ -461,13 +460,11 @@ source: function [
 what: function [
     {Prints a list of known actions}
 
-    return: [void! block!]
+    return: [bad-word! block!]
     'name [<end> word! lit-word!]
         "Optional module name"
-    /args
-        "Show arguments not titles"
-    /as-block
-        "Return data as block"
+    /args "Show arguments not titles"
+    /as-block "Return data as block"
 ][
     list: make block! 400
     size: 0
@@ -511,7 +508,7 @@ pending: does [
 ]
 
 
-bugs: func [return: <void>] [
+bugs: func [return: <none>] [
     "View bug database."
 ][
     browse https://github.com/metaeducation/ren-c/issues
@@ -520,7 +517,7 @@ bugs: func [return: <void>] [
 
 chat: func [
     "Open REBOL/ren-c developers chat forum"
-    return: <void>
+    return: <none>
 ][
     browse http://chat.stackoverflow.com/rooms/291/rebol
 ]
@@ -530,7 +527,7 @@ chat: func [
 require-commit: function [
     "checks current commit against required commit"
 
-    return: <void>
+    return: <none>
     commit [text!]
 ][
     c: select system/script/header 'commit else [return]

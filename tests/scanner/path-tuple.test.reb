@@ -37,8 +37,8 @@
 
         "/<tag>/"  ->  [_ <tag> _]
 
-        "(a b)/c"  ->  [@(a b) c]
-        "(a b) /c"  ->  @(a b)  [_ c]
+        "(a b)/c"  ->  [^(a b) c]
+        "(a b) /c"  ->  ^(a b)  [_ c]
 
         "a.b/c.d"  ->  [(a b) (c d)]
         "a/b.c/d"  ->  [a (b c) d]
@@ -49,15 +49,15 @@
         "./a"  ->  [(_ _) a]
         "/.a"  ->  [_ (_ a)]
 
-        "[a].(b)"  ->  (@[a] @(b))
+        "[a].(b)"  ->  (^[a] ^(b))
 
         "a.. b"  ->  (a _ _)  b
         "a.. /b"  ->  (a _ _)  [_ b]
         "a../b"  ->  [(a _ _) b]
 
-        "/./(a b)/./"  ->  [_ (_ _) @(a b) (_ _) _]
+        "/./(a b)/./"  ->  [_ (_ _) ^(a b) (_ _) _]
 
-        "a.1.(x)/[a b c]/<d>.2"  ->  [(a 1 @(x)) @[a b c] (<d> 2)]
+        "a.1.(x)/[a b c]/<d>.2"  ->  [(a 1 ^(x)) ^[a b c] (<d> 2)]
 
         "~/projects/"  ->  [~ projects _]
         "~a~.~b~/~c~"  !!  <scan-invalid>
@@ -69,7 +69,7 @@
         ; === Bad Path Element Tests ===
         ;
         ; TUPLE! can go in PATH! but not vice-versa.  Besides that, only
-        ; INTEGER!, WORD!, GROUP!, BLOCK!, TEXT!, TAG!, and VOID! are
+        ; INTEGER!, WORD!, GROUP!, BLOCK!, TEXT!, TAG!, and BAD-WORD! are
         ; currently allowed in either sequence form.
 
         "/#a"  !!  <scan-invalid>
@@ -82,8 +82,8 @@
         ; a plain WORD! at the head of a GET-PATH!.  Instead, single-element
         ; GROUP!s are made as cheap as GET-WORD! cells in path.
 
-        "a/:b"  ->  [a @(:b)]
-        "a/:b/c"  ->  [a @(:b) c]
+        "a/:b"  ->  [a ^(:b)]
+        "a/:b/c"  ->  [a ^(:b) c]
     ]
 
 
@@ -103,7 +103,7 @@
         if mtype [
             value: to mtype collect [
                 for index 1 (length of value) 1 [
-                    keep transform pick value index
+                    keep/only transform pick value index
                 ]
             ]
         ]

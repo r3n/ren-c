@@ -112,15 +112,19 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
 
     if (not p) {  // libRebol's null/<opt> (IS_NULLED prohibited in CELL case)
 
-        if (QUOTING_BYTE(feed) == 0)
-            panic ("Cannot directly splice nulls...use rebQ(), rebXxxQ()");
-
-        // !!! We could make a global QUOTED_NULLED_VALUE with a stable
-        // pointer and not have to use fetched or FETCHED_MARKED_TEMPORARY.
+        // This is the compromise of convenience, where ~null~ is put in
+        // to the feed.  If it's converted into an array we've told a
+        // small lie (~null~ is a BAD-WORD! and a thing, so not the same
+        // as the NULL non-thing).  But it's a mean enough thing that
+        // any misunderstandings should cause a problem...while typical
+        // uses will be all right.
         //
-        assert(FEED_SPECIFIER(feed) == SPECIFIED);
+        // !!! "We could make a global QUOTED_NULLED_VALUE with a stable
+        // pointer and not have to use fetched." <- probably silly optimization
 
-        Quotify(Init_Nulled(&feed->fetched), 1);
+        Init_Nulled(&feed->fetched);
+        Isotopic_Quotify(&feed->fetched, QUOTING_BYTE(feed));
+        assert(FEED_SPECIFIER(feed) == SPECIFIED);  // !!! why assert this?
         feed->value = &feed->fetched;
 
     } else switch (Detect_Rebol_Pointer(p)) {
@@ -234,7 +238,7 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
 
             REBVAL *single = SPECIFIC(ARR_SINGLE(inst1));
             Copy_Cell(&feed->fetched, single);
-            Quotify(
+            Isotopic_Quotify(
                 &feed->fetched,
                 QUOTING_BYTE(feed) + inst1->misc.quoting_delta
             );
@@ -278,11 +282,11 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
 
             REBVAL *single = SPECIFIC(ARR_SINGLE(inst1));
             Copy_Cell(&feed->fetched, single);
-            Quotify(&feed->fetched, QUOTING_BYTE(feed));
+            Isotopic_Quotify(&feed->fetched, QUOTING_BYTE(feed));
             feed->value = &feed->fetched;
             rebRelease(single);  // *is* the instruction
             break; }
-        
+
           default:
             //
             // Besides instructions, other series types aren't currenlty
@@ -292,7 +296,7 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
             // altogether (e.g. no usable cell pattern guaranteed at the head)
             // but it's important in several APIs to emphasize a value gives
             // phase information, while archetypes do not.
-            // 
+            //
             panic (inst1);
         }
         break; }
@@ -313,7 +317,8 @@ inline static void Detect_Feed_Pointer_Maybe_Fetch(
             // We don't want to corrupt the value itself.  We have to move
             // it into the fetched cell and quote it.
             //
-            Quotify(Copy_Cell(&feed->fetched, cell), QUOTING_BYTE(feed));
+            Copy_Cell(&feed->fetched, cell);
+            Isotopic_Quotify(&feed->fetched, QUOTING_BYTE(feed));
             feed->value = &feed->fetched;  // note END is detected separately
         }
         break; }
@@ -433,7 +438,7 @@ inline static void Fetch_Next_In_Feed(REBFED *feed) {
 inline static const RELVAL *Lookback_While_Fetching_Next(REBFRM *f) {
   #ifdef DEBUG_EXPIRED_LOOKBACK
     if (feed->stress) {
-        TRASH_CELL_IF_DEBUG(feed->stress);
+        REFORMAT_CELL_IF_DEBUG(feed->stress);
         free(feed->stress);
         feed->stress = nullptr;
     }
@@ -515,8 +520,8 @@ inline static REBFED* Alloc_Feed(void) {
     feed->tick = TG_Tick;
   #endif
 
-    Init_Unreadable_Void(Prep_Cell(&feed->fetched));
-    Init_Unreadable_Void(Prep_Cell(&feed->lookback));
+    Init_Trash(Prep_Cell(&feed->fetched));
+    Init_Trash(Prep_Cell(&feed->lookback));
 
     REBSER *s = &feed->singular;  // SER() not yet valid
     s->leader.bits = NODE_FLAG_NODE | FLAG_FLAVOR(FEED);

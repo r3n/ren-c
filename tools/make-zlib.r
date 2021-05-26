@@ -53,7 +53,7 @@ path-zlib: https://raw.githubusercontent.com/madler/zlib/master/
 ; Optionally will inline a list of files at the inclusion point
 ;
 disable-user-includes: function [
-    return: <void>
+    return: <none>
     lines [block!] {Block of strings}
     /inline [block!] {Block of filenames to inline if seen}
     /stdio {Disable stdio.h}
@@ -71,12 +71,12 @@ disable-user-includes: function [
 
     for-next line-iter lines [
         parse line: line-iter/1 [
-            any space {#}
-            any space {include}
+            while space {#}
+            while space {include}
             some space include-rule to end
         ] then [
             if pos: find try inline (as file! name) [
-                change/part line-iter (read/lines join-all [path-zlib name]) 1 
+                change/part line-iter (read/lines join-all [path-zlib name]) 1
                 take pos
             ] else [
                 insert line unspaced [{//} space]
@@ -84,7 +84,7 @@ disable-user-includes: function [
                     space {/* REBOL: see make-zlib.r */}
                 ]
             ]
-        ] 
+        ]
     ]
 
     if inline and (not empty? inline) [
@@ -103,7 +103,7 @@ disable-user-includes: function [
 make-warning-lines: func [name [file!] title [text!]] [
     reduce [
         {/*}
-        { * Extraction of ZLIB compression and decompression routines} 
+        { * Extraction of ZLIB compression and decompression routines}
         { * for REBOL [R3] Language Interpreter and Run-time Environment}
         { * This is a code-generated file.}
         { *}
@@ -152,8 +152,8 @@ fix-kr: function [
     single-param: bind [
         identifier ;(part of)type
         some [
-            any white-space
-            any [#"*" any white-space]
+            while white-space
+            while [#"*" any white-space]
 
             ; It could get here even after last identifier, so this tmp-start
             ; is not the begining of the name, but the last one is...
@@ -162,8 +162,8 @@ fix-kr: function [
             identifier (
                 name-start: tmp-start
             )
-            any white-space
-            any [#"*" any white-space]
+            while white-space
+            while [#"*" any white-space]
         ]
     ] c-lexical/grammar
 
@@ -174,9 +174,9 @@ fix-kr: function [
             #"(" open-paren: to #")" close-paren: #")"
             param-ser: copy param-spec: [
                 some [
-                    some [any white-space any [#"*" any white-space]
+                    some [while white-space, while [#"*" any white-space]
                         identifier any white-space opt #","
-                        any [#"*" any white-space]
+                        while [#"*" any white-space]
                     ] #";"
                 ]
                 any white-space
@@ -195,14 +195,14 @@ fix-kr: function [
 
                 param-block: make block! 8
                 parse params [
-                    any white-space
+                    while white-space
                     copy name: identifier (
                         append param-block reduce [name _]
                     )
-                    any [
-                        any white-space
+                    while [
+                        while white-space
                         #","
-                        any white-space
+                        while white-space
                         copy name: identifier (
                             append param-block reduce [name _]
                         )
@@ -217,7 +217,7 @@ fix-kr: function [
                 ; 2) "int i, *j, **k;"
                 ;dump param-spec
                 parse param-spec [
-                    any white-space
+                    while white-space
                     some [
                         (typed?: true)
                         single-param-start: single-param (
@@ -228,8 +228,8 @@ fix-kr: function [
                             )
                            ;dump spec-type
                        )
-                       any [
-                           any white-space
+                       while [
+                           while white-space
                            param-end: #"," (
                                 ; case 2)
                                 ; spec-type should be "int "
@@ -252,14 +252,14 @@ fix-kr: function [
                                    ]
                                    typed?: false
                            )
-                           single-param-start:
-                           any white-space
-                           any [#"*" any white-space]
+                           single-param-start: here
+                           while white-space
+                           while [#"*" any white-space]
                            copy name identifier
-                       ]
-                       any white-space
-                       param-end: #";"
-                       (
+                        ]
+                        any white-space
+                        param-end: #";"
+                        (
                            poke (find/skip param-block name 2) 2
                                either typed? [
                                    (copy/part single-param-start
@@ -275,9 +275,9 @@ fix-kr: function [
                                             - (index of single-param-start)
                                        ) ; " **k"
                                    ]
-                               ]
-                           )
-                       any white-space
+                                ]
+                            )
+                        while white-space
                     ]
                 ]
 
@@ -360,7 +360,7 @@ source-lines: copy []
 
 append source-lines read/lines join-all [path-zlib %crc32.c]
 
-; 
+;
 ; Macros DO1 and DO8 are defined differently in crc32.c, and if you don't
 ; #undef them you'll get a redefinition warning.
 ;

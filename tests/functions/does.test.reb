@@ -15,7 +15,7 @@
 )
 
 (
-    make-x: does just 'x
+    make-x: does the 'x
     make-x = 'x
 )
 

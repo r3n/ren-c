@@ -10,7 +10,7 @@
 
 ; return-less return value tests
 (
-    f: does []
+    f: does [null]
     null? f
 )
 (
@@ -186,7 +186,7 @@
 )
 (
     f: does [()]
-    null? f
+    '~void~ = ^ f
 )
 (
     f: does ['a]
@@ -269,13 +269,13 @@
 
     (10 == hard 10)
     ('a == hard a)
-    (just 'a == hard 'a)
-    (just :a == hard :a)
-    (just a: == hard a:)
-    (just (10 + 20) == hard (10 + 20))
+    (the 'a == hard 'a)
+    (the :a == hard :a)
+    (the a: == hard a:)
+    (the (10 + 20) == hard (10 + 20))
     (
         o: context [f: 10]
-        just :o/f == hard :o/f
+        the :o/f == hard :o/f
     )
 ]
 
@@ -472,9 +472,9 @@
 )
 
 [#539 https://github.com/metaeducation/ren-c/issues/755 (
-    f: func [return: <void>] [
+    f: func [return: <none>] [
         use [x] [return]
         42
     ]
-    void? f
+    '~none~ = ^ f
 )]

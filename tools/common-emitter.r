@@ -52,29 +52,29 @@ cscape: function [
     num-text: to text! num  ; CHANGE won't take GROUP! to evaluate, #1279
 
     list: collect* [
-        parse string [(col: 0) start: here any [
+        parse string [(col: 0) start: here while [  ; <- No COMMA! in bootstrap
             [
                 (prefix: _ suffix: _) finish: here
 
-                "${" change [copy expr: [to "}"]] num-text skip (
+                "${" change [copy expr: [to "}"]] (num-text) skip (
                     mode: #cname
                     pattern: unspaced ["${" num "}"]
                 )
                     |
-                "$<" change [copy expr: [to ">"]] num-text skip (
+                "$<" change [copy expr: [to ">"]] (num-text) skip (
                     mode: #unspaced
                     pattern: unspaced ["$<" num ">"]
                 )
                     |
                 (prefix: copy/part start finish)
-                "$[" change [copy expr: [to "]"]] num-text skip (
+                "$[" change [copy expr: [to "]"]] (num-text) skip (
                     mode: #delimit
                     pattern: unspaced ["$[" num "]"]
                 )
                 copy suffix: to newline
                     |
                 (prefix: copy/part start finish)
-                "$(" change [copy expr: [to ")"]] num-text skip (
+                "$(" change [copy expr: [to ")"]] (num-text) skip (
                     mode: #delimit
                     pattern: unspaced ["$(" num ")"]
                 )
@@ -243,12 +243,12 @@ make-emitter: function [
 
     temporary: did any [
         temporary
-        parse stem ["tmp-" to end]
+        parse? stem ["tmp-" to end]
     ]
 
-    is-c: did parse stem [thru [".c" | ".h" | ".inc"] end]
+    is-c: parse? stem [thru [".c" | ".h" | ".inc"] end]
 
-    is-js: did parse stem [thru ".js" end]
+    is-js: parse? stem [thru ".js" end]
 
     e: make object! compose [
         ;
@@ -265,7 +265,7 @@ make-emitter: function [
         emit: function [
             {Write data to the emitter using CSCAPE templating (see HELP)}
 
-            return: <void>
+            return: <none>
             'look [any-value! <variadic>]
             data [text! char! <variadic>]
             <with> buf-emit
@@ -292,7 +292,7 @@ make-emitter: function [
         ]
 
         write-emitted: function [
-            return: <void>
+            return: <none>
             /tabbed
             <with> file buf-emit
         ][

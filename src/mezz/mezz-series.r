@@ -71,7 +71,7 @@ remold: redescribe [
     ]
 )
 
-array: function [
+array: func [
     {Makes and initializes a block of a given size}
 
     return: "Generated block or null if blank input"
@@ -80,8 +80,9 @@ array: function [
         [<blank> integer! block!]
     /initial "Initial value (will be called each time if a function)"
         [any-value!]
+    <local> rest block
 ][
-    initial: :initial else '_  ; default to BLANK!
+    initial: try :initial  ; default to BLANK!
     if block? size [
         rest: next size else [
             ;
@@ -90,7 +91,7 @@ array: function [
             fail "Empty ARRAY dimensions (file issue if you want a meaning)"
         ]
         if not integer? size: size/1 [
-            fail @size ["Expect INTEGER! size in BLOCK!, not" type of size]
+            fail ^size ["Expect INTEGER! size in BLOCK!, not" type of size]
         ]
         if tail? rest [rest: null]  ; want `array [2]` => `[_ _]`, no recurse
     ]
@@ -99,16 +100,16 @@ array: function [
     block: make block! size
     case [
         block? rest [
-            loop size [append/only block array/initial rest :initial]
+            loop size [append block ^(array/initial rest :initial)]
         ]
         any-series? :initial [
-            loop size [append/only block copy/deep initial]
+            loop size [append block ^(copy/deep initial/)]
         ]
         action? :initial [
-            loop size [append/only block initial]  ; Called every time
+            loop size [append block ^(initial/)]  ; Called every time
         ]
     ] else [
-        append/only/dup block :initial size
+        append/dup block ^initial size
     ]
     return block
 ]
@@ -120,9 +121,9 @@ replace: function [
     target "Series to replace within (modified)"
         [any-series!]
     pattern "Value to be replaced (converted if necessary)"
-        [<opt> any-value!]
+        [any-value!]
     replacement "Value to replace with (called each time if a function)"
-        [<opt> any-value!]
+        [any-value!]
 
     ; !!! Note these refinments alias ALL, CASE, TAIL natives!
     /all "Replace all occurrences"
@@ -131,7 +132,7 @@ replace: function [
 
     ; Consider adding an /any refinement to use find/any, once that works.
 ][
-    if not set? 'pattern [return target]
+    if blank? :pattern [return target]
 
     all_REPLACE: all
     all: :lib/all
@@ -312,14 +313,14 @@ reword: function [
                 (keyword-match: '(<*> keyword))
             ]
 
-            keep/line '|
+            keep/line [|]
         ]
-        keep 'false  ; add failure if no match, instead of removing last |
+        keep [false]  ; add failure if no match, instead of removing last |
     ]
 
     rule: [
         a: here  ; Begin marking text to copy verbatim to output
-        any [
+        while [
             to prefix  ; seek to prefix (may be blank!, this could be a no-op)
             b: here  ; End marking text to copy verbatim to output
             prefix  ; consume prefix (if no-op, may not be at start of match)
@@ -403,7 +404,7 @@ extract: function [
     index: default '1
     out: make (type of series) len
     iterate-skip series width [
-        append/only out pick series index
+        append out try ^(pick series index)
     ]
 ]
 
@@ -489,10 +490,9 @@ collect-lines: redescribe [
     body: compose [
         keep: adapt* specialize* :keep [
             line: #
-            only: #
             part: null
         ][
-            value: spaced try :value
+            value: try spaced :value
         ]
         (as group! body)
     ]
@@ -506,10 +506,9 @@ collect-text: redescribe [
         body: compose [
             keep: adapt* specialize* :keep [
                 line: null
-                only: null
                 part: null
             ][
-                value: unspaced try :value
+                value: try unspaced :value
             ]
             (as group! body)
         ]
@@ -583,7 +582,7 @@ format: function [
 
 printf: func [
     "Formatted print."
-    return: <void>
+    return: <none>
     fmt "Format"
     val "Value or block of values"
 ][
@@ -629,7 +628,7 @@ split: function [
                     copy series to end (keep/only series)
                 ]
             ] else [
-                [any [copy series 1 size skip (keep/only series)]]
+                [while [copy series 1 size skip (keep/only series)]]
             ]
         ]
         block? dlm [
@@ -638,21 +637,21 @@ split: function [
             ;
 
             [
-                any [mk1: here, while [mk2: here, [dlm | end] break | skip] (
+                while [not end [
+                    mk1: here, while [mk2: here, [dlm | end] break | skip] (
                     keep/only copy/part mk1 mk2
-                )]
+                )]]
                 end
             ]
         ]
     ] else [
         ensure [bitset! text! char! word! tag!] dlm
         [
-            some [
+            some [not end [
                 copy mk1: [to dlm | to end]
                 (keep/only mk1)
                 opt thru dlm
-            ]
-            end
+            ]]
         ]
     ]]
 
@@ -661,8 +660,8 @@ split: function [
     ; or where the dlm was a char/string/charset and it was the last char
     ; (so we want to append an empty field that the above rule misses).
     ;
-    fill-val: does [copy either any-array? series [[]] [""]]
-    add-fill-val: does [append/only result fill-val]
+    fill-val: does [copy either any-array? series [just []] [""]]
+    add-fill-val: does [append result fill-val]
     if integer? dlm [
         if into [
             ; If the result is too short, i.e., less items than 'size, add
@@ -682,8 +681,8 @@ split: function [
             char! [dlm = last series]
             text! tag! word! [
                 did all [
-                    find series dlm
-                    empty? find-last/tail series dlm
+                    find series ^dlm
+                    empty? find-last/tail series ^dlm
                 ]
             ]
             block! [false]

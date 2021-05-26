@@ -104,6 +104,9 @@ inline static RELVAL *Quotify_Core(
     RELVAL *v,
     REBLEN depth
 ){
+    if (depth == 0)
+        return v;
+
     if (KIND3Q_BYTE_UNCHECKED(v) == REB_QUOTED) {  // reuse payload
         assert(VAL_QUOTED_PAYLOAD_DEPTH(v) + depth <= MONDEX_MOD);  // limited
         VAL_WORD_INDEXES_U32(v) += (depth << 20);
@@ -112,6 +115,9 @@ inline static RELVAL *Quotify_Core(
 
     REBYTE kind = KIND3Q_BYTE_UNCHECKED(v) % REB_64;  // HEART_BYTE may differ
     assert(kind <= REB_MAX);
+
+    if (kind == REB_BAD_WORD)
+        assert(NOT_CELL_FLAG(v, ISOTOPE));  // invariant is no quoted isotopes
 
     depth += KIND3Q_BYTE_UNCHECKED(v) / REB_64;
 
@@ -131,7 +137,7 @@ inline static RELVAL *Quotify_Core(
         // essentially noise, and only the literal's specifier should be used.
 
         REBVAL *unquoted = Alloc_Pairing();
-        Init_Unreadable_Void(PAIRING_KEY(unquoted));  // Key not used ATM
+        Init_Trash(PAIRING_KEY(unquoted));  // Key not used ATM
 
         Copy_Cell_Header(unquoted, v);
         mutable_KIND3Q_BYTE(unquoted) = kind;  // escaping only in literal
@@ -269,6 +275,116 @@ inline static RELVAL *Unquotify_Core(RELVAL *v, REBLEN unquotes) {
 #endif
 
 
+//=//// ISOTOPIC QUOTING ///////////////////////////////////////////////////=//
+
+// When a plain BAD-WORD! evaluates, it stays as the same BAD-WORD! but with
+// the isotope bit set.  If you want that to be generically reversible, then
+// quoting an isotopic BAD-WORD! has to give a plain one...then quoting a
+// plain one gives a QUOTED!, etc.
+//
+// Because QUOTE doesn't take isotope BAD-WORD!s as parameters, it doesn't have
+// to deal with this problem.  But rebQ() in the API does, as does the idea
+// of "literalization".
+
+inline static RELVAL *Isotopic_Quote(RELVAL *v) {
+    if (IS_BAD_WORD(v) and GET_CELL_FLAG(v, ISOTOPE)) {
+        if (VAL_BAD_WORD_ID(v) == SYM_NULL) {
+            //
+            // ~null~ isotope goes to ' because ~null~ BAD-WORD! evaluates to
+            // true null.  There has to be *a* way to get the null isotope,
+            // so the transition between (' <=> ~null~ isotope) is that.
+            //
+            Init_Nulled(v);
+            Quotify(v, 1);
+            return v;
+        }
+        CLEAR_CELL_FLAG(v, ISOTOPE);  // ...make it "friendly" now...
+        return v;  // ...but differentiate its status by not quoting it...
+    }
+    return Quotify(v, 1);  // a non-isotope BAD-WORD! winds up quoted
+}
+
+inline static RELVAL *Isotopic_Unquote(RELVAL *v) {
+    assert(not IS_NULLED(v));  // use Unliteralize
+    if (KIND3Q_BYTE(v) == REB_NULL + REB_64) {  // plain '
+        Init_Curse_Word(v, SYM_NULL);  // ' <=> ~null~ isotope
+    }
+    else if (IS_BAD_WORD(v))  // Literalize flipped isotope off, flip back on.
+        SET_CELL_FLAG(v, ISOTOPE);
+    else {
+        Unquotify_Core(v, 1);
+        if (IS_BAD_WORD(v))  // ...was friendly before Literalizez quoted it...
+            assert(NOT_CELL_FLAG(v, ISOTOPE));  // ...should still be friendly
+    }
+    return v;
+}
+
+// It's easiest to write the isotopic general forms by doing a single isotopic
+// step, and then N - 1 non-isotopic steps.
+
+inline static RELVAL *Isotopic_Quotify(RELVAL *v, REBLEN depth) {
+    if (depth == 0) {
+        if (IS_NULLED(v))  // !!! should this be handled here?
+            Init_Bad_Word_Core(v, Canon(SYM_NULL), CELL_MASK_NONE);
+        return v;
+    }
+    Isotopic_Quote(v);
+    return Quotify(v, depth - 1);
+}
+
+inline static RELVAL *Isotopic_Unquotify(RELVAL *v, REBLEN depth) {
+    assert(not IS_NULLED(v));  // see Unliteralize
+    if (depth == 0)
+        return v;
+    Unquotify(v, depth - 1);
+    return Isotopic_Unquote(v);
+}
+
+#ifdef __cplusplus
+    inline static REBVAL *Isotopic_Quote(REBVAL *v)
+      { return SPECIFIC(Isotopic_Quote(cast(RELVAL*, v))); }
+
+    inline static REBVAL *Isotopic_Unquote(REBVAL *v)
+      { return SPECIFIC(Isotopic_Unquote(cast(RELVAL*, v))); }
+
+    inline static REBVAL *Isotopic_Quotify(REBVAL *v, REBLEN depth)
+      { return SPECIFIC(Isotopic_Quotify(cast(RELVAL*, v), depth)); }
+
+    inline static REBVAL *Isotopic_Unquotify(REBVAL *v, REBLEN depth)
+      { return SPECIFIC(Isotopic_Unquotify(cast(RELVAL*, v), depth)); }
+#endif
+
+
+//=//// LITERALIZATION /////////////////////////////////////////////////////=//
+
+// Literalization is almost exactly like isotopic quoting, but it has a twist
+// that NULL does not become a single tick mark (') but rather it stays as
+// NULL.  It also translates emptiness (e.g. an END marker) into an isotope
+// BAD-WORD! of ~void~.  It is done by ^ and the the REB_LIT_XXX family.
+
+inline static RELVAL *Literalize(RELVAL *v) {
+    if (IS_END(v))
+        return Init_Void(v);  // *unfriendly*
+    if (IS_NULLED(v))
+        return v;  // as-is
+    return Isotopic_Quote(v);
+}
+
+inline static RELVAL *Unliteralize(RELVAL *v) {
+    if (IS_NULLED(v))
+        return v;  // do nothing
+    return Isotopic_Unquote(v);
+}
+
+#ifdef __cplusplus
+    inline static REBVAL *Literalize(REBVAL *v)
+        { return SPECIFIC(Literalize(cast(RELVAL*, v))); }
+
+    inline static REBVAL *Unliteralize(REBVAL *v)
+        { return SPECIFIC(Unliteralize(cast(RELVAL*, v))); }
+#endif
+
+
 inline static REBCEL(const*) VAL_UNESCAPED(const RELVAL *v) {
     if (KIND3Q_BYTE_UNCHECKED(v) != REB_QUOTED)  // allow unreadable voids
         return v;  // Note: kind byte may be > 64
@@ -309,4 +425,29 @@ inline static bool IS_QUOTED_PATH(const RELVAL *v) {
     return IS_QUOTED(v)
         and VAL_QUOTED_DEPTH(v) == 1
         and CELL_KIND(VAL_UNESCAPED(v)) == REB_PATH;
+}
+
+
+inline static REBVAL *Init_Lit(RELVAL *out) {
+    RESET_CELL(out, REB_LIT, CELL_MASK_NONE);
+
+    // Although LIT! carries no data, it is not inert.  To make ANY_INERT()
+    // fast, it's in the part of the list of bindable evaluative types.
+    // This means the binding has to be nulled out in the cell to keep the
+    // GC from crashing on it.
+    //
+    mutable_BINDING(out) = nullptr;
+    return cast(REBVAL*, out);
+}
+
+inline static REBVAL *Init_The(RELVAL *out) {
+    RESET_CELL(out, REB_THE, CELL_MASK_NONE);
+
+    // Although THE! carries no data, it is not inert.  To make ANY_INERT()
+    // fast, it's in the part of the list of bindable evaluative types.
+    // This means the binding has to be nulled out in the cell to keep the
+    // GC from crashing on it.
+    //
+    mutable_BINDING(out) = nullptr;
+    return cast(REBVAL*, out);
 }

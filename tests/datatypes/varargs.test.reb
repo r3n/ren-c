@@ -85,8 +85,8 @@
 
     ([] = do [soft])
     (
-        a: '~void~
-        (trap [a soft])/id = 'need-non-void
+        a: ~void~
+        (trap [a soft])/id = 'bad-word-get
     )
     ([7] = do [:(1 + 2) :(3 + 4) soft])
 ][
@@ -103,8 +103,8 @@
 
     ([] = do [hard])
     (
-        a: '~void~
-        (trap [a hard])/id = 'need-non-void
+        a: ~void~
+        (trap [a hard])/id = 'bad-word-get
     )
     ([(3 + 4)] = do [(1 + 2) (3 + 4) hard])
 ]

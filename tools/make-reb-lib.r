@@ -51,7 +51,13 @@ map-each-api: func [code [block!]] [
     ]
 ]
 
-emit-proto: func [return: <void> proto] [
+for-each-api: func [code [block!]] [
+    for-each api api-objects compose/only [
+        do in api (code)  ; want API variable visible to `code` while running
+    ]
+]
+
+emit-proto: func [return: <none> proto] [
     header: proto-parser/data
 
     all [
@@ -94,10 +100,9 @@ emit-proto: func [return: <void> proto] [
                         pos: back pos
                     ]
                     keep trim/tail copy/part param next pos  ; TEXT! of type
-                    keep to word! next pos  ; WORD! of the parameter name
+                    keep/only to word! next pos  ; WORD! of the parameter name
                 )
             ]]
-            end
         ] else [
             fail ["Couldn't extract API schema from prototype:" proto]
         ]
@@ -110,7 +115,7 @@ emit-proto: func [return: <void> proto] [
         ]
     ]
 
-    if is-variadic: did find paramlist 'vaptr [
+    if is-variadic: did find/only paramlist 'vaptr [
         parse paramlist [
             ;
             ; `quotes` is first to facilitate C99 macros that want two places
@@ -198,11 +203,9 @@ for-each api api-objects [do in api [
 
     make-c-proxy: function [
         return: [text!]
-        /Q
         /inline
         <with> returns wrapper-params
     ][
-        q: try if Q ["Q"]  ; !!! case-sensitive concession, temporary (?)
         inline: try if inline ["_inline"]
 
         returns: default ["void"]
@@ -211,25 +214,22 @@ for-each api api-objects [do in api [
 
         cscape/with {
             $<OPT-NORETURN>
-            inline static $<Returns> $<Name>$<Q>$<inline>($<Wrapper-Params>) {
+            inline static $<Returns> $<Name>$<inline>($<Wrapper-Params>) {
                 $<Opt-Va-Start>
                 $<opt-return> LIBREBOL_PREFIX($<Name>)($<Proxied-Args>);
                 $<OPT-DEAD-END>
             }
         } compose [
-            wrapper-params  ; "global" where q is undefined, must be first
+            wrapper-params  ; "global" where locals undefined, must be first
             (api)
-            q  ; !!! Binding to all words in contexts
+            inline
         ]
     ]
 
     make-c++-proxy: function [
         return: [text!]
-        /Q
         <with> returns wrapper-params
     ][
-        q: try if Q ["Q"]  ; !!! case-sensitive concession, temporary (?)
-
         returns: default ["void"]
 
         wrapper-params: default ["void"]
@@ -237,15 +237,14 @@ for-each api api-objects [do in api [
         cscape/with {
             template <typename... Ts>
             $<OPT-NORETURN>
-            inline static $<Returns> $<Name>$<Q>($<Wrapper-Params>) {
+            inline static $<Returns> $<Name>($<Wrapper-Params>) {
                 LIBREBOL_PACK_CPP_ARGS;
                 $<opt-return> LIBREBOL_PREFIX($<Name>)($<Proxied-Args>);
                 $<OPT-DEAD-END>
             }
         } compose [
-            wrapper-params  ; "global" where q is undefined, must be first
+            wrapper-params  ; "global" where locals undefined, must be first
             (api)
-            q  ; !!! Binding to all words in contexts
         ]
     ]
 
@@ -270,11 +269,6 @@ for-each api api-objects [do in api [
         ]
         append c89-variadic-inlines make-c-proxy/inline
 
-        proxied-args: delimit ", " compose [
-            "1" ((map-each [type var] paramlist [to-text var])) "p" "&va"
-        ]
-        append c89-variadic-inlines make-c-proxy/inline/Q
-
 
         ; NOW THE C++ VERSIONS
         ; these take `const Ts &... args`
@@ -294,14 +288,6 @@ for-each api api-objects [do in api [
             "nullptr"
         ]
         append c++-variadic-inlines make-c++-proxy
-
-        proxied-args: delimit ", " compose [
-            "1"
-            ((map-each [type var] paramlist [to-text var]))
-            "packed"
-            "nullptr"
-        ]
-        append c++-variadic-inlines make-c++-proxy/Q
     ]
     else [
         opt-va-start: _
@@ -318,35 +304,24 @@ for-each api api-objects [do in api [
     ]
 ]]
 
-c89-macros: collect [ map-each-api [
+c89-macros: map-each-api [
     if is-variadic [
-        keep cscape/with {#define $<Name> $<Name>_inline} api
-        keep cscape/with {#define $<Name>Q $<Name>Q_inline} api
+        cscape/with {#define $<Name> $<Name>_inline} api
     ]
-] ]
+]
 
-c99-or-c++11-macros: collect [ map-each-api [
+c99-or-c++11-macros: map-each-api [
     ;
     ; C99/C++11 have the ability to do variadic macros, giving the power to
     ; implicitly slip a rebEND signal at the end of the parameter list.  This
     ; overcomes a C variadic function's fundamental limitation of not being
     ; able to implicitly know the number of variadic parameters used.
     ;
-    ; We make two entries for each variadic splicer--one that quotes splices
-    ; (e.g. rebDidQ) and one that does not (plain rebDid)
-    ;
-    ; !!! We could likely do better than this, e.g. if the `quotes` were moved
-    ; to the first parameter, it could be passed as 0 or 1 here and use only
-    ; one inline function instead of two.  But so long as C89 support is
-    ; a given, it would just make the header file larger to add that variant.
-    ;
     if is-variadic [
-        keep cscape/with
+        cscape/with
             {#define $<Name>(...) $<Name>_inline(__VA_ARGS__, rebEND)} api
-        keep cscape/with
-            {#define $<Name>Q(...) $<Name>Q_inline(__VA_ARGS__, rebEND)} api
     ]
-] ]
+]
 
 
 === GENERATE REBOL.H ===

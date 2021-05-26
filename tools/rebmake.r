@@ -344,7 +344,7 @@ application-class: make project-class [
     searches: _
     ldflags: _
 
-    link: meth [return: <void>] [
+    link: meth [return: <none>] [
         linker/link output depends ldflags
     ]
 
@@ -371,7 +371,7 @@ dynamic-library-class: make project-class [
 
     searches: _
     ldflags: _
-    link: meth [return: <void>] [
+    link: meth [return: <none>] [
         linker/link output depends ldflags
     ]
 
@@ -409,7 +409,7 @@ compiler-class: make object! [
     version: _
     exec-file: _
     compile: meth [
-        return: <void>
+        return: <none>
         output [file!]
         source [file!]
         include [file! block!]
@@ -508,7 +508,7 @@ gcc: make compiler-class [
                     ; This is a stopgap workaround that ultimately would
                     ; permit cross-platform {MBEDTLS_CONFIG_FILE="filename.h"}
                     ;
-                    if find [gcc g++ cl] name [
+                    if find/only [gcc g++ cl] name [
                         flg: replace/all copy flg {"} {\"}
                     ]
 
@@ -538,7 +538,7 @@ gcc: make compiler-class [
             ]
             if F [
                 for-each flg F [
-                    keep filter-flag flg id
+                    keep try filter-flag flg id
                 ]
             ]
 
@@ -638,7 +638,7 @@ cl: make compiler-class [
             ]
             if F [
                 for-each flg F [
-                    keep filter-flag flg id
+                    keep try filter-flag flg id
                 ]
             ]
 
@@ -666,7 +666,7 @@ linker-class: make object! [
     id: _ ;flag prefix
     version: _
     link: meth [
-        return: <void>
+        return: <none>
     ][
         ...  ; overridden
     ]
@@ -733,7 +733,7 @@ ld: make linker-class [
             ]
 
             for-each flg ldflags [
-                keep filter-flag flg id
+                keep try filter-flag flg id
             ]
 
             for-each dep depends [
@@ -837,7 +837,7 @@ llvm-link: make linker-class [
             ]
 
             for-each flg ldflags [
-                keep filter-flag flg id
+                keep try filter-flag flg id
             ]
 
             for-each dep depends [
@@ -923,7 +923,7 @@ link: make linker-class [
             ]
 
             for-each flg ldflags [
-                keep filter-flag flg id
+                keep try filter-flag flg id
             ]
 
             for-each dep depends [
@@ -1025,7 +1025,7 @@ object-file-class: make object! [
     generated?: false
     depends: _
 
-    compile: meth [return: <void>] [
+    compile: meth [return: <none>] [
         compiler/compile
     ]
 
@@ -1213,7 +1213,7 @@ generator-class: make object! [
                             val: localize select vars name
                             stop: false
                         )
-                    ] val
+                    ] (val)
                     | skip
                 ]
                 end
@@ -1225,15 +1225,15 @@ generator-class: make object! [
     ]
 
     prepare: meth [
-        return: <void>
+        return: <none>
         solution [object!]
     ][
-        if find words-of solution 'output [
+        if find/only words-of solution 'output [
             setup-outputs solution
         ]
         flip-flag solution false
 
-        if find words-of solution 'depends [
+        if find/only words-of solution 'depends [
             for-each dep solution/depends [
                 if dep/class = #variable [
                     append vars reduce [
@@ -1249,16 +1249,16 @@ generator-class: make object! [
     ]
 
     flip-flag: meth [
-        return: <void>
+        return: <none>
         project [object!]
         to [logic!]
     ][
         all [
-            find words-of project 'generated?
+            find/only words-of project 'generated?
             to != project/generated?
         ] then [
             project/generated?: to
-            if find words-of project 'depends [
+            if find/only words-of project 'depends [
                 for-each dep project/depends [
                     flip-flag dep to
                 ]
@@ -1267,7 +1267,7 @@ generator-class: make object! [
     ]
 
     setup-output: meth [
-        return: <void>
+        return: <none>
         project [object!]
     ][
         if not let suffix: find reduce [
@@ -1317,7 +1317,7 @@ generator-class: make object! [
 
     setup-outputs: meth [
         {Set the output/implib for the project tree}
-        return: <void>
+        return: <none>
         project [object!]
     ][
         ;print ["Setting outputs for:"]
@@ -1428,7 +1428,7 @@ makefile: make generator-class [
     ]
 
     emit: meth [
-        return: <void>
+        return: <none>
         buf [binary!]
         project [object!]
         /parent [object!]  ; !!! Not heeded?
@@ -1465,7 +1465,7 @@ makefile: make generator-class [
                         depends: join objs map-each ddep dep/depends [
                             if ddep/class <> #object-library [ddep]
                         ]
-                        commands: append reduce [dep/command] opt dep/post-build-commands
+                        commands: append reduce [dep/command] try dep/post-build-commands
                     ]
                     emit buf dep
                 ]
@@ -1502,7 +1502,7 @@ makefile: make generator-class [
     ]
 
     generate: meth [
-        return: <void>
+        return: <none>
         output [file!]
         solution [object!]
     ][
@@ -1553,7 +1553,7 @@ Execution: make generator-class [
     gen-cmd-strip: :host/gen-cmd-strip
 
     run-target: meth [
-        return: <void>
+        return: <none>
         target [object!]
         /cwd "change working directory"  ; !!! Not heeded (?)
             [file!]
@@ -1596,7 +1596,7 @@ Execution: make generator-class [
     ]
 
     run: meth [
-        return: <void>
+        return: <none>
         project [object!]
         /parent "parent project"
             [object!]

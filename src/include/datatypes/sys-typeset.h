@@ -205,7 +205,7 @@ inline static void CLEAR_ALL_TYPESET_BITS(RELVAL *v) {
     //
     //     >> eval/only :foo 1 + 2
     //     a is 1
-    //     ** Script error: + does not allow void! for its value1 argument
+    //     ** Script error: + does not allow bad-word! for its value1 argument
     //
 
     // `REB_P_HARD` is cued by a quoted WORD! in the function spec
@@ -450,6 +450,21 @@ inline static bool Typecheck_Including_Constraints(
     const REBPAR *param,
     const RELVAL *v
 ){
+    if (VAL_PARAM_CLASS(param) == REB_P_RETURN) {
+        if (IS_BAD_WORD(v) and GET_CELL_FLAG(v, ISOTOPE)) {
+            //
+            // The strategy is that you can return any "mean" bad-word you
+            // like from a function, as it's nearly as problematic as raising
+            // a return type checking error.  This helps keep BAD-WORD! in the
+            // spec for actually returning the "friendly" isotopes as values,
+            // which would be things you want to support with ANY-TYPE!.  And
+            // it means `return: []` works with `return ~none~`, which is the
+            // default for RETURN with no arguments.
+            //
+            return true;
+        }
+    }
+
     if (VAL_PARAM_CLASS(param) == REB_P_OUTPUT) {
         //
         // !!! For the moment, output parameters don't actually check the

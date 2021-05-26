@@ -327,7 +327,7 @@ system-definitions: make object! [
     ;LL?: _                       ; might have LL consts, reb-config.h checks
 
     ; See C_STACK_OVERFLOWING for an explanation of the dodgy technique used
-    ; to try and preempt a C stackoverflow crash with a trappable error. 
+    ; to try and preempt a C stackoverflow crash with a trappable error.
     ;
     SGD: "OS_STACK_GROWS_DOWN"    ; most widespread choice in C compilers
     ;SGU: "OS_STACK_GROWS_UP"     ; rarer (Debian HPPA, some emscripten/wasm)
@@ -421,9 +421,9 @@ system-libraries: make object! [
 
     DL: "dl" ; dynamic lib
     LOG: "log" ; Link with liblog.so on Android
-    
+
     W32: ["wsock32" "comdlg32" "user32" "shell32" "advapi32"]
-    
+
     NWK: "network" ; Needed by HaikuOS
 ]
 
@@ -431,7 +431,7 @@ system-libraries: make object! [
 for-each-system: func [
     {Use PARSE to enumerate the systems, and set 'var to a record object}
 
-    return: <void>
+    return: <none>
     'var [word!]
     body [block! action!]
         {Body of code to run for each system}
@@ -455,7 +455,7 @@ for-each-system: func [
             platform-name: to-word platform-name
         )
         set platform-number integer!
-        any [
+        while [
             set id tuple!
             [blank! (
                 os: _
@@ -474,16 +474,16 @@ for-each-system: func [
                     build-label: to-word build-label
                 )
             ]
-            copy definitions [any issue!] (
+            copy definitions [while issue!] (
                 definitions: map-each x definitions [to-word x]
             )
-            copy cflags [any tag!] (
+            copy cflags [while tag!] (
                 cflags: map-each x cflags [to-word to-text x]
             )
-            copy ldflags [any refinement!] (
+            copy ldflags [while refinement!] (
                 ldflags: map-each x ldflags [to-word x]
             )
-            copy libraries [any file!] (
+            copy libraries [while file!] (
                 libraries: map-each x libraries [to-word to-text x]
             )
 
@@ -494,7 +494,7 @@ for-each-system: func [
                 ]
             )
         ]
-    ] end ] else [
+    ]] else [
         fail "Couldn't parse systems.r table"
     ]
 ]

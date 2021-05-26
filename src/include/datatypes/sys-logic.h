@@ -38,10 +38,24 @@ inline static bool VAL_LOGIC(REBCEL(const*) v) {
 }
 
 inline static bool IS_TRUTHY(const RELVAL *v) {
+    if (IS_BAD_WORD(v)) {
+        //
+        // We make a special exemption for the ~null~ isotope in order to make
+        // things work along the lines of:
+        //
+        //     >> any [if true [null], 1020]
+        //     == 1020
+        //
+        // At one time this was handled by having more than one kind of null.
+        // But having one ~null~ BAD-WORD! whose isotope is falsey has parallel
+        // concerns, but fits into existing manipulation mechanisms.
+        // 
+        if (GET_CELL_FLAG(v, ISOTOPE) and VAL_BAD_WORD_ID(v) == SYM_NULL)
+            return false;
+        fail (Error_Bad_Conditional_Raw());
+    }
     if (KIND3Q_BYTE(v) > REB_LOGIC)
-        return true;  // includes JUST: `if just '_ [-- "this is truthy"]`
-    if (IS_VOID(v))
-        fail (Error_Void_Conditional_Raw());
+        return true;  // includes QUOTED! `if first ['_] [-- "this is truthy"]`
     if (IS_LOGIC(v))
         return VAL_LOGIC(v);
     assert(IS_BLANK(v) or IS_NULLED(v));

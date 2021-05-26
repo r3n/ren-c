@@ -686,8 +686,8 @@ static inline const REBVAL *Get_Word_May_Fail(
     REBSPC *specifier
 ){
     const REBVAL *var = Lookup_Word_May_Fail(any_word, specifier);
-    if (IS_VOID(var))
-        fail (Error_Need_Non_Void_Core(
+    if (IS_BAD_WORD(var))
+        fail (Error_Bad_Word_Get_Core(
             cast(const REBVAL*, any_word), specifier,
             var
         ));
@@ -739,7 +739,7 @@ inline static REBVAL *Sink_Word_May_Fail(
     REBSPC *specifier
 ){
     REBVAL *var = Lookup_Mutable_Word_May_Fail(any_word, specifier);
-    TRASH_CELL_IF_DEBUG(var);
+    REFORMAT_CELL_IF_DEBUG(var);
     return var;
 }
 

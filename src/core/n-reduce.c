@@ -109,6 +109,8 @@ REBNATIVE(reduce)
         //
         if (not IS_NULLED(D_OUT)) {
             Copy_Cell(DS_PUSH(), D_OUT);
+            if (IS_BAD_WORD(DS_TOP))
+                CLEAR_CELL_FLAG(DS_TOP, ISOTOPE);  // must be block-safe
             if (line)
                 SET_CELL_FLAG(DS_TOP, NEWLINE_BEFORE);
         }
@@ -187,7 +189,7 @@ REB_R Compose_To_Stack_Core(
         DECLARE_LOCAL (temp);
         Derelativize(temp, composee, specifier);
         PUSH_GC_GUARD(temp);
-        any_array = rebValueQ("as block!", temp);
+        any_array = rebValue("as block! @", temp);
         DROP_GC_GUARD(temp);
     }
     else
@@ -279,10 +281,10 @@ REB_R Compose_To_Stack_Core(
             }
             else if (
                 insert
-                and Splices_Without_Only(insert)
+                and ANY_ARRAY(insert)
                 and (predicate or doubled_group)
             ){
-                // We splice blocks if they were produced by a predicate
+                // We splice arrays if they were produced by a predicate
                 // application, or if (( )) was used.
 
                 // compose [(([a b])) merges] => [a b merges]
@@ -312,7 +314,7 @@ REB_R Compose_To_Stack_Core(
                 }
             }
             else {
-                // !!! What about VOID!s?  REDUCE and other routines have
+                // !!! What about VBAD-WORD!s?  REDUCE and other routines have
                 // become more lenient, and let you worry about it later.
 
                 // compose [(1 + 2) inserts as-is] => [3 inserts as-is]
@@ -345,8 +347,8 @@ REB_R Compose_To_Stack_Core(
             if (insert != out)
                 rebRelease(insert);
 
-          #ifdef DEBUG_UNREADABLE_VOIDS
-            Init_Unreadable_Void(out);  // shouldn't leak temp eval to caller
+          #ifdef DEBUG_UNREADABLE_TRASH
+            Init_Trash(out);  // shouldn't leak temp eval to caller
           #endif
 
             changed = true;
@@ -441,13 +443,13 @@ REB_R Compose_To_Stack_Core(
 //
 //  {Evaluates only contents of GROUP!-delimited expressions in an array}
 //
-//      return: [blackhole! any-array! any-path! any-word! action!]
+//      return: [blackhole! any-array! any-sequence! any-word! action!]
 //      'predicate [<skip> action!]  ; !!! PATH! may be meant as value (!)
 //          "Function to run on composed slots (default: ENBLOCK)"
 //      'label "Distinguish compose groups, e.g. [(plain) (<*> composed)]"
 //          [<skip> tag! file!]
 //      value "The template to fill in (no-op if WORD!, ACTION! or SPACE!)"
-//          [blackhole! any-array! any-path! any-word! action!]
+//          [blackhole! any-array! any-sequence! any-word! action!]
 //      /deep "Compose deeply into nested arrays"
 //      /only "Do not exempt ((...)) from predicate application"
 //  ]

@@ -6,8 +6,7 @@
 (not error? trap [help to])
 (not error? trap [help to-])
 (not error? trap [help "to"])
-(not error? trap [help nihil])
-(not error? trap [help nihil?])
+(not error? trap [help void])
 (not error? trap [help xxx])
 (not error? trap [help function])
 
@@ -40,7 +39,7 @@
 (not error? trap [
     for-each w words of lib [
         dump w
-        if action? get/any w
+        if action? friendly get/any w
             (compose [source (w)])
     ]
 ])

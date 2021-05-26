@@ -216,7 +216,7 @@ static REBVAL *Make_Locked_Tag(const char *utf8) { // helper
 //
 static void Init_Action_Spec_Tags(void)
 {
-    Root_Void_Tag = Make_Locked_Tag("void");
+    Root_None_Tag = Make_Locked_Tag("none");
     Root_With_Tag = Make_Locked_Tag("with");
     Root_Variadic_Tag = Make_Locked_Tag("variadic");
     Root_Opt_Tag = Make_Locked_Tag("opt");
@@ -225,18 +225,17 @@ static void Init_Action_Spec_Tags(void)
     Root_Local_Tag = Make_Locked_Tag("local");
     Root_Skip_Tag = Make_Locked_Tag("skip");
     Root_Const_Tag = Make_Locked_Tag("const");
-    Root_In_Out_Tag = Make_Locked_Tag("in-out");
     Root_Invisible_Tag = Make_Locked_Tag("invisible");
-    Root_Elide_Tag = Make_Locked_Tag("elide");
+    Root_Void_Tag = Make_Locked_Tag("void");
 
     // !!! Needed for bootstrap, as `@arg` won't LOAD in old r3
     //
-    Root_Modal_Tag = Make_Locked_Tag("modal");
+    Root_Literal_Tag = Make_Locked_Tag("literal");
 }
 
 static void Shutdown_Action_Spec_Tags(void)
 {
-    rebRelease(Root_Void_Tag);
+    rebRelease(Root_None_Tag);
     rebRelease(Root_With_Tag);
     rebRelease(Root_Variadic_Tag);
     rebRelease(Root_Opt_Tag);
@@ -245,11 +244,10 @@ static void Shutdown_Action_Spec_Tags(void)
     rebRelease(Root_Local_Tag);
     rebRelease(Root_Skip_Tag);
     rebRelease(Root_Const_Tag);
-    rebRelease(Root_In_Out_Tag);
     rebRelease(Root_Invisible_Tag);
-    rebRelease(Root_Elide_Tag);
+    rebRelease(Root_Void_Tag);
 
-    rebRelease(Root_Modal_Tag);  // !!! only needed for bootstrap with old r3
+    rebRelease(Root_Literal_Tag);  // !!! only needed for bootstrap with old r3
 }
 
 
@@ -325,10 +323,6 @@ static void Init_Root_Vars(void)
     Init_Blank(Prep_Cell(&PG_Blank_Value));
     Init_False(Prep_Cell(&PG_False_Value));
     Init_True(Prep_Cell(&PG_True_Value));
-
-  #ifdef DEBUG_TRASH_MEMORY
-    TRASH_CELL_IF_DEBUG(Prep_Cell(&PG_Trash_Value_Debug));
-  #endif
 
     RESET_CELL(Prep_Cell(&PG_R_Thrown), REB_R_THROWN, CELL_MASK_NONE);
     RESET_CELL(Prep_Cell(&PG_R_Invisible), REB_R_INVISIBLE, CELL_MASK_NONE);
@@ -889,7 +883,7 @@ void Startup_Core(void)
 
     // Initialize UNSET_VALUE (must be done after symbols loaded)
     //
-    Init_Void(Prep_Cell(&PG_Unset_Value), SYM_UNSET);  // symbol never GC'd
+    Init_Unset(Prep_Cell(&PG_Unset_Value));  // symbol not GC'd
 
     // ID_OF_SYMBOL(), VAL_WORD_ID() and Canon(SYM_XXX) now available
 

@@ -65,7 +65,7 @@ REBNATIVE(register_stdio_device)
 
     Free_Req(req);
 
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
 }
 
 
@@ -175,7 +175,7 @@ void Print_OS_Line(void)
 //
 //  "Write text to standard output, or raw BINARY! (for control codes / CGI)"
 //
-//      return: [<opt> void!]
+//      return: [<opt> bad-word!]
 //      value [<blank> text! char! binary!]
 //          "Text to write, if a STRING! or CHAR! is converted to OS format"
 //  ]
@@ -210,5 +210,5 @@ REBNATIVE(write_stdout)
         Prin_OS_String(utf8, utf8_size, OPT_ENC_0);
     }
 
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
 }

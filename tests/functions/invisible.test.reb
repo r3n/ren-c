@@ -9,7 +9,7 @@
     1 = do [1 comment "a"]
 )
 (
-    null? do [comment "a"]
+    '~void~ = ^ do [comment "a"]
 )
 
 (
@@ -55,7 +55,7 @@
     1 = do [1 elide "a"]
 )
 (
-    null? do [elide "a"]
+    '~void~ = ^ do [elide "a"]
 )
 
 (
@@ -66,7 +66,7 @@
 )
 (
     pos: evaluate evaluate [1 elide "a" elide "b" + 2 * 3 fail "too far"]
-    pos = just '[elide "b" + 2 * 3 fail "too far"]
+    pos = the '[elide "b" + 2 * 3 fail "too far"]
 )
 (
     pos: evaluate [
@@ -132,7 +132,7 @@
             tail? right,
             '|1| = look: take lookahead  ; hack...recognize selfs
         ] else [
-            fail @right [
+            fail ^right [
                 "|1| expected single expression, found residual of" :look
             ]
         ]
@@ -144,7 +144,7 @@
 ]
 
 (
-    null? do [|||]
+    '~void~ = ^ do [|||]
 )
 (
     3 = do [1 + 2 ||| 10 + 20, 100 + 200]
@@ -323,8 +323,8 @@
     ]
 )
 
-(null-2? (if true [] else [<else>]))
-(null-2? (if true [comment <true-branch>] else [<else>]))
+('~void~ = ^ (if true [] else [<else>]))
+('~void~ = ^ (if true [comment <true-branch>] else [<else>]))
 
 (1 = all [1 elide <vaporize>])
 (1 = any [1 elide <vaporize>])
@@ -339,7 +339,7 @@
 ; REEVAL has been tuned to be able to act invisibly if the thing being
 ; reevaluated turns out to be invisible.
 ;
-(integer? reeval just (comment "this group vaporizes") 1020)
+(integer? reeval the (comment "this group vaporizes") 1020)
 (<before> = (<before> reeval :comment "erase me"))
 (
     x: <before>
@@ -365,18 +365,18 @@
 
 ; "Opportunistic Invisibility" means that functions can treat invisibility as
 ; a return type, decided on after they've already started running.  This means
-; using the @(...) form of RETURN, which can also be used for chaining.
+; using the ^(...) form of RETURN, which can also be used for chaining.
 [
     (vanish-if-odd: func [return: [<invisible> integer!] x] [
         if even? x [return x]
-        return @()
+        return
     ] true)
 
     (2 = (<test> vanish-if-odd 2))
     (<test> = (<test> vanish-if-odd 1))
 
     (vanish-if-even: func [return: [<invisible> integer!] y] [
-       return @(vanish-if-odd y + 1)
+       return devoid unquote friendly ^(vanish-if-odd y + 1)
     ] true)
 
     (<test> = (<test> vanish-if-even 2))
@@ -388,16 +388,18 @@
 ; by default if not.
 [
     (
-        no-spec: func [x] [return @()]
+        no-spec: func [x] [return ()]
         <test> = (<test> no-spec 10)
     )
     (
-        int-spec: func [return: [integer!] x] [return @()]
+        int-spec: func [return: [integer!] x] [return]
         e: trap [int-spec 10]
         e/id = 'bad-invisible
     )
     (
-        invis-spec: func [return: [<invisible> integer!] x] [return @()]
+        invis-spec: func [return: [<invisible> integer!] x] [
+            return
+        ]
         <test> = (<test> invis-spec 10)
     )
 ]

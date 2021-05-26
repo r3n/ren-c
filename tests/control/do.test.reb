@@ -1,24 +1,53 @@
 ; functions/control/do.r
 
-; Empty BLOCK! forms will return NULL if empty
-; Empty GROUP! forms will vaporize
-; !!! Review: probably a better idea to use REEVAL for this.
+; By default, DO will not be invisible.  You get an "ornery" return result
+; on invisibility to help remind you that you are not seeing the whole
+; picture.  Returning NULL might seem "friendlier" but it is misleading.
 [
-    (null? (1 + 2, do []))
-    (null? (1 + 2, do @[]))
-    (null? (1 + 2, do :[]))
-    (null? (1 + 2, do [comment "hi"]))
-    (null? (1 + 2, do @[comment "hi"]))
-    (null? (1 + 2, do :[comment "hi"]))
+    ('~stale~ = ^ (10 + 20 do []))
+    ('~stale~ = ^ (10 + 20 do [void]))
+    ('~stale~ = ^ (10 + 20 do [comment "hi"]))
+    ('~stale~ = ^ (10 + 20 do make frame! :void))
+    (else? do [null])
+    ((the ') = ^ do [if true [null]])
 
-    (3 = (1 + 2, do '()))
-    (3 = (1 + 2, do @()))
-    (3 = (1 + 2, do ':()))
-    (3 = (1 + 2, do '(comment "hi")))
-    (3 = (1 + 2, do @(comment "hi")))
-    (3 = (1 + 2, do ':(comment "hi")))
+    ('~void~ = ^ comment "HI" do [comment "HI"])
+
+    ('~void~ = (10 + 20 ^(do [])))
+    ('~void~ = (10 + 20 ^(do [comment "hi"])))
+    ('~void~ = (10 + 20 ^(do make frame! :void)))
+    (else? ^(do [null]))
+    ((the ') = ^(do [if true [null]]))
+
+    (30 = (10 + 20 devoid do []))
+    (30 = (10 + 20 devoid do [comment "hi"]))
+    (30 = (10 + 20 devoid do make frame! :void))
+    (else? ^(devoid do [null]))
+    ('' = ^(devoid do [heavy null]))
+    ('' = ^(devoid do [if true [null]]))
+
+    ; Try standalone ^ operator so long as we're at it.
+    ('~void~ = ^ ^ devoid do [])
+    ('~void~ = ^ ^ devoid do [comment "hi"])
+    ('~void~ = ^ ^ devoid do make frame! :void)
+    (else? ^ devoid do [null])
+    ((the ') = ^ devoid do [heavy null])
+    ((the ') = ^ devoid do [if true [null]])
 ]
 
+
+[
+    ('~stale~ = ^ (1 + 2 do [comment "HI"]))
+    ('~void~ = ^ do [comment "HI"])
+
+    (
+        x: (1 + 2 y: do [comment "HI"])
+        did all [
+            '~stale~ = ^x
+            '~void~ = ^y
+        ]
+    )
+]
 
 (
     success: false
@@ -122,7 +151,7 @@
 )
 (0:00 == do [0:00])
 (0.0.0 == do [0.0.0])
-(null? do [()])
+('~void~ = ^ do [()])
 ('a == do ['a])
 (error? trap [do trap [1 / 0] 1])
 (
@@ -133,7 +162,7 @@
     a-value: "1"
     1 == do :a-value
 )
-(null? do "")
+('~void~ = ^ do "")
 (1 = do "1")
 (3 = do "1 2 3")
 
@@ -178,8 +207,8 @@
 (
     value: <overwritten>
     did all [
-        null? [# value]: evaluate []
-        null? value
+        null? ^ [# value]: evaluate []
+        '~void~ = ^value
     ]
 )
 (

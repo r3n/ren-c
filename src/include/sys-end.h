@@ -37,8 +37,8 @@
 //
 //=//// NOTES /////////////////////////////////////////////////////////////=//
 //
-// * There's some crossover in situations where you might use an "unreadable
-//   VOID!" with when you would use an END.  But there are fewer places where
+// * There's some crossover in situations where you might use an "unreadable"
+//   with when you would use an END.  But there are fewer places where
 //   ends are tolerated by the GC...such as frame output cells.  You can't put
 //   an END in an array, while an unreadable void can go there.
 //
@@ -66,7 +66,7 @@
         //
         // !!! Review relevance of this now that Endlike_Header() is gone.
         //
-        mutable_HEART_BYTE(v) = REB_T_TRASH;
+        mutable_HEART_BYTE(v) = REB_T_UNSAFE;
         return cast(REBVAL*, v);
     }
 
@@ -107,4 +107,3 @@
 
 #define NOT_END(v) \
     (not IS_END(v))
-

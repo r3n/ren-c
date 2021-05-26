@@ -28,7 +28,7 @@
 //
 //  Compare_Spellings: C
 //
-// Used in CT_Word() and CT_Void()
+// Used in CT_Word() and CT_Bad_Word()
 //
 REBINT Compare_Spellings(const REBSYM *a, const REBSYM *b, bool strict)
 {
@@ -235,7 +235,7 @@ void MF_Get_word(REB_MOLD *mo, REBCEL(const*) v, bool form) {
 //
 void MF_Sym_word(REB_MOLD *mo, REBCEL(const*) v, bool form) {
     UNUSED(form);
-    Append_Codepoint(mo->series, '@');
+    Append_Codepoint(mo->series, '^');
     Mold_Word(mo, v);
 }
 

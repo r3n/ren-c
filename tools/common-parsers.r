@@ -28,27 +28,28 @@ decode-key-value-text: function [
     {Decode key value formatted text.}
     text [text!]
 ][
-    
     data-fields: [
-        any [
-            position:
+        while [
+            position: here
             data-field
             | newline
         ]
-        end
     ]
 
     data-field: [
-        data-field-name eof: [
-            #" " to newline any [
+        data-field-name eof: here [
+            #" " to newline while [
                 newline not data-field-name not newline to newline
             ]
-            | any [1 2 newline 2 20 #" " to newline]
+            | while [1 2 newline 2 20 #" " to newline]
         ] eol: (emit-meta) newline
     ]
 
     data-field-char: charset [#"A" - #"Z" #"a" - #"z"]
-    data-field-name: [some data-field-char any [#" " some data-field-char] #":"]
+    data-field-name: [
+        some data-field-char
+        while [#" " some data-field-char] #":"
+    ]
 
     emit-meta: func [<local> key] [
         key: replace/all copy/part position eof #" " #"-"
@@ -94,16 +95,16 @@ load-until-blank: function [
         opt wsp opt [1 2 newline] position: here to end
     ]
 
-    either parse text rule [
+    parse text rule then [
         values: load copy/part text position
         reduce [values position]
-    ][
+    ] else [
         blank
     ]
 ]
 
 
-collapse-whitespace: [some [change some white-space space | skip] end]
+collapse-whitespace: [some [change some white-space (space) | skip] end]
 bind collapse-whitespace c-lexical/grammar
 
 
@@ -120,7 +121,7 @@ proto-parser: context [
     data: _
     eoh: _ ; End of file header.
 
-    process: func [return: <void> text] [
+    process: func [return: <none> text] [
         parse text [grammar/rule]  ; Review: no END (return result unused?)
     ]
 
@@ -128,7 +129,7 @@ proto-parser: context [
 
         rule: [
             parse-position: here opt fileheader
-            any [parse-position: here segment]
+            while [parse-position: here segment]
         ]
 
         fileheader: [
@@ -145,7 +146,7 @@ proto-parser: context [
             (proto-id: proto-arg-1: _)
             format-func-section
             | span-comment
-            | line-comment any [newline line-comment] newline
+            | line-comment while [newline line-comment] newline
             | opt wsp directive
             | other-segment
         ]
@@ -153,7 +154,7 @@ proto-parser: context [
         directive: [
             copy data [
                 ["#ifndef" | "#ifdef" | "#if" | "#else" | "#elif" | "#endif"]
-                any [not newline c-pp-token]
+                while [not newline c-pp-token]
             ] eol
             (
                 emit-directive data
@@ -171,7 +172,7 @@ proto-parser: context [
         format-func-section: copy/deep [
             doubleslashed-lines
             and is-intro
-            function-proto any white-space
+            function-proto while white-space
             function-body
             (
                 ; EMIT-PROTO doesn't want to see extra whitespace (such as
@@ -197,7 +198,7 @@ proto-parser: context [
                 ; can also examine state variables of the parser to extract
                 ; other properties--such as the processed intro block.
                 ;
-                emit-proto proto 
+                emit-proto proto
             )
         ]
 
@@ -208,7 +209,7 @@ proto-parser: context [
         is-fileheader: parsing-at position [
             try all [
                 lines: attempt [decode-lines lines {//} { }]
-                parse lines [copy data to {=///} to end]
+                parse? lines [copy data to {=///} to end]
                 data: attempt [load-until-blank trim/auto data]
                 data: attempt [
                     if set-word? first data/1 [data/1]
@@ -269,13 +270,13 @@ proto-parser: context [
                     ]
                 ]
                 "("
-                any white-space
+                while white-space
                 opt [
                     not typemacro-parentheses
                     not ")"
                     copy proto-arg-1 identifier
                 ]
-                any [typemacro-parentheses | not ")" [white-space | skip]]
+                while [typemacro-parentheses | not ")" [white-space | skip]]
                 ")"
             ]
         ]
@@ -292,9 +293,9 @@ rewrite-if-directives: function [
             (rewritten: false)
             some [
                 [
-                    change ["#if" thru newline "#endif" thru newline] ""
-                    | change ["#elif" thru newline "#endif"] "#endif"
-                    | change ["#else" thru newline "#endif"] "#endif"
+                    change ["#if" thru newline "#endif" thru newline] ("")
+                    | change ["#elif" thru newline "#endif"] ("#endif")
+                    | change ["#else" thru newline "#endif"] ("#endif")
                 ] (rewritten: true)
                 seek :position  ; GET-WORD! for bootstrap (SEEK is no-op)
 

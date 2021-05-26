@@ -104,7 +104,7 @@ boot-banner: [
 
 about: func [
     "Information about REBOL"
-    return: <void>
+    return: <none>
 ][
     print make-banner boot-banner
 ]
@@ -120,7 +120,7 @@ about: func [
 ;
 usage: func [
     "Prints command-line arguments."
-    return: <void>
+    return: <none>
 ][
 ;       --cgi (-c)       Load CGI utiliy module and modes
 ;       --version tuple  Script must be this version or greater
@@ -169,14 +169,14 @@ usage: func [
 
 license: func [
     "Prints the REBOL/core license agreement."
-    return: <void>
+    return: <none>
 ][
     print system/license
 ]
 
 host-script-pre-load: func [
     {Code registered as a hook when a module or script are loaded}
-    return: <void>
+    return: <none>
     is-module [logic!]
     hdr [blank! object!]
         {Header object (will be blank for DO of BINARY! with no header)}
@@ -247,14 +247,14 @@ main-startup: func [
     ][
         switch type of item [
             issue! [
-                if not empty? instruction [append/line instruction ',]
+                if not empty? instruction [append/line instruction [,]]
                 insert instruction item
             ]
             text! [
                 append/line instruction compose [comment (item)]
             ]
             block! [
-                if not empty? instruction [append/line instruction ',]
+                if not empty? instruction [append/line instruction [,]]
                 append/line instruction compose/deep <*> item
             ]
             unreachable
@@ -315,21 +315,16 @@ main-startup: func [
         ]
     ]
 
-    ; The core presumes no built-in I/O ability in the release build, hence
-    ; during boot PANIC and PANIC-VALUE can only do printf() in the debug
-    ; build.  While there's no way to hook the core panic() or panic_at()
-    ; calls, the rebPanic() API dispatches to PANIC and PANIC-VALUE.  Hook
-    ; them just to show we can...use I/O to print a message.
+    ; The internal panic() and panic_at() calls in C code cannot be hooked.
+    ; However, if you use the PANIC native in usermode, that *can* be hijacked.
+    ; This prints a message to distinguish the source of the panic, which is
+    ; useful to know that is what happened (and it demonstrates the ability
+    ; to hook it, just to remind us that we can).
     ;
     hijack :panic adapt (copy :panic) [
-        print "PANIC ACTION! called (explicitly or by rebPanic() API)"
+        print "PANIC ACTION! is being triggered from a usermode call"
         ;
         ; ...adaptation falls through to our copy of the original PANIC
-    ]
-    hijack :panic-value adapt (copy :panic-value) [
-        print "PANIC-VALUE ACTION! called (explicitly or by rebPanic() API)"
-        ;
-        ; ...adaptation falls through to our copy of the original PANIC-VALUE
     ]
 
     system/product: 'core
@@ -510,7 +505,7 @@ main-startup: func [
 
     while [not tail? argv] [
 
-        let is-option: did parse/case argv/1 [
+        let is-option: parse?/case argv/1 [
 
             ["--" end] (
                 ; Double-dash means end of command line arguments, and the

@@ -132,7 +132,7 @@
     ]
 )
 (
-    void? redbol-apply func [
+    bad-word? redbol-apply func [
         return: [<opt> any-value!]
         'x [<opt> any-value!]
     ][

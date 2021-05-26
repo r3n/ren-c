@@ -241,7 +241,7 @@ REBVAL *Get_System(REBLEN i1, REBLEN i2)
     REBVAL *obj;
 
     // Note: At present, one common way to crash here is if you use special
-    // tags in the return spec like <elide> or <void> for a native.
+    // tags in the return spec like <none> or <void> for a native.
     //
     obj = CTX_VAR(VAL_CONTEXT(Root_System), i1);
     if (i2 == 0) return obj;

@@ -43,7 +43,7 @@ PVAR REBU64 PG_Mem_Limit;   // Memory limit set by SECURE
 //
 PVAR const REBSYM *PG_Slash_1_Canon;  // Preallocated "fake" word for `/`
 PVAR const REBSYM *PG_Dot_1_Canon;  // Preallocated "fake" word for `.`
-PVAR const REBSYM *PG_Unreadable_Canon;  // Preallocated ~unreadable~ void
+PVAR const REBSYM *PG_Trash_Canon;  // Preallocated ~trash~ bad word
 
 PVAR REBSER *PG_Symbol_Canons; // Canon symbol pointers for words in %words.r
 PVAR REBSER *PG_Symbols_By_Hash; // Symbol REBSTR pointers indexed by hash
@@ -89,10 +89,6 @@ PVAR REBVAL PG_False_Value;
 PVAR REBVAL PG_True_Value;
 PVAR REBVAL PG_Unset_Value;
 
-#ifdef DEBUG_TRASH_MEMORY
-    PVAR REBVAL PG_Trash_Value_Debug;
-#endif
-
 PVAR REBVAL PG_R_Invisible;  // has "pseudotype" REB_R_INVISIBLE
 PVAR REBVAL PG_R_Immediate;  // has "pseudotype" REB_R_IMMEDIATE
 PVAR REBVAL PG_R_Redo_Unchecked;  // "pseudotype" REB_R_REDO + false extra
@@ -108,7 +104,7 @@ PVAR REBVAL PG_R_Thrown;  // has "pseudotype" REB_R_THROWN
 PVAR REBVAL *Root_System;
 PVAR REBVAL *Root_Typesets;
 
-PVAR REBVAL *Root_Void_Tag; // used with RETURN: <void> to suppress results
+PVAR REBVAL *Root_None_Tag; // used with RETURN: <none> to suppress results
 PVAR REBVAL *Root_With_Tag; // overrides locals gathering (can disable RETURN)
 PVAR REBVAL *Root_Variadic_Tag; // marks variadic argument <variadic>
 PVAR REBVAL *Root_Opt_Tag; // marks optional argument (can be NULL)
@@ -117,10 +113,9 @@ PVAR REBVAL *Root_Blank_Tag; // marks that passing blank won't run the action
 PVAR REBVAL *Root_Local_Tag; // marks beginning of a list of "pure locals"
 PVAR REBVAL *Root_Skip_Tag; // marks a hard quote as "skippable" if wrong type
 PVAR REBVAL *Root_Const_Tag; // pass a CONST version of the input argument
-PVAR REBVAL *Root_In_Out_Tag;  // output followed by input alias in frame
 PVAR REBVAL *Root_Invisible_Tag;  // return value can be invisible
-PVAR REBVAL *Root_Elide_Tag;  // will make any return result act invisibly
-PVAR REBVAL *Root_Modal_Tag;  // !!! needed for bootstrap, vs @arg modal
+PVAR REBVAL *Root_Void_Tag;  // will make any return result act invisibly
+PVAR REBVAL *Root_Literal_Tag;  // !!! needed for bootstrap, vs @arg literal
 
 PVAR REBVAL *Root_Empty_Text; // read-only ""
 PVAR REBVAL *Root_Empty_Binary; // read-only #{}

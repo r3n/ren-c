@@ -180,7 +180,7 @@ inline static void Prep_Array(
             Prep_Cell(prep);
 
       #ifdef DEBUG_TERM_ARRAYS  // allocation deliberately oversized by 1
-        Init_Trash_Debug(ARR_AT(a, a->content.dynamic.rest - 1));
+        Init_Trash(ARR_AT(a, a->content.dynamic.rest - 1));
       #endif
     }
     else {
@@ -219,7 +219,7 @@ inline static REBARR *Make_Array_Core(REBLEN capacity, REBFLGS flags)
         Prep_Array(ARR(s), capacity);
 
       #ifdef DEBUG_TERM_ARRAYS
-        Init_Trash_Debug(ARR_HEAD(ARR(s)));
+        Init_Trash(ARR_HEAD(ARR(s)));
       #endif
     }
     else {
@@ -337,7 +337,7 @@ enum {
     Copy_Values_Len_Extra_Shallow_Core((v), (s), (l), 0, (f))
 
 #define Copy_Values_Len_Extra_Shallow(v,s,l,e) \
-    Copy_Values_Len_Extra_Shallow_Core((v), (s), (l), (e), 0) 
+    Copy_Values_Len_Extra_Shallow_Core((v), (s), (l), (e), 0)
 
 
 #define Copy_Array_Shallow(a,s) \
@@ -582,16 +582,6 @@ inline static RELVAL *Init_Relative_Block_At(
 
 #define Init_Relative_Block(out,action,array) \
     Init_Relative_Block_At((out), (action), (array), 0)
-
-
-// The rule for splicing is now fixed as "only plain BLOCK! splices":
-// https://forum.rebol.info/t/1332
-//
-// Despite the simple contract, using a call to this routine helps document
-// placs where the decision to splice or not is being made.
-//
-#define Splices_Without_Only(v) \
-    IS_BLOCK(v)
 
 
 // Checks if ANY-GROUP! is like ((...)) or (...), used by COMPOSE & PARSE

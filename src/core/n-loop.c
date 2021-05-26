@@ -589,8 +589,14 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
 
           case LOOP_MAP_EACH:
           case LOOP_MAP_EACH_SPLICED:
-            if (IS_NULLED(les->out))
-                Init_Void(les->out, SYM_NULLED);  // null signals break only
+            if (IS_NULLED(les->out) or Is_Curse_Word(les->out, SYM_NULL))
+                Init_Curse_Word(les->out, SYM_NULL);  // null signals break
+            else if (
+                IS_BAD_WORD(les->out)
+                and GET_CELL_FLAG(les->out, ISOTOPE)
+            ){
+                fail (les->out);
+            }
             else if (
                 les->mode == LOOP_MAP_EACH_SPLICED
                 and IS_BLOCK(les->out)
@@ -600,8 +606,9 @@ static REB_R Loop_Each_Core(struct Loop_Each_State *les) {
                 for (; v != tail; ++v)
                     Derelativize(DS_PUSH(), v, VAL_SPECIFIER(les->out));
             }
-            else
+            else {
                 Copy_Cell(DS_PUSH(), les->out);  // non nulls added to result
+            }
             break;
         }
     } while (more_data and not broke);
@@ -641,7 +648,7 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
         // as part of an overall vetting of "generic iteration" (which this
         // is a poor substitute for).
         //
-        REBVAL *block = rebValueQ("as block!", ARG(data));
+        REBVAL *block = rebValue("as block! @", ARG(data));
         Copy_Cell(ARG(data), block);
         rebRelease(block);
     }
@@ -763,7 +770,8 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
         // any other value is the last body result, and is truthy
         // only illegal value here is void (would cause error if body gave it)
         //
-        assert(not IS_VOID(D_OUT));
+        if (IS_BAD_WORD(D_OUT) and GET_CELL_FLAG(D_OUT, ISOTOPE))
+            assert(Is_Heavy_Nulled(D_OUT));
         return D_OUT;
 
       case LOOP_MAP_EACH:
@@ -969,7 +977,7 @@ REBNATIVE(for_skip)
 //
 //  {End the current iteration of CYCLE and return a value (nulls allowed)}
 //
-//      value "If no argument is provided, assume VOID!"
+//      value "If no argument is provided, assume ~none~"
 //          [<opt> <end> any-value!]
 //  ]
 //
@@ -1314,8 +1322,8 @@ static REB_R Remove_Each_Core(struct Remove_Each_State *res)
                 // CONTINUE - res->out may not be void if /WITH refinement used
             }
         }
-        if (IS_VOID(res->out))
-            fail (Error_Void_Conditional_Raw());  // neither true nor false
+        if (IS_BAD_WORD(res->out))
+            fail (Error_Bad_Conditional_Raw());  // neither true nor false
 
         if (ANY_ARRAY(res->data)) {
             if (IS_NULLED(res->out) or IS_FALSEY(res->out)) {
@@ -1415,7 +1423,7 @@ REBNATIVE(remove_each)
         // If index is past the series end, then there's nothing removable.
         //
         // !!! Should REMOVE-EACH follow the "loop conventions" where if the
-        // body never gets a chance to run, the return value is void?
+        // body never gets a chance to run, the return value is bad-word?
         //
         return Init_Integer(D_OUT, 0);
     }
@@ -1512,9 +1520,8 @@ REBNATIVE(remove_each)
 //          "Word or block of words to set each time (local)"
 //      data [<blank> any-series! any-path! action!]
 //          "The series to traverse"
-//      body [<const> <modal> block!]
+//      body [<const> block!]
 //          "Block to evaluate each time"
-//      /splice "Splice body result if it's a block"
 //  ]
 //
 REBNATIVE(map_each)
@@ -1526,7 +1533,7 @@ REBNATIVE(map_each)
 
     return Loop_Each(
         frame_,
-        REF(splice) ? LOOP_MAP_EACH_SPLICED : LOOP_MAP_EACH
+        LOOP_MAP_EACH  // will transition to MAP_EACH_SPLICED as default
     );
 }
 
@@ -1702,13 +1709,20 @@ REBNATIVE(while)
 {
     INCLUDE_PARAMS_OF_WHILE;
 
-    Init_Heavy_Nulled(D_OUT); // result if body never runs
+    Init_Heavy_Nulled(D_OUT);  // result if body never runs
 
     do {
-        if (Do_Branch_Throws(D_SPARE, ARG(condition))) {
+        if (Do_Branch_With_Throws(D_SPARE, ARG(condition), D_OUT)) {
             Move_Cell(D_OUT, D_SPARE);
             return R_THROWN;  // don't see BREAK/CONTINUE in the *condition*
         }
+
+        // !!! We use Do_Branch_Throws() here because we want to run actions as
+        // well as blocks, feeding back the body result each time if it's an
+        // action.  But when you use branching you might get ~null~.  Decay
+        // it if so, to keep from having trouble with the IF_FALSEY().
+        //
+        Decay_If_Nulled(D_SPARE);
 
         if (IS_FALSEY(D_SPARE))  // will error if void, neither true nor false
             return D_OUT;  // condition was false, so return last body result

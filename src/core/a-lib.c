@@ -245,7 +245,7 @@ void RL_rebFree(void *ptr)
     REBBIN *s = *ps;
     if (Is_Node_Cell(s)) {
         rebJumps(
-            "PANIC [",
+            "panic [",
                 "{rebFree() mismatched with allocator!}"
                 "{Did you mean to use free() instead of rebFree()?}",
             "]"
@@ -460,7 +460,18 @@ REBVAL *RL_rebVoid(void)
 {
     ENTER_API;
 
-    return Init_Void(Alloc_Value(), SYM_VOID);
+    return Init_Void(Alloc_Value());
+}
+
+
+//
+//  rebNone: RL_API
+//
+REBVAL *RL_rebNone(void)
+{
+    ENTER_API;
+
+    return Init_None(Alloc_Value());
 }
 
 
@@ -778,7 +789,7 @@ const void *RL_rebArgR(unsigned char quotes, const void *p, va_list *vaptr)
     REBVAL *arg = FRM_ARGS_HEAD(f);
     for (; key != tail; ++key, ++arg) {
         if (Are_Synonyms(KEY_SYMBOL(key), symbol))
-            return arg;
+            return NULLIFY_NULLED(arg);
     }
 
     fail ("Unknown rebArg(...) name.");
@@ -827,9 +838,7 @@ REBVAL *RL_rebArg(unsigned char quotes, const void *p, va_list *vaptr)
 //
 // The default evaluators splice Rebol values "as-is" into the feed.  This
 // means that any evaluator active types (like WORD!, ACTION!, GROUP!...)
-// will run.  This can be mitigated with rebQ, but to make it easier for
-// some cases variants like `rebValueQ()` and `rebUnboxIntegerQ()` are provided
-// which default to splicing with quotes.
+// will run.  This can be mitigated with rebQ.
 //
 // (see `#define FLAG_QUOTING_BYTE` for why splice quoting is not the default)
 //
@@ -842,7 +851,7 @@ static void Run_Va_May_Fail_Core(
     const void *p,  // first pointer (may be END, nullptr means NULLED)
     va_list *vaptr  // va_end() handled by feed for all cases (throws, fails)
 ){
-    Init_Empty_Nulled(out);
+    Init_Void(out);
 
     REBFLGS flags = EVAL_MASK_DEFAULT | FLAG_QUOTING_BYTE(quotes);
 
@@ -881,6 +890,15 @@ static void Run_Va_May_Fail_Core(
     }
 
     CLEAR_CELL_FLAG(out, OUT_NOTE_STALE);
+
+    // We want cases like `rebDid(nullptr)` to work, but the variadic
+    // evaluator cannot splice NULL into the feed of execution and have it
+    // be convertible into an array.  The ~null~ BAD-WORD! in isotope form
+    // provides a compromise, and it decays into a regular null several
+    // places in the system (e.g. normal arguments).  Here is another place
+    // the tolerance is extended to.
+    // 
+    Decay_If_Nulled(out);
 }
 
 #define Run_Va_May_Fail(out,quotes,p,vaptr) \
@@ -908,6 +926,28 @@ REBVAL *RL_rebValue(unsigned char quotes, const void *p, va_list *vaptr)
 
 
 //
+//  rebInto: RL_API
+//
+// Like rebValue, but puts the value into an existing cell.  Note that if it
+// nulls the cell, the returned value is nullptr and the cell is nulled.
+//
+REBVAL *RL_rebInto(
+    unsigned char quotes,
+    REBVAL *out,
+    const void *p, va_list *vaptr
+){
+    ENTER_API;
+
+    Run_Va_May_Fail(out, quotes, p, vaptr);  // calls va_end()
+
+    if (not IS_NULLED(out))
+        return out;  // caller must rebRelease()
+
+    return nullptr;  // No NULLED cells in API, see notes on NULLIFY_NULLED()
+}
+
+
+//
 //  rebQuote: RL_API
 //
 // Variant of rebValue() that simply quotes its result.  So `rebQuote(...)` is
@@ -930,13 +970,13 @@ REBVAL *RL_rebQuote(unsigned char quotes, const void *p, va_list *vaptr)
 
 
 //
-//  rebQuoteInterruptible: RL_API
+//  rebValueInterruptible: RL_API
 //
-// !!! The core interruptible routine used at the moment is rebQuote, inside
-// of console code.  More will be needed, but this is made to quarantine the
-// unfinished design points to one routine for now.
+// !!! The core interruptible routine used is this one inside of console code.
+// More will be needed, but this is made to quarantine the unfinished design
+// points to one routine for now.
 //
-REBVAL *RL_rebQuoteInterruptible(
+REBVAL *RL_rebValueInterruptible(
     unsigned char quotes,
     const void *p,
     va_list *vaptr
@@ -946,7 +986,11 @@ REBVAL *RL_rebQuoteInterruptible(
     REBVAL *result = Alloc_Value();
     Run_Va_May_Fail_Core(result, true, quotes, p, vaptr);  // calls va_end()
 
-    return Quotify(result, 1);  // nulled cells legal for API if quoted
+    if (not IS_NULLED(result))
+        return result;  // caller must rebRelease()
+
+    rebRelease(result);
+    return nullptr;  // No NULLED cells in API, see notes on NULLIFY_NULLED()
 }
 
 //
@@ -1212,7 +1256,9 @@ char *RL_rebSpell(
     Run_Va_May_Fail(v, quotes, p, vaptr);  // calls va_end()
 
     if (IS_NULLED(v))
-        return nullptr;  // NULL is passed through, for opting out
+        fail ("rebSpell() does not take NULL (use TRY/BLANK! to opt out)");
+    if (IS_BLANK(v))
+        return nullptr;  // blank in, null out
 
     size_t size = Spell_Into(nullptr, 0, v);
     char *result = rebAllocN(char, size);  // no +1 for term needed...
@@ -1319,7 +1365,9 @@ REBWCHAR *RL_rebSpellWide(
     Run_Va_May_Fail(v, quotes, p, vaptr);  // calls va_end()
 
     if (IS_NULLED(v))
-        return nullptr;  // null passed through, for opting out
+        fail ("rebSpellWide() does not take NULL (use TRY/BLANK! to opt out)");
+    if (IS_BLANK(v))
+        return nullptr;  // blank in, null out
 
     REBLEN len = Spell_Into_Wide(nullptr, 0, v);
     REBWCHAR *result = cast(
@@ -1429,9 +1477,11 @@ unsigned char *RL_rebBytes(
     DECLARE_LOCAL (v);
     Run_Va_May_Fail(v, quotes, p, vaptr);  // calls va_end()
 
-    if (IS_NULLED(v)) {
+    if (IS_NULLED(v))
+        fail ("rebBytes() does not take NULL (use TRY/BLANK! to opt out)");
+    if (IS_BLANK(v)) {
         *size_out = 0;
-        return nullptr;  // nullptr is passed through, for opting out
+        return nullptr;  // blank in, null out
     }
 
     REBSIZ size = Bytes_Into(nullptr, 0, v);
@@ -1560,7 +1610,7 @@ REBVAL *RL_rebRescueWith(
         if (Is_Api_Value(result))
             rebRelease(result);
 
-        result = rebVoid();
+        Init_Curse_Word(result, SYM_ERRORED);
         goto proxy_result;
     }
     else {
@@ -1653,11 +1703,10 @@ bool RL_rebWasHalting(void)
 //=////////////////////////////////////////////////////////////////////////=//
 
 
-// The rebQ instruction is designed to work so that `rebValue(rebQ(...))` would
-// be the same as rebValueQ(...).  Hence it doesn't mean "quote", it means
+// The rebQ instruction was designed such that it doesn't mean "quote", it means
 // "quote any value splices in this section".  And if you turned around and
-// said `rebValue(rebQ(rebU(...)))` that should undo your effect.  The two
-// operations share a mostly common implementation.
+// said `rebU(rebQ(...))` that should undo your effect.  The two operations
+// share a mostly common implementation.
 //
 // Note that `rebValue("print {One}", rebQ("print {Two}", ...), ...)` should not
 // execute rebQ()'s code right when C runs it.  If it did, then `Two` would
@@ -1717,10 +1766,10 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
                 FLAG_FLAVOR(INSTRUCTION_ADJUST_QUOTING) | NODE_FLAG_MANAGED
             );
             CLEAR_SERIES_FLAG(a, MANAGED);  // see notes above on why we lied
-            Quotify(Copy_Cell(ARR_SINGLE(a), first), 1);
+            Isotopic_Quote(Copy_Cell(ARR_SINGLE(a), first));
         }
         else {  // no shortcut, push and keep going
-            Quotify(Copy_Cell(DS_PUSH(), first), 1);
+            Isotopic_Quote(Copy_Cell(DS_PUSH(), first));
             goto no_shortcut;
         }
     }
@@ -1731,7 +1780,7 @@ static const REBINS *rebSpliceQuoteAdjuster_internal(
         DECLARE_VA_FEED (feed, p, vaptr, feed_flags);
 
         while (NOT_END(feed->value)) {
-            Quotify(Copy_Cell(DS_PUSH(), SPECIFIC(unwrap(feed->value))), 1);
+            Isotopic_Quote(Copy_Cell(DS_PUSH(), SPECIFIC(unwrap(feed->value))));
             Fetch_Next_In_Feed(feed);
         }
 

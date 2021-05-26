@@ -40,7 +40,7 @@
 //
 //  "Converts a value to a human-readable string."
 //
-//      value "The value to form (will error on VOID!)"
+//      value "The value to form (currently errors on BAD-WORD!)"
 //          [any-value!]
 //  ]
 //
@@ -49,7 +49,7 @@ REBNATIVE(form)
     INCLUDE_PARAMS_OF_FORM;
 
     REBVAL *v = ARG(value);
-    if (IS_VOID(v))
+    if (IS_BAD_WORD(v))
         fail (ARG(value));
 
     return Init_Text(D_OUT, Copy_Form_Value(v, 0));
@@ -80,6 +80,7 @@ REBNATIVE(mold)
     INCLUDE_PARAMS_OF_MOLD;
 
     REBVAL *v = ARG(value);
+
     if (IS_NULLED(v))
         return nullptr;
 
@@ -118,7 +119,7 @@ REBNATIVE(mold)
 //
 //  "Boot-only implementation of WRITE-STDOUT (HIJACK'd by STDIO module)"
 //
-//      return: [<opt> void!]
+//      return: [<opt> bad-word!]
 //      value [<blank> text! char! binary!]
 //          "Text to write, if a STRING! or CHAR! is converted to OS format"
 //  ]
@@ -153,7 +154,7 @@ REBNATIVE(write_stdout)
         fail ("Boot WRITE-STDOUT received BINARY!, needs DEBUG_HAS_PROBE");
       #endif
     }
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
   #endif
 }
 

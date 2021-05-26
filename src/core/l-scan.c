@@ -1049,6 +1049,10 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
         ss->end = cp + 1;
         return TOKEN_COLON;
     }
+    if (*cp == '^') {
+        ss->end = cp + 1;
+        return TOKEN_CARET;
+    }
     if (*cp == '@') {
         ss->end = cp + 1;
         return TOKEN_AT;
@@ -1204,7 +1208,7 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
 
           case LEX_DELIMIT_TILDE: {
             ++cp;
-            if (*cp == '~') {  // only legal multi-tilde is the `~~~` VOID!
+            if (*cp == '~') {  // only legal multi-tilde is the `~~~` BAD-WORD!
                 ++cp;
                 if (*cp != '~') {
                     ss->end = cp;
@@ -1262,7 +1266,7 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
         if (
             HAS_LEX_FLAG(flags, LEX_SPECIAL_AT)  // @ anywhere but at the head
             and *cp != '<'  // want <foo="@"> to be a TAG!, not an EMAIL!
-            and *cp != '\''  // want '@foo to be a SYM-WORD!
+            and *cp != '\''  // want '@foo to be a ... ?
             and *cp != '#'  // want #@ to be an ISSUE! (charlike)
         ){
             if (*cp == '@')  // consider `@a@b`, `@@`, etc. ambiguous
@@ -1901,7 +1905,14 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         assert(*bp == '~');
         assert(bp[len - 1] == '~');
         const REBSTR *label = Intern_UTF8_Managed(bp + 1, len - 2);
-        Init_Void_Core(DS_PUSH(), label);
+
+        // !!! At time of writing it is still being established when it is
+        // best to set isotope bits.  You'd like isotope bits in blocks being
+        // produced, because people might path pick out.  Whether the path
+        // picking has to clear it or there's an invariant that blocks
+        // never hold isotopes needs to be decided.
+        //
+        Init_Bad_Word_Core(DS_PUSH(), label, CELL_MASK_NONE);  // "friendly"
         break; }
 
       case TOKEN_COMMA:
@@ -1919,9 +1930,20 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         Init_Comma(DS_PUSH());
         break;
 
-      case TOKEN_AT:
-        assert(*bp == '@');
+      case TOKEN_CARET:
+        assert(*bp == '^');
+        if (IS_LEX_ANY_SPACE(*ep) or *ep == ']' or *ep == ')') {
+            Init_Lit(DS_PUSH());
+            break;
+        }
         goto token_prefixable_sigil;
+
+      case TOKEN_AT:
+        if (IS_LEX_ANY_SPACE(*ep) or *ep == ']' or *ep == ')') {
+            Init_The(DS_PUSH());
+            break;
+        }
+        fail (Error_Syntax(ss, token));
 
       case TOKEN_COLON:
         assert(*bp == ':');
@@ -2074,7 +2096,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
         if (level->mode == ')')
             goto done;
 
-        if (Is_Dot_Or_Slash(level->mode)) {  // implicit end e.g. (just /)
+        if (Is_Dot_Or_Slash(level->mode)) {  // implicit end e.g. (the /)
             Init_Blank(DS_PUSH());
             --ss->begin;
             --ss->end;
@@ -2298,7 +2320,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
             // data stack could go bad on any DS_PUSH() or DS_DROP().
             //
             DECLARE_LOCAL (cell);
-            Init_Unreadable_Void(cell);
+            Init_Trash(cell);
             PUSH_GC_GUARD(cell);
 
             PUSH_GC_GUARD(array);
@@ -2346,9 +2368,15 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                 Init_True(DS_PUSH());
                 break;
 
-              case SYM_UNSET:  // !!! Should be under a LEGACY flag
-                case SYM_VOID:
-                Init_Void(DS_PUSH(), SYM_VOID);
+              case SYM_UNSET:  // !!! Should be under a LEGACY flag...
+                //
+                // BAD-WORD!s are put in blocks, are "friendly" non-isotopes.
+                //
+                Init_Bad_Word_Core(
+                    DS_PUSH(),
+                    Canon(SYM_UNSET),
+                    CELL_MASK_NONE
+                );
                 break;
 
               default: {
@@ -2650,7 +2678,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
             fail (Error_Syntax(ss, token));
 
         enum Reb_Kind kind = VAL_TYPE(DS_TOP);
-        if (not IS_ANY_SIGIL_KIND(kind))
+        if (IS_ANY_SIGIL_KIND(kind))
             fail (Error_Syntax(ss, token));
 
         mutable_KIND3Q_BYTE(DS_TOP) = SETIFY_ANY_PLAIN_KIND(kind);
@@ -2661,7 +2689,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
     }
     else if (prefix_pending != TOKEN_END) {
         enum Reb_Kind kind = VAL_TYPE(DS_TOP);
-        if (not IS_ANY_SIGIL_KIND(kind))
+        if (IS_ANY_SIGIL_KIND(kind))
             fail (Error_Syntax(ss, token));
 
         switch (prefix_pending) {
@@ -2671,7 +2699,7 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
                 mutable_HEART_BYTE(DS_TOP) = GETIFY_ANY_PLAIN_KIND(kind);
             break;
 
-          case TOKEN_AT:
+          case TOKEN_CARET:
             mutable_KIND3Q_BYTE(DS_TOP) = SYMIFY_ANY_PLAIN_KIND(kind);
             if (kind != REB_PATH and kind != REB_TUPLE)  // keep "heart" as is
                 mutable_HEART_BYTE(DS_TOP) = SYMIFY_ANY_PLAIN_KIND(kind);

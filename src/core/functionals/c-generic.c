@@ -79,7 +79,7 @@ REB_R Generic_Dispatcher(REBFRM *f)
 //
 //  {Creates datatype action (currently for internal use only)}
 //
-//      return: [void!]
+//      return: []
 //      :verb [set-word!]
 //      spec [block!]
 //  ]
@@ -103,7 +103,7 @@ REBNATIVE(generic)
         spec,
         &flags  // return type checked only in debug build
     );
-    assert(not (flags & MKF_IS_VOIDER));
+    assert(not (flags & MKF_HAS_OPAQUE_RETURN));
     assert(not (flags & MKF_IS_ELIDER));
 
     REBACT *generic = Make_Action(
@@ -145,7 +145,7 @@ REBNATIVE(generic)
     REBVAL *verb_var = Sink_Word_May_Fail(ARG(verb), SPECIFIED);
     Init_Action(verb_var, generic, VAL_WORD_SYMBOL(ARG(verb)), UNBOUND);
 
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
 }
 
 

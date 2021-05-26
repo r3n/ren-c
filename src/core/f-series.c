@@ -62,7 +62,7 @@ REB_R Series_Common_Action_Maybe_Unhandled(
           case SYM_LENGTH: {
             REBI64 len_head = VAL_LEN_HEAD(v);
             if (VAL_INDEX_RAW(v) < 0 or VAL_INDEX_RAW(v) > len_head)
-                return Init_Void(D_OUT, SYM_VOID);  // !!! better than error?
+                return Init_None(D_OUT);  // !!! better than error?
             return Init_Integer(D_OUT, len_head - VAL_INDEX_RAW(v)); }
 
           case SYM_HEAD:
@@ -452,8 +452,8 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool strict)
         assert(CT_Blank(s, t, strict) == 0);
         return 0;  // shortcut call to comparison
 
-      case REB_VOID:
-        return CT_Void(s, t, strict);
+      case REB_BAD_WORD:
+        return CT_Bad_word(s, t, strict);
 
       case REB_HANDLE:
         return CT_Handle(s, t, strict);

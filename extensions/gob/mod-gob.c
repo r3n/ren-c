@@ -37,7 +37,7 @@ REBTYP *EG_Gob_Type = nullptr;  // (E)xtension (G)lobal
 //
 //  {Make the GOB! datatype work with GENERIC actions, comparison ops, etc}
 //
-//      return: [void!]
+//      return: []
 //      generics "List for HELP of which generics are supported (unused)"
 //          [block!]
 //  ]
@@ -62,7 +62,7 @@ REBNATIVE(register_gob_hooks)
         &MF_Gob
     );
 
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
 }
 
 
@@ -71,7 +71,7 @@ REBNATIVE(register_gob_hooks)
 //
 //  {Remove behaviors for GOB! added by REGISTER-GOB-HOOKS}
 //
-//      return: [void!]
+//      return: []
 //  ]
 //
 REBNATIVE(unregister_gob_hooks)
@@ -80,7 +80,7 @@ REBNATIVE(unregister_gob_hooks)
 
     Unhook_Datatype(EG_Gob_Type);
 
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
 }
 
 

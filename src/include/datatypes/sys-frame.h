@@ -450,7 +450,7 @@ inline static void Abort_Frame(REBFRM *f) {
     while (n != f) {
         REBARR *a = ARR(n);
         n = LINK(ApiNext, a);
-        TRASH_CELL_IF_DEBUG(ARR_SINGLE(a));
+        REFORMAT_CELL_IF_DEBUG(ARR_SINGLE(a));
         GC_Kill_Series(a);
     }
     TRASH_POINTER_IF_DEBUG(f->alloc_value_list);
@@ -531,7 +531,7 @@ inline static void Prep_Frame_Core(
 
     f->feed = feed;
     Prep_Cell(&f->spare);
-    Init_Unreadable_Void(&f->spare);
+    Init_Trash(&f->spare);
     f->dsp_orig = DS_Index;
     TRASH_POINTER_IF_DEBUG(f->out);
 
@@ -714,14 +714,14 @@ inline static void Push_Action(
     for (; prep >= tail; --prep) {
         USED(TRACK_CELL_IF_DEBUG(prep));
         prep->header.bits =
-            FLAG_KIND3Q_BYTE(REB_T_TRASH)  // notice no NODE_FLAG_CELL
-            | FLAG_HEART_BYTE(REB_T_TRASH);  // so unreadable and unwritable
+            FLAG_KIND3Q_BYTE(REB_T_UNSAFE)
+            | FLAG_HEART_BYTE(REB_T_UNSAFE); // unreadable
     }
   }
   #endif
 
   #ifdef DEBUG_TERM_ARRAYS  // expects cell is trash (e.g. a cell) not poison
-    Init_Trash_Debug(Prep_Cell(ARR_TAIL(f->varlist)));
+    Init_Trash(Prep_Cell(ARR_TAIL(f->varlist)));
   #endif
 
     // Each layer of specialization of a function can only add specializations
@@ -964,6 +964,9 @@ inline static void FAIL_IF_NO_INVISIBLE_RETURN(REBFRM *f) {
     const REBPAR *param = ACT_PARAMS_HEAD(phase);
     assert(KEY_SYM(ACT_KEYS_HEAD(phase)) == SYM_RETURN);
 
-    if (not TYPE_CHECK(param, REB_TS_INVISIBLE))
+    if (ACT_DISPATCHER(phase) == &Opaque_Dispatcher)
+        return;  // allow plain RETURN in <none> functions
+
+    if (not TYPE_CHECK(param, REB_TS_ENDABLE))
         fail (Error_Bad_Invisible(f));
 }

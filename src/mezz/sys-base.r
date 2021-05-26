@@ -78,7 +78,7 @@ do*: func [
     let original-script: _
 
     let finalizer: func [
-        value [<opt> any-value!]
+        ^value' [<opt> any-value!]
         /quit
         <with> return
     ][
@@ -91,11 +91,11 @@ do*: func [
         if original-path [change-dir original-path]
 
         if quit_FINALIZER and (only) [
-            quit get/any 'value  ; "rethrow" the QUIT if DO/ONLY
+            quit unquote value'  ; "rethrow" the QUIT if DO/ONLY
         ]
 
         set 'force-remote-import old-force-remote-import
-        return get/any 'value  ; returns from DO*, because of <with> return
+        return unquote value'  ; returns from DO*, because of <with> return
     ]
 
     ; If a file is being mentioned as a DO location and the "current path"
@@ -187,7 +187,7 @@ do*: func [
                 ;
                 ; https://github.com/rebol/rebol-issues/issues/2373
                 ;
-                result: '~void~  ; console won't show VOID!s named ~void~
+                result: ~void~  ; console won't show BAD-WORD!s named ~void~
             ] then :finalizer/quit
         ][
             do-needs hdr  ; Load the script requirements

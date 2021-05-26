@@ -694,6 +694,7 @@ bool Eval_Path_Throws_Core(
   return_not_thrown:;
     Abort_Frame(pvs);
     assert(not Is_Evaluator_Throwing_Debug());
+
     return false; // not thrown
 
   return_thrown:;
@@ -829,7 +830,7 @@ REBNATIVE(pick)
 
     PVS_PICKER(pvs) = ARG(picker);
 
-    pvs->label = nullptr; // applies to e.g. :append/only returning APPEND
+    pvs->label = nullptr; // applies to e.g. :append/dup returning APPEND
     pvs->param = nullptr;
 
   redo: ;  // semicolon is intentional, next line is declaration
@@ -925,7 +926,7 @@ REBNATIVE(poke)
 
     PVS_PICKER(pvs) = ARG(picker);
 
-    pvs->label = nullptr;  // e.g. :append/only returning APPEND
+    pvs->label = nullptr;  // e.g. :append/dup returning APPEND
     pvs->param = cast_PAR(ARG(value));
 
     PATH_HOOK *hook = Path_Hook_For_Type_Of(location);
@@ -1057,7 +1058,7 @@ REB_R MAKE_Path(
 // consistent with ANY-WORD! interconversion, and also allows another avenue
 // for putting blocks as-is in paths by using the decorated type:
 //
-//     >> to path! @[a b c]
+//     >> to path! ^[a b c]
 //     == /[a b c]
 //
 REB_R TO_Sequence(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {

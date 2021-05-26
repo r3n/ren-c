@@ -73,7 +73,7 @@
     ; type matched what it was looking for.
     (
         unset 'var
-        block: [just 1 lefty "hi"]
+        block: [the 1 lefty "hi"]
         did all [
             [lefty "hi"] = block: evaluate/result block 'var
             1 = var
@@ -123,16 +123,16 @@
 
 [
     (
-        left-just: enfixed :just
+        left-the: enfixed :the
         o: make object! [i: 10 f: does [20]]
         true
     )
 
-    ((trap [o/i left-just])/id = 'literal-left-path)
-    (o/i ->- left-just = 'o/i)
+    ((trap [o/i left-the])/id = 'literal-left-path)
+    (o/i ->- left-the = 'o/i)
 
-    ((trap [o/f left-just])/id = 'literal-left-path)
-    (o/f ->- left-just = 'o/f)
+    ((trap [o/f left-the])/id = 'literal-left-path)
+    (o/f ->- left-the = 'o/f)
 ]
 
 ; Rather than error when SET-WORD! or SET-PATH! are used as the left hand
@@ -154,13 +154,13 @@
 
 ; Right enfix always wins over left, unless the right is at array end
 
-((just ->-) = first [->-])
-((just ->- just) = 'just)
-('x = (x >- just))
-(1 = (1 ->- just))
+((the ->-) = first [->-])
+((the ->- the) = 'the)
+('x = (x >- the))
+(1 = (1 ->- the))
 
-(1 = (1 >- just))
-('x = (x >- just))
+(1 = (1 >- the))
+('x = (x >- the))
 
 ; "Precedence" manipulation via >- and ->-
 
@@ -274,7 +274,7 @@
     )
 
     (
-        bar: func [return: <elide>] [bar: _]
+        bar: func [return: <void>] [bar: _]
         did all [
             [bar 304] == evaluate/result [1020 bar 304] 'var
             var == 1020
@@ -282,7 +282,7 @@
         ]
         comment {Invisible normal arity-0 function should run on next eval}
     )(
-        enbar: enfixed func [return: <elide>] [enbar: _]
+        enbar: enfixed func [return: <void>] [enbar: _]
         did all [
             [304] == evaluate/result [1020 enbar 304] 'var
             var == 1020
@@ -306,7 +306,7 @@
             comment {skip irrelevant (tests right on *next* step)}
         ]
     )(
-        enibar: enfixed func [return: <elide> 'i [<skip> integer!]] [
+        enibar: enfixed func [return: <void> 'i [<skip> integer!]] [
             fail {
                 When arguments are skipped, this defers the enfix until the
                 next evaluator step.  Doing otherwise would mean that
@@ -326,7 +326,7 @@
             ]
         ]
     )(
-        enibar: enfixed func [return: <elide> 'i [<skip> integer!]] [
+        enibar: enfixed func [return: <void> 'i [<skip> integer!]] [
             enibar: _
         ]
         did all [

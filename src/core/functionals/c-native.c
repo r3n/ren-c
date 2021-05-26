@@ -130,11 +130,11 @@ REBVAL *Make_Native(
 
     // Natives are their own dispatchers; there is no point of interjection
     // to force their outputs to anything but what they return.  Instead of
-    // `return: <void>` use `return: [void!]` and `return Init_Void(D_OUT);`
-    // And instead of `return: <elide>` use `return: [<invisible>]` along
+    // `return: <none>` use `return: []` and `return Init_None(D_OUT);`
+    // And instead of `return: <void>` use `return: [<invisible>]` along
     // with `return D_OUT;`...having made no modifications to D_OUT.
     //
-    assert(not (flags & MKF_IS_VOIDER));
+    assert(not (flags & MKF_HAS_OPAQUE_RETURN));
     assert(not (flags & MKF_IS_ELIDER));
 
     REBACT *native = Make_Action(

@@ -44,4 +44,6 @@ REBOL [
     %mezz-help.r  ; depends on DUMP-OBJ in %mezz-dump.r
     %mezz-colors.r
     %mezz-legacy.r
+
+    %uparse.reb  ; migrated to mezzanine, will someday have native portions
 ]

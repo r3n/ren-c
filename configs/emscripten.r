@@ -256,8 +256,8 @@ ldflags: compose [
     ; after the module's preRun() method, and to assign ENV with MODULARIZE=1
     ; one must export it (or ENV is a function stub that raises an error).
     ;
-    {-s "EXTRA_EXPORTED_RUNTIME_METHODS=['ENV']"}
-    ; {-s "EXTRA_EXPORTED_RUNTIME_METHODS=['ccall', 'cwrap', 'allocateUTF8']"}
+    {-s "EXPORTED_RUNTIME_METHODS=['ENV']"}
+    ; {-s "EXPORTED_RUNTIME_METHODS=['ccall', 'cwrap', 'allocateUTF8']"}
 
     ; WASM does not have source maps, so disabling it can aid in debugging
     ; But emcc WASM=0 does not work in VirtualBox shared folders by default

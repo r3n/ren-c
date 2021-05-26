@@ -159,8 +159,8 @@
 %functions/hijack.test.reb
 %functions/invisible.test.reb
 %functions/let.test.reb
+%functions/literal.test.reb
 %functions/macro.test.reb
-%functions/modal.test.reb
 %functions/multi.test.reb
 %functions/native.test.reb
 %functions/oneshot.test.reb
@@ -213,6 +213,10 @@
 
 %parse/parse.test.reb
 %parse/parse-collect.test.reb
+%parse/uparse.test.reb
+%parse/uparse-furthest.test.reb
+%parse/uparse-breaker.test.reb
+%parse/uparse-reword.test.reb
 
 %redbol/redbol-apply.test.reb
 
@@ -242,6 +246,7 @@
 %series/indexq.test.reb
 %series/insert.test.reb
 %series/intersect.test.reb
+%series/just.test.reb
 %series/last.test.reb
 %series/lengthq.test.reb
 %series/next.test.reb

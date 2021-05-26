@@ -23,8 +23,8 @@
 
     out: make (type of source) length of source
 
-    prefix: null
-    suffix: null
+    prefix: ~unset~
+    suffix: ~unset~
     case [
         null? escape [prefix: "$"]  ; refinement not used, so use default
 
@@ -32,7 +32,8 @@
             escape = ""
             escape = []
         ][
-            prefix: null  ; pure search and replace, no prefix/suffix
+            ; !!! Review: NULL not supported by UPARSE at the moment
+            prefix: ""  ; pure search and replace, no prefix/suffix
         ]
 
         block? escape [
@@ -46,6 +47,11 @@
     ] else [
         prefix: ensure delimiter-types escape
     ]
+
+    ; !!! UPARSE doesn't allow fetched blank or fetched NULL at the moment.
+    ; Use an empty string.
+    ;
+    suffix: default [""]  ; default to no suffix
 
     if match [integer! word!] prefix [prefix: to-text prefix]
     if match [integer! word!] suffix [suffix: to-text suffix]
@@ -73,16 +79,16 @@
                 (keyword-match: '(<*> keyword))
             ]
 
-            keep/line '|
+            keep/line [|]
         ]
-        keep 'false  ; add failure if no match, instead of removing last |
+        keep [false]  ; add failure if no match, instead of removing last |
     ]
 
     rule: [
-        a: here  ; Begin marking text to copy verbatim to output
+        a: <here>  ; Begin marking text to copy verbatim to output
         while [
             to prefix  ; seek to prefix (may be blank!, this could be a no-op)
-            b: here  ; End marking text to copy verbatim to output
+            b: <here>  ; End marking text to copy verbatim to output
             prefix  ; consume prefix (if no-op, may not be at start of match)
             [
                 [
@@ -103,17 +109,17 @@
                             :v
                         ]
                     )
-                    a: here  ; Restart mark of text to copy verbatim to output
+                    a: <here>  ; Restart mark of text to copy verbatim to output
                 ]
                     |
-                skip  ; if wasn't at match, keep the ANY rule scanning ahead
+                <any>  ; if wasn't at match, keep the WHILE rule scanning ahead
             ]
         ]
-        to end  ; Seek to end, just so rule succeeds
+        to <end>  ; Seek to end, just so rule succeeds
         (append out a)  ; finalize output - transfer any remainder verbatim
     ]
 
-    uparse/(case_REWORD) source rule else [fail]  ; should succeed
+    uparse*/(case_REWORD) source rule else [fail]  ; should succeed
     return out
 ])
 
@@ -140,14 +146,14 @@
         "B" func [w] [join "one-" w]
     ]
 )
-
+(
     https://github.com/metaeducation/ren-c/issues/1005
     ("ò" = uparse-reword "ò$a" reduce ['a ""])
-
+)
     ;#2333
 (
     subs: ["1" "foo" "10" "bar"]
     text: "$<10>"
-    "bar" = reword/escape text subs ["$<" ">"]
+    "bar" = uparse-reword/escape text subs ["$<" ">"]
 )]
 

@@ -64,10 +64,10 @@ REBNATIVE(test_librebol)
     intptr_t getter = rebUnboxInteger("api-transient {Hello}");
     Recycle();  // transient should survive a recycle
     REBNOD *getter_node = cast(REBNOD*, cast(void*, getter));
-    Init_Logic(DS_PUSH(), rebDidQ("{Hello} =", getter_node));
+    Init_Logic(DS_PUSH(), rebDid("{Hello} = @", getter_node));
 
     SET_CELL_FLAG(Init_Integer(DS_PUSH(), 3), NEWLINE_BEFORE);
-    REBVAL *macro = rebValue("macro [x] [[append x first]]");
+    REBVAL *macro = rebValue("macro [x] [[append x ^ first]]");
     REBVAL *mtest1 = rebValue(macro, "[1 2 3]", "[d e f]");
     Copy_Cell(DS_PUSH(), mtest1);
     rebRelease(mtest1);
@@ -78,6 +78,9 @@ REBNATIVE(test_librebol)
     REBVAL *mtest2 = rebValue(macro, rebR(numbers), rebR(letters));
     Copy_Cell(DS_PUSH(), mtest2);
     rebRelease(mtest2);
+
+    SET_CELL_FLAG(Init_Integer(DS_PUSH(), 5), NEWLINE_BEFORE);
+    Init_Logic(DS_PUSH(), rebDid("null?", nullptr));
 
     rebRelease(macro);
 
@@ -121,7 +124,7 @@ REBNATIVE(diagnose)
 
     Dump_Value_Debug(v);
 
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
   #endif
 }
 
@@ -131,7 +134,7 @@ REBNATIVE(diagnose)
 //
 //  {Introduce periodic or deterministic fuzzing of out of memory errors}
 //
-//      return: [void!]
+//      return: []
 //      factor "Ticks or percentage of time to cause allocation errors"
 //          [integer! percent!]
 //  ]
@@ -156,6 +159,6 @@ REBNATIVE(fuzz)
         assert(IS_PERCENT(ARG(factor)));
         PG_Fuzz_Factor = 10000 * VAL_DECIMAL(ARG(factor));
     }
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
   #endif
 }

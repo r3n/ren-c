@@ -171,11 +171,14 @@ REBLEN Find_Binstr_In_Binstr(
     }
 
     // `str2` is always stepped through forwards in FIND, even with a negative
-    // value for skip.  If the position is at the tail, it cannot be found.
+    // value for skip.  If the position is at the tail, it is considered
+    // to be found, e.g. `find "abc" ""` is "abc"...there are infinitely many
+    // empty strings at each string position.
     //
     if (len2 == 0) {
-        assert(size2 == 0);
-        return NOT_FOUND;  // Note: c2 at end of '\0' means LO_CASE illegal
+        assert(size2 == 0); // Note: c2 at end of '\0' means LO_CASE illegal
+        *len_out = 0;
+        return VAL_INDEX(binstr1);
     }
 
     bool is_1_str = (CELL_KIND(binstr1) != REB_BINARY);
@@ -233,7 +236,7 @@ REBLEN Find_Binstr_In_Binstr(
 
     bool caseless = not (flags & AM_FIND_CASE);  // case insenstive
     if (not is_2_str)
-        caseless = false;  // 
+        caseless = false;  //
 
     // Binary-compatible to: [next2 = NEXT_CHR(&c2_canon, head2)]
     REBUNI c2_canon;  // calculate first char lowercase once, vs. each step
@@ -470,7 +473,7 @@ REBLEN Find_Bitset_In_Binstr(
         if (flags & AM_FIND_MATCH)
             break;
 
-        if (is_str) 
+        if (is_str)
             cp1 = SKIP_CHR(&c1, cast(REBCHR(const*), cp1), skip);
         else {
             cp1 += skip;

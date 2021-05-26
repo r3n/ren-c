@@ -34,16 +34,18 @@ any-branch!
 
 datatypes
 
-; === NAMED VOIDS ===
+; === NAMED BAD WORDS ===
 ; A new Ren-C feature is that voids are interned like WORD!, so they can be
-; more communicative.  These are standard symbols passed to Init_Void().
+; more communicative.  These are standard symbols passed to Init_Curse_Word().
 ;
 void
+stale  ; for non-/VOID DO, e.g. `(1 + 2 do [comment "hi"])` is ~stale~
 unset
-nulled
-blanked
-matched
-unreadable  ; only release build uses, debug build uses NULL as the label
+; null  ; already added as a symbol from type table
+falsey
+errored  ; when rebRescue() has no handler and evaluates to non-fail ERROR!
+trash  ; only release build uses (debug build uses null as label to assert)
+rootvar  ; used as placeholder in rootvar cells
 
 
 ; ...note that the words for types are created programmatically before
@@ -190,7 +192,8 @@ across
 collect  ; Variant in Red, but Ren-C's acts SET-like, suggested by @rgchris
 keep
 some
-any
+any  ; no longer a parse keyword, use WHILE FURTHER
+further  ; https://forum.rebol.info/t/1593
 opt
 not  ; turned to _not_ for SYM__NOT_, see TO-C-NAME for why this is weird
 and  ; turned to _and_ for SYM__AND_, see TO-C-NAME for why this is weird
@@ -215,7 +218,7 @@ break
 skip
 to
 thru
-quote  ; !!! kept for compatibility, but use JUST instead
+quote  ; !!! kept for compatibility, but use THE instead
 just
 lit-word!  ; !!! simulated datatype constraint (a QUOTED! like 'x)
 lit-path!  ; !!! simulated datatype costraint (a QUOTED! like 'x/y)

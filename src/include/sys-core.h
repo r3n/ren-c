@@ -294,7 +294,7 @@ enum {
 
     // These flags are also set during the spec analysis process.
     //
-    MKF_IS_VOIDER = 1 << 6,
+    MKF_HAS_OPAQUE_RETURN = 1 << 6,
     MKF_IS_ELIDER = 1 << 7,
     MKF_HAS_RETURN = 1 << 8
 };
@@ -394,7 +394,6 @@ inline static void INIT_BINDING_MAY_MANAGE(
 #include "datatypes/sys-blank.h"
 #include "datatypes/sys-comma.h"
 
-#include "datatypes/sys-logic.h"
 #include "datatypes/sys-integer.h"
 #include "datatypes/sys-decimal.h"
 
@@ -437,6 +436,9 @@ inline static void SET_SIGNAL(REBFLGS f) { // used in %sys-series.h
 #define CLR_SIGNAL(f) \
     cast(void, Eval_Signals &= ~(f))
 
+
+#include "sys-trash.h"
+
 #include "datatypes/sys-series.h"
 #include "datatypes/sys-array.h"  // REBARR used by UTF-8 string bookmarks
 
@@ -452,6 +454,8 @@ inline static void SET_SIGNAL(REBFLGS f) { // used in %sys-series.h
 
 #include "sys-symbol.h"
 #include "datatypes/sys-void.h"  // SYMID needed
+
+#include "datatypes/sys-logic.h"  // ~null~ BAD-WORD! is falsey
 
 #include "datatypes/sys-pair.h"
 #include "datatypes/sys-quoted.h"  // pairings for storage, void used as well

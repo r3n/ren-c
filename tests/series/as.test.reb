@@ -1,14 +1,14 @@
 (
     block: copy [a b c]
     path: to path! block
-    append block 'd
+    append block [d]
     path = 'a/b/c  ; AS was not legal
 )
 (
     block: copy [a b c]
     group: as group! block
-    append block 'd
-    group = just (a b c d)
+    append block [d]
+    group = the (a b c d)
 )
 
 ; With UTF-8 Everywhere, AS will be able to alias series data for

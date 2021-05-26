@@ -25,7 +25,7 @@
 
     (
         tcopy: copy t
-        replace tcopy braille null
+        replace tcopy braille _
         (length of tcopy) = (tlen - length of braille)
     )
 
@@ -73,7 +73,7 @@
     )
 
     (
-        assert [parse t [to braille copy b to newline to end]]
+        assert [parse? t [to braille copy b to newline to end]]
         b = braille
     )
 ]

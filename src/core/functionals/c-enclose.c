@@ -125,7 +125,7 @@ REB_R Encloser_Dispatcher(REBFRM *f)
     INIT_VAL_FRAME_PHASE(rootvar, VAL_ACTION(inner));
     INIT_VAL_FRAME_BINDING(rootvar, VAL_ACTION_BINDING(inner));
 
-    // We want people to be able to DO the FRAME! being given back.  
+    // We want people to be able to DO the FRAME! being given back.
     //
     assert(GET_SUBCLASS_FLAG(VARLIST, f->varlist, FRAME_HAS_BEEN_INVOKED));
     CLEAR_SUBCLASS_FLAG(VARLIST, f->varlist, FRAME_HAS_BEEN_INVOKED);
@@ -158,7 +158,7 @@ REB_R Encloser_Dispatcher(REBFRM *f)
     INIT_VAL_FRAME_PHASE_OR_LABEL(FRM_SPARE(f), VAL_ACTION_LABEL(inner));
 
     const bool fully = true;
-    if (RunQ_Throws(f->out, fully, rebU(outer), rootcopy, rebEND))
+    if (RunQ_Maybe_Stale_Throws(f->out, fully, rebU(outer), rootcopy, rebEND))
         return R_THROWN;
 
     return f->out;

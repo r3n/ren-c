@@ -28,7 +28,7 @@
 // The best thing to do is to pass in whatever REBVAL* or REBSER* subclass
 // (including REBARR*, REBCTX*, REBACT*...) is the most useful "smoking gun":
 //
-//     if (VAL_TYPE(value) == REB_VOID)
+//     if (VAL_TYPE(value) == REB_BAD_WORD)
 //         panic (value);  // debug build points out this file and line
 //
 //     if (ARR_LEN(array) < 2)

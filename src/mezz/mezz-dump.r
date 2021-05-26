@@ -15,7 +15,7 @@ REBOL [
 dump: function [
     {Show the name of a value or expressions with the value (See Also: --)}
 
-    return: <elide>
+    return: <void>
         "Doesn't return anything, not even void (so like a COMMENT)"
     :value [any-value!]
     'extra "Optional variadic data for SET-WORD!, e.g. `dump x: 1 + 2`"
@@ -45,7 +45,7 @@ dump: function [
         ]
     ]
 
-    dump-one: function [return: <void> item] [
+    dump-one: function [return: <none> item] [
         switch type of item [
             refinement!  ; treat as label, /a no shift and shorter than "a"
             text! [  ; good for longer labeling when you need spaces/etc.
@@ -72,7 +72,7 @@ dump: function [
                 enablements/(prefix): item
             ]
 
-            fail @value [
+            fail ^value [
                 "Item not TEXT!, INTEGER!, WORD!, PATH!, GROUP!:" :item
             ]
         ]
@@ -80,7 +80,7 @@ dump: function [
 
     case [
         swp: match [set-word! set-path!] :value [ ; `dump x: 1 + 2`
-            pos: evaluate/result extra (just result:)
+            pos: evaluate/result extra (the result:)
             set swp :result
             print [swp, result]
         ]
@@ -88,7 +88,7 @@ dump: function [
         b: match block! :value [
             while [not tail? b] [
                 if swp: match [set-word! set-path!] :b/1 [ ; `dump [x: 1 + 2]`
-                    b: evaluate/result b (just result:)
+                    b: evaluate/result b (the result:)
                     print [swp, result]
                 ] else [
                     dump-one b/1
@@ -127,7 +127,7 @@ dump-to-newline: adapt :dump [
             tail? extra
             '| = extra/1
         ]] [
-            append/only value extra/1
+            append value ^extra/1
             all [
                 match [block! group!] :extra/1
                 contains-newline :extra/1
@@ -168,7 +168,7 @@ dumps: enfixed function [
         ; have a way to be called--in spirit they are like enfix functions,
         ; so SHOVE (>-) would be used, but it doesn't work yet...review.)
         ;
-        d: function [return: <elide> /on /off <static> d'] compose/deep [
+        d: function [return: <void> /on /off <static> d'] compose/deep [
             d': default [
                 d'': specialize :dump [prefix: (as text! name)]
                 d'' #on
@@ -226,7 +226,7 @@ summarize-obj: function [
         for-each [word val] obj [
             if not set? 'val [continue]  ; don't consider unset fields
 
-            type: type of get/any 'val
+            type: type of friendly get/any 'val
 
             str: if match [object!] type [
                 spaced [word, words of :val]
@@ -248,10 +248,10 @@ summarize-obj: function [
                     if not find str pattern [continue]
                 ]
 
-                fail @pattern
+                fail ^pattern
             ]
 
-            if desc: description-of try get/any 'val [
+            if desc: description-of try friendly get/any 'val [
                 if 48 < length of desc [
                     desc: append copy/part desc 45 "..."
                 ]
@@ -280,7 +280,7 @@ summarize-obj: function [
 **: enfixed function [
     {Comment until end of line, or end of current BLOCK!/GROUP!}
 
-    return: <elide>
+    return: <void>
     left "Enfix required for 'fully invisible' enfix behavior (ignored)"
         [<opt> <end> any-value!]
     :args [any-value! <variadic>]
@@ -292,7 +292,7 @@ summarize-obj: function [
         all [
             any-array? :value
             contains-newline value
-            return @()
+            return
         ]
     ]
 ]

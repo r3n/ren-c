@@ -207,11 +207,13 @@ REBNATIVE(checksum)
     // builds in when you `#include "md.h"`.  How many entries are in this
     // table depend on the config settings (see %mbedtls-rebol-config.h)
     //
-    char *method_name = rebSpellQ(
-        "all [", REF(method), REF(settings), "] then [",
+    char *method_name = rebSpell(
+        "all [@", REF(method), "@", REF(settings), "] then [",
             "fail {Specify SETTINGS or /METHOD for CHECKSUM, not both}",
         "]",
-        "uppercase try to text! try any [", REF(method), REF(settings), "]"
+        "uppercase try to text! try any [",
+            "@", REF(method), "@", REF(settings),
+        "]"
     );
     if (method_name == nullptr)
         fail ("Must specify SETTINGS for CHECKSUM");
@@ -386,7 +388,7 @@ REBNATIVE(rc4_key)
 //
 //  "Encrypt/decrypt data (modifies) using RC4 algorithm."
 //
-//      return: [void!]
+//      return: []
 //      ctx "Stream cipher context"
 //          [handle!]
 //      data "Data to encrypt/decrypt (modified)"
@@ -421,7 +423,7 @@ REBNATIVE(rc4_stream)
      if (error)
         rebJumps ("fail", error);
 
-    return rebVoid();
+    return rebNone();
 }
 
 
@@ -1074,17 +1076,17 @@ static const struct mbedtls_ecp_curve_info *Ecp_Curve_Info_From_Word(
 ){
     const struct mbedtls_ecp_curve_info *info;
 
-    if (rebDidQ("'curve25519 =", word))
+    if (rebDid("'curve25519 = @", word))
         info = &curve25519_info;
     else {
-        char *name = rebSpellQ("lowercase to text!", word);
+        char *name = rebSpell("lowercase to text! @", word);
         info = mbedtls_ecp_curve_info_from_name(name);
         rebFree(name);
     }
 
     if (not info)
-        rebJumpsQ (
-            "fail [{Unknown ECC curve specified:}", word, "]"
+        rebJumps (
+            "fail [{Unknown ECC curve specified:} @", word, "]"
         );
 
     return info;
@@ -1264,7 +1266,7 @@ REBNATIVE(ecdh_shared_secret)
 //
 //  {Initialize random number generators and OS-provided crypto services}
 //
-//      return: [void!]
+//      return: []
 //  ]
 //
 REBNATIVE(init_crypto)
@@ -1279,13 +1281,13 @@ REBNATIVE(init_crypto)
         PROV_RSA_FULL,
         CRYPT_VERIFYCONTEXT | CRYPT_SILENT
     )){
-        return rebVoid();
+        return rebNone();
     }
     gCryptProv = 0;
   #else
     rng_fd = open("/dev/urandom", O_RDONLY);
     if (rng_fd != -1)
-        return rebVoid();
+        return rebNone();
   #endif
 
     // !!! Should we fail here, or wait to fail until the system tries to
@@ -1300,7 +1302,7 @@ REBNATIVE(init_crypto)
 //
 //  {Shut down random number generators and OS-provided crypto services}
 //
-//      return: [void!]
+//      return: []
 //  ]
 //
 REBNATIVE(shutdown_crypto)
@@ -1319,5 +1321,5 @@ REBNATIVE(shutdown_crypto)
     }
   #endif
 
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
 }

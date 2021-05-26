@@ -815,11 +815,11 @@ REBCTX *Make_Error_Managed_Core(
                 }
                 else if (IS_END(p)) {
                     assert(!"Not enough arguments in Make_Error_Managed()");
-                    Init_Void(var, SYM_END);
+                    Init_Void(var);
                 }
                 else if (IS_RELATIVE(cast(const RELVAL*, p))) {
                     assert(!"Relative argument in Make_Error_Managed()");
-                    Init_Void(var, SYM_VOID);
+                    Init_Unset(var);
                 }
                 else {
                     const REBVAL *arg = cast(const REBVAL*, p);
@@ -920,9 +920,9 @@ REBCTX *Error_Need_Non_End_Core(
 
 
 //
-//  Error_Need_Non_Void_Core: C
+//  Error_Bad_Word_Get_Core: C
 //
-REBCTX *Error_Need_Non_Void_Core(
+REBCTX *Error_Bad_Word_Get_Core(
     const RELVAL *target,
     REBSPC *specifier,
     const RELVAL *voided
@@ -930,11 +930,11 @@ REBCTX *Error_Need_Non_Void_Core(
     // SET calls this, and doesn't work on just SET-WORD! and SET-PATH!
     //
     assert(ANY_WORD(target) or ANY_SEQUENCE(target) or ANY_BLOCK(target));
-    assert(IS_VOID(voided));
+    assert(IS_BAD_WORD(voided));
 
     DECLARE_LOCAL (specific);
     Derelativize(specific, target, specifier);
-    return Error_Need_Non_Void_Raw(specific, SPECIFIC(voided));
+    return Error_Bad_Word_Get_Raw(specific, SPECIFIC(voided));
 }
 
 
@@ -1269,9 +1269,6 @@ REBCTX *Error_Bad_Return_Type(REBFRM *f, enum Reb_Kind kind) {
 
     if (kind == REB_NULL)
         return Error_Needs_Return_Opt_Raw(label);
-
-    if (kind == REB_VOID)
-        return Error_Needs_Return_Value_Raw(label);
 
     return Error_Bad_Return_Type_Raw(label, Datatype_From_Kind(kind));
 }

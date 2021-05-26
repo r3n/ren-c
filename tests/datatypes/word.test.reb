@@ -149,9 +149,9 @@
     same? :a-value a-value
 )
 (
-    a-value: '~void~
+    a-value: ~void~
     e: trap [a-value]
-    e/id = 'need-non-void
+    e/id = 'bad-word-get
 )
 (
     a-value: 'a
@@ -196,7 +196,7 @@
         assert [pos = ""]
         assert [g = as get-word! word]
 
-        [l pos]: transcode unspaced ["@" str]
+        [l pos]: transcode unspaced ["^^" str]
         assert [pos = ""]
         assert [l = as get-word! word]
     ]
@@ -217,11 +217,11 @@
     ("$" = as text! match word! '$)
     ("$" = as text! match set-word! '$:)
     ("$" = as text! match get-word! ':$)
-    ("$" = as text! match sym-word! '@$)
+    ("$" = as text! match sym-word! '^$)
     ("$" = as text! match word! first [$])
     ("$" = as text! match set-word! first [$:])
     ("$" = as text! match get-word! first [:$])
-    ("$" = as text! match sym-word! first [@$])
+    ("$" = as text! match sym-word! first [^$])
     ("$" = as text! match word! first [$ 1.00])
     ("$$" = as text! match word! '$$)
     ("$$$" = as text! match word! '$$$)
@@ -237,11 +237,11 @@
     ("%%" = as text! match word! '%%)
     ("%%" = as text! match set-word! '%%:)
     ("%%" = as text! match get-word! ':%%)
-    ("%%" = as text! match sym-word! '@%%)
+    ("%%" = as text! match sym-word! '^%%)
     ("%%" = as text! match word! first [%%])
     ("%%" = as text! match set-word! first [%%:])
     ("%%" = as text! match get-word! first [:%%])
-    ("%%" = as text! match sym-word! first [@%%])
+    ("%%" = as text! match sym-word! first [^%%])
 
     ("%%/foo" = form match path! '%%/foo)
 ]

@@ -30,7 +30,7 @@
 //
 // * If a branch *does* run--and that branch evaluation produces a NULL--then
 //   conditionals designed to be used with branching (like IF or CASE) will
-//   return a special variant of NULL (tentatively called "NULL-2").  It acts
+//   return a special "heavy" isotope variant of NULL (aka "NULL-2").  It acts
 //   just like NULL in most cases, but for the purposes of ELSE and THEN it
 //   is considered a signal that a branch ran.
 //
@@ -267,7 +267,7 @@ inline static bool Single_Test_Throws(
             goto return_thrown;
         }
 
-        matched = IS_TRUTHY(temp);  // errors on VOID!
+        matched = IS_TRUTHY(temp);  // errors on BAD-WORD!
         goto return_matched; }
 
       case REB_DATATYPE:
@@ -296,11 +296,9 @@ inline static bool Single_Test_Throws(
         );
         goto return_matched; }
 
-      case REB_VOID:
+      case REB_BAD_WORD:
         //
-        // Was considered because NON VOID XXX is shorter than NON VOID! XXX.
-        // However, that encourages a habit of passing void values where they
-        // probably are better caught as errors.
+        // Is `non '~void~ x` worth supporting?
         //
       default:
         fail (Error_Invalid_Type(test_kind));
@@ -375,7 +373,7 @@ bool Match_Core_Throws(
 //      return: "Input value if not null, or branch result (possibly null)"
 //          [<opt> any-value!]
 //      optional "<deferred argument> Run branch if this is null"
-//          [<opt> any-value!]
+//          [<opt> <literal> any-value!]
 //      :branch [any-branch!]
 //  ]
 //
@@ -383,8 +381,15 @@ REBNATIVE(else)  // see `tweak :else #defer on` in %base-defs.r
 {
     INCLUDE_PARAMS_OF_ELSE;
 
-    if (not Is_Light_Nulled(ARG(optional)))
-        RETURN (ARG(optional));
+    if (not IS_NULLED(ARG(optional))) {
+        //
+        // We have to use a literalized parameter in order to detect the
+        // difference between NULL (which runs the branch) and NULL-2 (which
+        // does not run the branch).  But we don't want to actually return a
+        // quoted parameter.
+        //
+        RETURN (Unliteralize(ARG(optional)));
+    }
 
     if (Do_Branch_With_Throws(D_OUT, ARG(branch), NULLED_CELL))
         return R_THROWN;
@@ -400,13 +405,13 @@ REBNATIVE(else)  // see `tweak :else #defer on` in %base-defs.r
 //
 //      return: [logic!]
 //      optional "Argument to test (note that WORD!-fetch would decay NULL-2)"
-//          [<opt> any-value!]
+//          [<opt> <literal> any-value!]
 //  ]
 //
 REBNATIVE(else_q)
 {
     INCLUDE_PARAMS_OF_ELSE_Q;
-    return Init_Logic(D_OUT, Is_Light_Nulled(ARG(optional)));
+    return Init_Logic(D_OUT, IS_NULLED(ARG(optional)));
 }
 
 
@@ -418,7 +423,7 @@ REBNATIVE(else_q)
 //      return: "null if input is null, or branch result (voided if null)"
 //          [<opt> any-value!]
 //      optional "<deferred argument> Run branch if this is not null"
-//          [<opt> any-value!]
+//          [<opt> <literal> any-value!]
 //      :branch "If arity-1 ACTION!, receives value that triggered branch"
 //          [any-branch!]
 //  ]
@@ -427,10 +432,18 @@ REBNATIVE(then)  // see `tweak :then #defer on` in %base-defs.r
 {
     INCLUDE_PARAMS_OF_THEN;
 
-    if (Is_Light_Nulled(ARG(optional)))
+    REBVAL *optional = ARG(optional);
+
+    if (IS_NULLED(optional))
         return nullptr;  // left didn't run, so signal THEN didn't run either
 
-    if (Do_Branch_With_Throws(D_OUT, ARG(branch), ARG(optional)))
+    // We received the left hand side literalized, so it's quoted in order
+    // to tell the difference between the NULL and ~null~ isotope.  Now that's
+    // tested, unliteralize it.
+    //
+    Unliteralize(optional);
+
+    if (Do_Branch_With_Throws(D_OUT, ARG(branch), optional))
         return R_THROWN;
 
     return D_OUT;  // note NULL branches will have been converted to NULL-2
@@ -444,13 +457,13 @@ REBNATIVE(then)  // see `tweak :then #defer on` in %base-defs.r
 //
 //      return: [logic!]
 //      optional "Argument to test (note that WORD!-fetch would decay NULL-2)"
-//          [<opt> any-value!]
+//          [<opt> <literal> any-value!]
 //  ]
 //
 REBNATIVE(then_q)
 {
     INCLUDE_PARAMS_OF_THEN_Q;
-    return Init_Logic(D_OUT, not Is_Light_Nulled(ARG(optional)));
+    return Init_Logic(D_OUT, not IS_NULLED(ARG(optional)));
 }
 
 
@@ -462,7 +475,7 @@ REBNATIVE(then_q)
 //      return: "The same value as input, regardless of if branch runs"
 //          [<opt> any-value!]
 //      optional "<deferred argument> Run branch if this is not null"
-//          [<opt> any-value!]
+//          [<opt> <literal> any-value!]
 //      :branch "If arity-1 ACTION!, receives value that triggered branch"
 //          [any-branch!]
 //  ]
@@ -471,18 +484,26 @@ REBNATIVE(also)  // see `tweak :also #defer on` in %base-defs.r
 {
     INCLUDE_PARAMS_OF_ALSO;  // `then func [x] [(...) :x]` => `also [...]`
 
-    if (Is_Light_Nulled(ARG(optional)))
+    REBVAL *optional = ARG(optional);
+
+    if (IS_NULLED(optional))
         return nullptr;  // telegraph original input, but don't run
 
-    if (Do_Branch_With_Throws(D_OUT, ARG(branch), ARG(optional)))
+    // We received the left hand side literalized, so it's quoted in order
+    // to tell the difference between the NULL and NULL-2.  Now that's tested
+    // we know it's not a stable NULL, so Unliteralize it.
+    //
+    Unliteralize(optional);
+
+    if (Do_Branch_With_Throws(D_OUT, ARG(branch), optional))
         return R_THROWN;
 
-    RETURN (ARG(optional));  // ran, but pass thru the original input
+    RETURN (optional);  // ran, but pass thru the original input
 }
 
 
 //
-//  either-match: native [
+//  match*: native [
 //
 //  {Check value using tests (match types, TRUE or FALSE, or filter action)}
 //
@@ -500,108 +521,56 @@ REBNATIVE(also)  // see `tweak :also #defer on` in %base-defs.r
 //              integer!  ; matches length of series
 //          ]
 //      value [<opt> any-value!]
-//      :branch "Branch to run on non-matches, passed VALUE if ACTION!"
-//          [any-branch!]
 //      /not "Invert the result of the the test (used by NON)"
+//      /safe "Voidify falsey results to avoid IF MATCH LOGIC! FALSE bugs"
 //  ]
 //
-REBNATIVE(either_match)
+REBNATIVE(match_p)
 {
-    INCLUDE_PARAMS_OF_EITHER_MATCH;
+    INCLUDE_PARAMS_OF_MATCH_P;
 
-    if (Match_Core_Throws(D_OUT, ARG(test), SPECIFIED, ARG(value), SPECIFIED))
-        return R_THROWN;
-
-    if (
-        (not REF(_not_) and VAL_LOGIC(D_OUT))
-        or (REF(_not_) and not VAL_LOGIC(D_OUT)
-    )){
-        RETURN (ARG(value));
-    }
-
-    if (Do_Branch_With_Throws(D_OUT, ARG(branch), ARG(value)))
-        return R_THROWN;
-
-    return D_OUT;
-}
-
-
-//
-//  match: native [
-//
-//  {Check value using tests (match types, TRUE or FALSE, or filter action)}
-//
-//      return: "Input if it matched, otherwise null (void if falsey match)"
-//          [<opt> any-value!]
-//      test "Typeset membership, LOGIC! to test for truth, filter function"
-//          [<opt>
-//              action!  ; arity-1 filter function
-//              path!  ; AND'd tests
-//              block!  ; OR'd tests
-//              datatype! typeset!  ; literals accepted
-//              logic!  ; tests TO-LOGIC compatibility
-//              tag!  ; just <opt> for now
-//              integer!  ; matches length of series
-//              quoted!  ; same test, but make quote level part of the test
-//          ]
-//      value [<opt> any-value!]
-//  ]
-//
-REBNATIVE(match)
-{
-    INCLUDE_PARAMS_OF_MATCH;
-
-    REBVAL *test = ARG(test);
     REBVAL *v = ARG(value);
 
-    DECLARE_LOCAL (temp);
-    if (Match_Core_Throws(temp, test, SPECIFIED, v, SPECIFIED))
+    if (Match_Core_Throws(D_OUT, ARG(test), SPECIFIED, v, SPECIFIED))
         return R_THROWN;
 
-    if (VAL_LOGIC(temp)) {
-        if (IS_VOID(v) or IS_TRUTHY(v))
-            RETURN (v);
-
-        // Falsey matched values return a VOID! to show they did match, but
-        // to avoid misleading falseness of the result.
+    if (did REF(_not_) == VAL_LOGIC(D_OUT)) {
         //
-        return Init_Void(D_OUT, SYM_MATCHED);
+        // Note: There's no good value we can return to signal failure
+        // in a safe mode here:
+        //
+        //    if not non null (null) [print "user intended this to run"]
+        //    non null (null) else [print "user intended this to run"]
+        //
+        // If we return nullptr, we break the first case.  But if we return
+        // anything else--like a void to cause a tripwire on the first case--
+        // we break the second case.
+        //
+        // So we have to fail here if trying to be safe.  TBD: Improve error.
+        //
+        if (REF(_not_))
+            if (REF(safe) and not IS_BAD_WORD(v) and IS_FALSEY(v))
+                fail ("Maybe-confusing NULL return in failed MATCH*/SAFE/NOT");
+
+        return nullptr;  // light null isotope if no match
     }
 
-    return nullptr;
-}
+    if (REF(safe) and not IS_BAD_WORD(v) and IS_FALSEY(v)) {
+        //
+        // In "safe" operation, falsey matched values return BAD-WORD! to show
+        // they did match, but to avoid misleading falseness of the result.
+        //
+        return Init_Curse_Word(D_OUT, SYM_FALSEY);
+    }
 
+    Move_Cell(D_OUT, v);  // Otherwise, input is the result
 
-//
-//  matches: enfix native [
-//
-//  {Check value using tests (match types, TRUE or FALSE, or filter action)}
-//
-//      return: "Input if it matched, otherwise null (void if falsey match)"
-//          [<opt> any-value!]
-//       value [<opt> any-value!]
-//      'test "Typeset membership, LOGIC! to test for truth, filter function"
-//          [
-//              word!  ; GET to find actual test
-//              action! get-word! get-path!  ; arity-1 filter function
-//              path!  ; AND'd tests
-//              block!  ; OR'd tests
-//              datatype! typeset!  ; literals accepted
-//              logic!  ; tests TO-LOGIC compatibility
-//              tag!  ; just <opt> for now
-//              integer!  ; matches length of series
-//              quoted!  ; same test, but make quote level part of the test
-//          ]
-//  ]
-//
-REBNATIVE(matches)
-{
-    INCLUDE_PARAMS_OF_MATCHES;
-
-    if (Match_Core_Throws(D_OUT, ARG(test), SPECIFIED, ARG(value), SPECIFIED))
-        return R_THROWN;
-
-    assert(IS_LOGIC(D_OUT));
+    // We turn nulls that matched the rule into heavy nulls.
+    //
+    //    >> match [<opt> integer!] null then [print "We want this to run!"]
+    //    We want this to run!
+    //
+    Isotopify_If_Nulled(D_OUT);
     return D_OUT;
 }
 
@@ -1155,7 +1124,18 @@ REBNATIVE(default)
         }
     }
 
-    if (not IS_NULLED_OR_VOID(D_OUT)) {
+    // We only consider those bad words which are in the "unfriendly" state
+    // that the system also knows to mean "emptiness" as candidates for
+    // overriding.  That's ~unset~ and ~void~ at the moment.  Note that
+    // friendly ones do not count:
+    //
+    //     >> x: second [~void~ ~unset~]
+    //     == ~unset~
+    //
+    //     >> x: default [10]
+    //     == ~unset~
+    //
+    if (not (IS_NULLED(D_OUT) or Is_Unset(D_OUT) or Is_Void(D_OUT))) {
         if (not REF(predicate)) {  // no custom additional constraint
             if (not IS_BLANK(D_OUT))  // acts as `x: default .not.blank? [...]`
                 return D_OUT;  // count it as "already set"

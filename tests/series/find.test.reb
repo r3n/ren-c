@@ -12,12 +12,12 @@
     blk: [1]
     same? blk find blk 1
 )
-(null? find/part [x] 'x 0)
-(equal? [x] find/part [x] 'x 1)
-(equal? [x] find-reverse tail of [x] 'x)
-(equal? [y] find/match [x y] 'x)
-(equal? [x] find-last [x] 'x)
-(equal? [x] find-last [x x x] 'x)
+(null? find/part [x] just x 0)
+(equal? [x] find/part [x] just x 1)
+(equal? [x] find-reverse tail of [x] just x)
+(equal? [y] find/match [x y] just x)
+(equal? [x] find-last [x] just x)
+(equal? [x] find-last [x x x] just x)
 [#66
     (null? find/skip [1 2 3 4 5 6] 2 3)
 ]
@@ -39,18 +39,18 @@
 )]
 
 [
-    (null = find "" "")
-    (null = find "a" "")
-    (null = find tail "a" "")
+    ("" = find "" "")
+    ("a" = find "a" "")
+    ("" = find tail "a" "")
     (null = find "" "a")
 
     ("ab" = find "ab" "a")
     ("b" = find "ab" "b")
     (null = find "ab" "c")
 
-    (null = find-reverse "" "")
-    (null = find-reverse "a" "")
-    (null = find-reverse tail "a" "")
+    ("" = find-reverse "" "")
+    ("a" = find-reverse "a" "")
+    ("" = find-reverse tail "a" "")
     (null = find-reverse "" "a")
 
     ("ab" = find-reverse tail "ab" "a")

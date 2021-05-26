@@ -81,12 +81,24 @@ enum {
 //
 bool Make_Invokable_From_Feed_Throws(REBVAL *out, REBFED *feed)
 {
+    // !!! The case of `([x]: @)` wants to make something which when it
+    // evaluates becomes invisible.  There's no QUOTED! value that can do
+    // that, so if the feature is to be supported it needs to be VOID.
+    //
+    // Not all callers necessarily want to tolerate an end condition, so this
+    // needs review.
+    //
     if (IS_END(feed->value)) {
-        Quotify(Init_Endish_Nulled(out), 1);
+        rebInto(out, "make frame! :void");
         return false;
     }
 
-    if (IS_GROUP(feed->value))  // `requote (append [a b c] #d, <can't-work>)`
+    // !!! Unfortunately, this means that `[x y]: ^(devoid do f)` and
+    // similar can't work; they're done as `([x y]: ^ devoid do f)` but
+    // it would be nice to find some kind of mitigation.  Descend into the
+    // feed and make sure the tail is reached?
+    //
+    if (ANY_GROUP(feed->value))  // `requote (append [a b c] #d, <can't-work>)`
         fail ("Actions made with REFRAMER cannot work with GROUP!s");
 
     DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT);
@@ -103,7 +115,6 @@ bool Make_Invokable_From_Feed_Throws(REBVAL *out, REBFED *feed)
     }
 
     if (not IS_ACTION(f->out)) {
-        Derelativize(f->out, f_value, f_specifier);
         Quotify(f->out, 1);
         Fetch_Next_Forget_Lookback(f);  // we've seen it now
         Drop_Frame(f);
@@ -310,7 +321,7 @@ REBNATIVE(reframer_p)
   blockscope {
     const REBKEY *key;
     const REBPAR *param;
-    
+
     if (REF(parameter)) {
         const REBSYM *symbol = VAL_WORD_SYMBOL(ARG(parameter));
         param_index = Get_Binder_Index_Else_0(&binder, symbol);

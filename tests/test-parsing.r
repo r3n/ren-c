@@ -32,7 +32,7 @@ make object! [
     ; is invalid rebol syntax.
 
     set 'test-source-rule [
-        any [
+        while [
             position: here
 
             ["{" | {"}] (  ; handle string using TRANSCODE
@@ -78,7 +78,7 @@ make object! [
     ]
 
     set 'collect-tests function [
-        return: <void>
+        return: <none>
         collected-tests [block!]
             {collect the tests here (modified)}
         test-file [file!]
@@ -119,7 +119,7 @@ make object! [
             ]
         ]
 
-        any-wsp: [any [wsp emit-token]]
+        any-wsp: [while [wsp emit-token]]
 
         single-value: parsing-at x [
             trap [
@@ -147,7 +147,7 @@ make object! [
                 :(text? value) (type: in types 'str)
                 emit-token
             ]
-            any [
+            while [
                 any-wsp single-value
                 [
                     :(tag? value) (
@@ -161,7 +161,7 @@ make object! [
                 ]
                 emit-token
             ]
-            any [any-wsp single-test emit-token]
+            while [any-wsp single-test emit-token]
             any-wsp "]" (type: in types 'grpe) emit-token
         ]
 
@@ -205,7 +205,7 @@ make object! [
             position: here, (type: value: _)
         ]
 
-        rule: [any token]
+        rule: [while token]
 
         parse test-sources rule else [
             append collected-tests reduce [
@@ -230,11 +230,11 @@ make object! [
 
         parse log-contents [
             (guard: [end skip])
-            any [
-                any whitespace
+            while [
+                while whitespace
                 [
                     position: "%"
-                    (next-position: transcode/next (just value:) position)
+                    (next-position: transcode/next (the value:) position)
                     :next-position
                         |
                     ; dialect failure?
@@ -242,7 +242,7 @@ make object! [
                     {"} thru {"}
                         |
                     copy last-vector ["(" test-source-rule ")"]
-                    any whitespace
+                    while whitespace
                     [
                         end (
                             ; crash found

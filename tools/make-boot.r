@@ -161,7 +161,7 @@ add-sym: function [
     /exists "return ID of existing SYM_XXX constant if already exists"
     <with> sym-n
 ][
-    if pos: find boot-words word [
+    if pos: find/only boot-words word [
         if exists [return index of pos]
         fail ["Duplicate word specified" word]
     ]
@@ -171,7 +171,7 @@ add-sym: function [
     ]
     sym-n: sym-n + 1
 
-    append boot-words word
+    append/only boot-words word
     return null
 ]
 
@@ -237,7 +237,7 @@ e-types/emit {
         /*** ALIASES FOR REB_0_END ***/
 
         REB_0 = REB_0_END,  /* REB_0 when used for signals besides ENDness */
-        REB_TS_ENDABLE = REB_0,  /* bit set in typesets for endability */
+        REB_TS_ENDABLE = REB_0,  /* in typesets for endability/invisibility */
 
         /*** PSEUDOTYPES ***/
 
@@ -248,32 +248,24 @@ e-types/emit {
         PSEUDOTYPE_TWO,
         REB_R_INVISIBLE = PSEUDOTYPE_TWO,
         REB_TS_SKIPPABLE = PSEUDOTYPE_TWO,
-      #if defined(DEBUG_TRASH_MEMORY)
-        REB_T_TRASH = PSEUDOTYPE_TWO,  /* identify trash in debug build */
+      #if defined(DEBUG_REFORMAT_CELLS)
+        REB_T_UNSAFE = PSEUDOTYPE_TWO,  /* simulate lack of GC safety*/
       #endif
 
         PSEUDOTYPE_THREE,
         REB_R_REDO = PSEUDOTYPE_THREE,
-        REB_TS_INVISIBLE = PSEUDOTYPE_THREE,
+        REB_TS_REFINEMENT = PSEUDOTYPE_THREE,
 
         PSEUDOTYPE_FOUR,
         REB_R_REFERENCE = PSEUDOTYPE_FOUR,
-        REB_TS_IN_OUT = PSEUDOTYPE_FOUR,
+        REB_TS_PREDICATE = PSEUDOTYPE_FOUR,
 
         PSEUDOTYPE_FIVE,
         REB_R_IMMEDIATE = PSEUDOTYPE_FIVE,
         REB_TS_NOOP_IF_BLANK = PSEUDOTYPE_FIVE,
 
         PSEUDOTYPE_SIX,
-        REB_G_XYF = PSEUDOTYPE_SIX,  /* used by GOB, compact 2xfloat */
         REB_TS_CONST = PSEUDOTYPE_SIX,
-
-        PSEUDOTYPE_SEVEN,
-        REB_V_SIGN_INTEGRAL_WIDE = PSEUDOTYPE_SEVEN,  /* used by VECTOR! */
-        REB_TS_REFINEMENT = PSEUDOTYPE_SEVEN,
-
-        PSEUDOTYPE_EIGHT,
-        REB_TS_PREDICATE = PSEUDOTYPE_EIGHT,
 
         REB_MAX_PLUS_MAX
     };
@@ -321,7 +313,7 @@ n: 0
 
 for-each-record t type-table [
     if n != 0 [
-        append boot-types either issue? t/name [
+        append/only boot-types either issue? t/name [
             to-word t/name
         ][
             to-word unspaced [form t/name "!"]
@@ -383,7 +375,7 @@ for-each-record t type-table [
             select typeset-sets ts
             first back insert tail typeset-sets reduce [ts copy []]
         ]
-        append spot t/name
+        append/only spot t/name
     ]
 ]
 
@@ -488,7 +480,7 @@ e-hooks/write-emitted
 ; Add SYM_XXX constants for the words in %words.r
 
 wordlist: load %words.r
-replace wordlist '*port-modes* load %modes.r
+replace wordlist [*port-modes*] load %modes.r
 for-each word wordlist [
     add-sym word  ; Note, may actually be a BAR! w/older boot
 ]
@@ -516,13 +508,13 @@ for-each item boot-generics [
 (e-sysobj: make-emitter "System Object"
     make-file [(prep-dir) include/tmp-sysobj.h])
 
-at-value: func ['field] [next find boot-sysobj to-set-word field]
+at-value: func ['field] [next find/only boot-sysobj to-set-word field]
 
 boot-sysobj: load %sysobj.r
-change at-value version version
-change at-value commit git-commit
-change at-value build now/utc
-change at-value product quote to word! product
+change/only at-value version version
+change/only at-value commit git-commit
+change/only at-value build now/utc
+change/only at-value product quote to word! product  ; /ONLY to keep quote
 
 change/only at-value platform reduce [
     any [config/platform-name "Unknown"]
@@ -532,7 +524,7 @@ change/only at-value platform reduce [
 ; If debugging something code in %sysobj.r, the C-DEBUG-BREAK should only
 ; apply in the non-bootstrap case.
 ;
-c-debug-break: :nihil
+c-debug-break: :void
 
 ob: make object! boot-sysobj
 
@@ -541,7 +533,7 @@ c-debug-break: :lib/c-debug-break
 make-obj-defs: function [
     {Given a Rebol OBJECT!, write C structs that can access its raw variables}
 
-    return: <void>
+    return: <none>
     e [object!]
        {The emitter to write definitions to}
     obj
@@ -674,7 +666,7 @@ for-each [sw-cat list] boot-errors [
 
         arity: 0
         if block? message [  ; can have N GET-WORD! substitution slots
-            parse message [any [get-word! (arity: arity + 1) | skip] end]
+            parse message [while [get-word! (arity: arity + 1) | skip] end]
         ] else [
             ensure text! message  ; textual message, no arguments
         ]
@@ -683,7 +675,7 @@ for-each [sw-cat list] boot-errors [
         ;
         f-name: uppercase/part to-c-name id 1
         parse f-name [
-            any ["_" w: here (uppercase/part w 1) | skip] end
+            while ["_" w: here (uppercase/part w 1) | skip]
         ]
 
         if arity = 0 [
@@ -759,7 +751,7 @@ for-each section [boot-base boot-sys boot-mezz] [
 
 sctx: make object! collect [
     for-each item sys-toplevel [
-        keep as set-word! item
+        keep/only as set-word! item
         keep "stub proxy for %sys-base.r item"
     ]
 ]

@@ -115,6 +115,8 @@ REBARR *Copy_Values_Len_Extra_Shallow_Core(
     for (; count < len; ++count, ++src, ++dest) {
         if (KIND3Q_BYTE_UNCHECKED(src) == REB_NULL)  // allow unreadable void
             assert(IS_VARLIST(a));  // usually not legal
+        if (KIND3Q_BYTE_UNCHECKED(src) == REB_BAD_WORD)
+            assert(NOT_CELL_FLAG(src, ISOTOPE));
 
         Derelativize(dest, src, specifier);
     }
@@ -149,8 +151,8 @@ void Clonify(
     //
     assert(not (deep_types & FLAGIT_KIND(REB_ACTION)));
 
-  #if !defined(NDEBUG)
-    if (IS_UNREADABLE_DEBUG(v))
+  #if defined(DEBUG_UNREADABLE_TRASH)
+    if (IS_TRASH(v))  // running code below would assert
         return;
   #endif
 
@@ -374,7 +376,7 @@ RELVAL *Alloc_Tail_Array(REBARR *a)
     EXPAND_SERIES_TAIL(a, 1);
     SET_SERIES_LEN(a, ARR_LEN(a));
     RELVAL *last = ARR_LAST(a);
-    TRASH_CELL_IF_DEBUG(last); // !!! was an END marker, good enough?
+    REFORMAT_CELL_IF_DEBUG(last); // !!! was an END marker, good enough?
     return last;
 }
 

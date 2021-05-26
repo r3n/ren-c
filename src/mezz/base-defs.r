@@ -27,22 +27,36 @@ REBOL [
 
 c-break-debug: :c-debug-break  ; easy to mix up
 
-??:  ; shorthand form to use in debug sessions, not intended to be committed
 probe: func* [
     {Debug print a molded value and returns that same value.}
 
     return: "Same as the input value"
         [<opt> any-value!]
-    value [<opt> any-value!]
+    ^value' [<opt> any-value!]
 ][
-    either set? 'value [
-        write-stdout mold get/any 'value
-    ][
-        write-stdout "; null"  ; MOLD won't take nulls
+    ; Remember this is early in the boot so many things not defined
+    write-stdout switch type of value' [
+        null ["; null"]
+        bad-word! [unspaced [value' space space "; isotope"]]
+    ] else [
+        let value: unquote value'
+        switch type of :value [
+            null ["; heavy null"]
+            bad-word! [mold value]  ; friendly
+        ] else [
+            mold :value
+        ]
     ]
+
     write-stdout newline
-    get/any 'value
+
+    ; We need to wait until the last minute and unquote the original value
+    ; because NULL-2 isotopes decay if assigned to a variable.
+    ;
+    return/isotope unquote value'
 ]
+
+??: :probe  ; shorthand to use in debug sessions, not intended to be committed
 
 
 ; Give special operations their special properties
@@ -116,7 +130,7 @@ lesser-or-equal?: :equal-or-lesser?
 comment: enfixed func* [
     {Ignores the argument value, but does no evaluation (see also ELIDE).}
 
-    return: <elide>
+    return: <void>
         {The evaluator will skip over the result (not seen, not even void)}
     returned [<opt> <end> any-value!]
         {The returned value.}  ; by protocol of enfixed `return: <invisible>`
@@ -128,16 +142,16 @@ comment: enfixed func* [
 elide: func* [
     {Argument is evaluative, but discarded (see also COMMENT).}
 
-    return: <elide>
+    return: <void>
         {The evaluator will skip over the result (not seen, not even void)}
-    discarded [<opt> any-value!]
+    ^discarded [<opt> any-value!]
         {Evaluated value to be ignored.}
 ][
 ]
 
-nihil: enfixed func* [  ; 0-arg so enfix doesn't matter, but tests issue below
+void: enfixed func* [  ; 0-arg so enfix doesn't matter, but tests issue below
     {Arity-0 COMMENT (use to replace an arity-0 function with side effects)}
-    return: <elide> {Evaluator will skip result}
+    return: <void> {Evaluator will skip result}
 ][
     ; https://github.com/metaeducation/ren-c/issues/581#issuecomment-562875470
 ]
@@ -146,11 +160,14 @@ nihil: enfixed func* [  ; 0-arg so enfix doesn't matter, but tests issue below
 ; it could dump those remarks out...perhaps based on how many == there are.
 ; (This is a good reason for retaking ==, as that looks like a divider.)
 ;
-===: func* ['remarks [any-value! <variadic>]] [
+===: func* [
+    return: <void>
+    'remarks [any-value! <variadic>]
+] [
     until [
         equal? '=== take remarks
     ]
-    return @()  ; return no value (invisible)
+    return  ; return no value (invisible)
 ]
 
 ; COMMA! is the new expression barrier.  But `||` is included as a redefine of
@@ -159,7 +176,7 @@ nihil: enfixed func* [  ; 0-arg so enfix doesn't matter, but tests issue below
 ;
 ||: func* [
     "Expression barrier - invisible so it vanishes, but blocks evaluation"
-    return: <elide>
+    return: <void>
 ][
     ; Note: actually *faster* than a native, due to Commenter_Dispatcher()
 ]
@@ -169,11 +186,18 @@ tweak :|| 'barrier on
 |||: func* [
     {Inertly consumes all subsequent data, evaluating to previous result.}
 
-    return: <elide>
+    return: <void>
     :omit [any-value! <variadic>]
 ][
     until [null? take omit]
 ]
+
+
+; MATCH isn't always used with ELSE and THEN.  So its result can trigger false
+; negatives on matches when CASE clauses and `IF MATCH` when the matched value
+; returned is falsey.  By default, make matches voidify falsey results.
+;
+match: :match*/safe
 
 
 ; !!! While POINTFREE is being experimented with in its design, it is being
@@ -238,7 +262,7 @@ pointfree*: func* [
     ]
 
     if :block/1 [
-        fail @block ["Unused argument data at end of POINTFREE block"]
+        fail ^block ["Unused argument data at end of POINTFREE block"]
     ]
 
     ; We now create an action out of the frame.  NULL parameters are taken as
@@ -284,7 +308,7 @@ inherit-meta: func* [
             m2/parameter-notes: make frame! :derived
             for-each [key value] m1/parameter-notes [
                 if in m2/parameter-notes key [
-                    m2/parameter-notes/(key): get* 'value  ; !!! VOID!s
+                    m2/parameter-notes/(key): get* 'value  ; !!! BAD-WORD!s
                 ]
             ]
         ]
@@ -292,7 +316,7 @@ inherit-meta: func* [
             m2/parameter-types: make frame! :derived
             for-each [key value] m1/parameter-types [
                 if in m2/parameter-types key [
-                    m2/parameter-types/(key): get* 'value  ; !!! VOID!s
+                    m2/parameter-types/(key): get* 'value  ; !!! BAD-WORD!s
                 ]
             ]
         ]
@@ -347,7 +371,19 @@ reframer: enclose :reframer* func* [f] [
 
 reorder: enclose :reorder* func* [f] [
     let action: get 'f/action
-    inherit-meta do f 'action  
+    inherit-meta do f 'action
+]
+
+; !!! The native R3-Alpha parse functionality doesn't have parity with UPARSE's
+; ability to synthesize results, but it will once it is re-engineered to match
+; UPARSE's design when it hardens.  For now these routines provide some amount
+; of interface parity with UPARSE.
+;
+parse: :parse*/fully
+parse?: chain [:parse | :then?]
+match-parse: enclose :parse func* [f] [
+    let input: f.input
+    do f then [input]
 ]
 
 ; The lower-level pointfree function separates out the action it takes, but
@@ -367,7 +403,7 @@ pointfree: specialize* (enclose :pointfree* func* [f] [
 
     inherit-meta do f 'action  ; no :action name cache
 ])[
-    action: :panic-value  ; gets overwritten, best to make it something mean
+    action: :panic/value  ; gets overwritten, best to make it something mean
 ]
 
 
@@ -426,7 +462,7 @@ spaced-text: chain [:spaced | specialize :else [branch: [copy ""]]]
 newlined: chain [
     adapt specialize :delimit [delimiter: newline] [
         if text? :line [
-            fail @line "NEWLINED on TEXT! semantics being debated"
+            fail ^line "NEWLINED on TEXT! semantics being debated"
         ]
     ]
         |
@@ -479,7 +515,7 @@ empty?: func* [
 
 reeval func* [
     {Make fast type testing functions (variadic to quote "top-level" words)}
-    return: <void>
+    return: <none>
     'set-words [<variadic> set-word! tag!]
     <local>
         set-word type-name tester meta
@@ -496,7 +532,7 @@ reeval func* [
         ]
     ]
 ]
-    void?:
+    bad-word?:
     blank?:
     comma?:
     logic?:
@@ -600,16 +636,20 @@ char?: func* [value [<opt> any-value!]] [
 print: func* [
     {Textually output spaced line (evaluating elements if a block)}
 
-    return: "NULL if blank input or effectively empty block, otherwise VOID!"
-        [<opt> void!]
+    return: "NULL if blank input or effectively empty block, else ~none~"
+        [<opt> bad-word!]
     line "Line of text or block, blank or [] has NO output, newline allowed"
-        [<blank> char! text! block!]
+        [<blank> char! text! block! quoted!]
 ][
     if char? line [
         if line <> newline [
             fail "PRINT only allows CHAR! of newline (see WRITE-STDOUT)"
         ]
         return write-stdout line
+    ]
+
+    if quoted? line [  ; Feature: treats a quote mark as a mold request
+        line: mold unquote line
     ]
 
     (write-stdout try spaced line) then [write-stdout newline]
