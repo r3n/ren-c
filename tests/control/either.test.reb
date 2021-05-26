@@ -10,11 +10,11 @@
 (1 = either true [1] [2])
 (2 = either false [1] [2])
 
-(null-2? either true [null] [1])
-(null-2? either false [1] [null])
+((the ') = ^ either true [null] [1])
+((the ') = ^ either false [1] [null])
 
-(null-1? either true @[null] [1])
-(null-1? either false [1] @[null])
+(null? either true ^[null] [1])
+(null? either false [1] ^[null])
 
 (error? either true [trap [1 / 0]] [])
 (error? either false [] [trap [1 / 0]])
@@ -81,11 +81,13 @@
 
     (
         takes-2-logics: func [x [logic!] y [logic!]] [x]
-        infix-voider: enfixed func [return: <void> x y] []
+        infix-voider: enfixed func [return: [bad-word!] x y] [
+            return/isotope '~none~
+        ]
         true
     )
 
-    (takes-2-logics ('~void~) = '~void~ false)
+    (takes-2-logics ('~none~) = '~none~ false)
 
     ('expect-arg = (trap [takes-2-logics true infix-voider true false])/id)
 ]
@@ -103,16 +105,16 @@
 ; Lit-Branching
 (
     j: 304
-    304 = either true @j [fail "Shouldn't run"]
+    304 = either true ^j [fail "Shouldn't run"]
 )(
     o: make object! [b: 1020]
-    1020 = either true @o/b [fail "Shouldn't run"]
+    1020 = either true ^o/b [fail "Shouldn't run"]
 )(
     var: <something>
     did all [
-        304 = either false @(var: <something-else> [1000 + 20]) [300 + 4]
+        304 = either false ^(var: <something-else> [1000 + 20]) [300 + 4]
         var = <something>
-        1020 = if true @(var: <something-else> [1000 + 20]) [300 + 4]
+        1020 = if true ^(var: <something-else> [1000 + 20]) [300 + 4]
         var = <something-else>
     ]
 )

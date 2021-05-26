@@ -16,7 +16,7 @@ REBOL [
 
 emit-native-proto: func [
     "Emit native prototypes to @unsorted-buffer"
-    return: <void>
+    return: <none>
     proto
     <with> proto-count
 ][
@@ -25,7 +25,7 @@ emit-native-proto: func [
     let [spec name]
     all [
         block? proto-parser/data
-        parse proto-parser/data [
+        parse? proto-parser/data [
             opt 'export
             set name: set-word!
             opt 'enfix
@@ -71,7 +71,7 @@ emit-native-proto: func [
 emit-include-params-macro: function [
     "Emit macros for a native's parameters"
 
-    return: <void>
+    return: <none>
     e [object!] "where to emit (see %common-emitters.r)"
     word [word!] "name of the native"
     paramlist [block!] "paramlist of the native"
@@ -99,7 +99,7 @@ emit-include-params-macro: function [
         for-each item paramlist [
             any [
                 not match [any-word! refinement! lit-word!] item
-                item = just return:
+                item = the return:
             ] then [
                 continue
             ]

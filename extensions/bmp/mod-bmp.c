@@ -565,16 +565,12 @@ REBNATIVE(decode_bmp)
   blockscope {
     REBVAL *binary = rebRepossess(image_bytes, (w * h) * 4);
 
-    REBVAL *image = rebValue(
+    return rebValue(
         "make image! compose [",
             "(make pair! [", rebI(w), rebI(h), "])",
-            binary,
+            rebR(binary),
         "]"
-    );
-
-    rebRelease(binary);
-
-    return image; }
+    ); }
 
   bit_len_error:
   bad_encoding_error:
@@ -603,9 +599,9 @@ REBNATIVE(encode_bmp)
     BITMAPFILEHEADER bmfh;
     BITMAPINFOHEADER bmih;
 
-    REBVAL *size = rebValueQ("pick", ARG(image), "'size");
-    int32_t w = rebUnboxIntegerQ("pick", size, "'x");
-    int32_t h = rebUnboxIntegerQ("pick", size, "'y");
+    REBVAL *size = rebValue("pick", ARG(image), "'size");
+    int32_t w = rebUnboxInteger("pick", size, "'x");
+    int32_t h = rebUnboxInteger("pick", size, "'y");
     rebRelease(size);
 
     size_t binsize;

@@ -592,7 +592,7 @@ void Pick_Or_Poke_Date(
     if (not opt_poke) {
         assert(opt_out);
         REBVAL *out = unwrap(opt_out);
-        TRASH_CELL_IF_DEBUG(out);
+        REFORMAT_CELL_IF_DEBUG(out);
 
         switch (sym) {
         case SYM_YEAR:

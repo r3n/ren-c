@@ -145,8 +145,8 @@ static int Read_Directory(REBREQ *dir_req, REBREQ *file_req)
     if (h == NULL) {
         // Read first file entry:
 
-        WCHAR *dir_wide = rebSpellWideQ(
-            "file-to-local/full/wild", ReqFile(dir_req)->path
+        WCHAR *dir_wide = rebSpellWide(
+            "file-to-local/full/wild @", ReqFile(dir_req)->path
         );
         h = FindFirstFile(dir_wide, &info);
         rebFree(dir_wide);
@@ -264,9 +264,9 @@ DEVICE_CMD Open_File(REBREQ *file)
     if (access == 0)
         rebJumps("fail {No access modes provided to Open_File()}");
 
-    WCHAR *path_wide = rebSpellWideQ(
+    WCHAR *path_wide = rebSpellWide(
         "applique :file-to-local [",
-            "path:", ReqFile(file)->path,
+            "path: @", ReqFile(file)->path,
             "wild: if", rebL(req->modes & RFM_DIR), "'#",
             "full: #"
         "]"
@@ -533,8 +533,8 @@ DEVICE_CMD Query_File(REBREQ *file)
     // used, it would mean `%/` would turn into an empty string, that would
     // cause GetFileAttributesEx() to error, vs. backslash (which works)
     //
-    WCHAR *path_wide = rebSpellWideQ(
-        "file-to-local/full", ReqFile(file)->path
+    WCHAR *path_wide = rebSpellWide(
+        "file-to-local/full @", ReqFile(file)->path
     );
 
     BOOL success = GetFileAttributesEx(
@@ -570,8 +570,8 @@ DEVICE_CMD Create_File(REBREQ *file)
     if (not (req->modes & RFM_DIR))
         return Open_File(file);
 
-    WCHAR *path_wide = rebSpellWideQ(
-        "file-to-local/full/no-tail-slash", ReqFile(file)->path
+    WCHAR *path_wide = rebSpellWide(
+        "file-to-local/full/no-tail-slash @", ReqFile(file)->path
     );
 
     LPSECURITY_ATTRIBUTES lpSecurityAttributes = NULL;
@@ -599,8 +599,8 @@ DEVICE_CMD Delete_File(REBREQ *file)
 {
     struct rebol_devreq *req = Req(file);
 
-    WCHAR *path_wide = rebSpellWideQ(
-        "file-to-local/full", ReqFile(file)->path
+    WCHAR *path_wide = rebSpellWide(
+        "file-to-local/full @", ReqFile(file)->path
     );  // leave tail slash on for directory removal
 
     BOOL success;
@@ -630,11 +630,11 @@ DEVICE_CMD Rename_File(REBREQ *file)
 
     REBVAL *to = cast(REBVAL*, req->common.data); // !!! hack!
 
-    WCHAR *from_wide = rebSpellWideQ(
-        "file-to-local/full/no-tail-slash", ReqFile(file)->path
+    WCHAR *from_wide = rebSpellWide(
+        "file-to-local/full/no-tail-slash @", ReqFile(file)->path
     );
-    WCHAR *to_wide = rebSpellWideQ(
-        "file-to-local/full/no-tail-slash", to
+    WCHAR *to_wide = rebSpellWide(
+        "file-to-local/full/no-tail-slash @", to
     );
 
     BOOL success = MoveFile(from_wide, to_wide);

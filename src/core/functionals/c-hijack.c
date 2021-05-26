@@ -83,7 +83,7 @@ enum {
 //     foo: func [a /b c] [...]  =>  bar: func [/b d e] [...]
 //                    foo/b 1 2  =>  bar/b 1 2
 //
-bool Redo_Action_Throws_Maybe_Stale(REBVAL *out, REBFRM *f, REBACT *run)
+bool Redo_Action_Maybe_Stale_Throws(REBVAL *out, REBFRM *f, REBACT *run)
 {
     REBARR *code_arr = Make_Array(FRM_NUM_ARGS(f)); // max, e.g. no refines
     RELVAL *code = ARR_HEAD(code_arr);
@@ -187,7 +187,7 @@ REB_R Hijacker_Dispatcher(REBFRM *f)
     // We need to build a new frame compatible with the hijacker, and
     // transform the parameters we've gathered to be compatible with it.
     //
-    if (Redo_Action_Throws_Maybe_Stale(f->out, f, VAL_ACTION(hijacker)))
+    if (Redo_Action_Maybe_Stale_Throws(f->out, f, VAL_ACTION(hijacker)))
         return R_THROWN;
 
     return f->out;  // Note: may have OUT_NOTE_STALE, hence invisible

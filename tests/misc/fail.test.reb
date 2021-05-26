@@ -27,30 +27,30 @@
 (e: trap [fail 'some-error-id], e/id = 'some-error-id)
 
 
-; FAIL can be given a SYM-WORD! of a parameter to blame.  This gives a
+; FAIL can be given a QUOTED! of a parameter to blame.  This gives a
 ; more informative message, even when no text is provided.
 ;
-; The SYM-WORD! is a skippable parameter, and can be used in combination
+; The QUOTED! is a skippable parameter, and can be used in combination
 ; with other error reason parameters
 [
     (
-        foo: func [x] [fail @x]
+        foo: func [x] [fail ^x]
 
         e: trap [foo 10]
         did all [
-            e/id = 'invalid-arg
-            e/arg1 = 'foo
-            e/arg2 = 'x
-            e/arg3 = 10
-            [foo 10] = copy/part e/near 2  ; implicates callsite
+            e.id = 'invalid-arg
+            e.arg1 = 'foo
+            e.arg2 = 'x
+            e.arg3 = 10
+            [foo 10] = copy/part e.near 2  ; implicates callsite
         ]
     )(
-        foo: func [x] [fail @x "error reason"]
+        foo: func [x] [fail ^x "error reason"]
 
         e: trap [foo 10]
         did all [
-            e/id = _  ; no longer an invalid arg error
-            [foo 10] = copy/part e/near 2  ; still implicates callsite
+            e.id = _  ; no longer an invalid arg error
+            [foo 10] = copy/part e.near 2  ; still implicates callsite
         ]
     )
 ]

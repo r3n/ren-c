@@ -201,7 +201,7 @@ REBNATIVE(get_os_browsers)
 //
 //  "Use system sleep to wait a certain amount of time (doesn't use PORT!s)."
 //
-//      return: [void!]
+//      return: []
 //      duration [integer! decimal! time!]
 //          {Length to sleep (integer and decimal are measuring seconds)}
 //
@@ -229,7 +229,7 @@ REBNATIVE(sleep)
     usleep(msec * 1000);
   #endif
 
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
 }
 
 
@@ -338,7 +338,7 @@ REBNATIVE(get_env)
   #ifdef TO_WINDOWS
     // Note: The Windows variant of this API is NOT case-sensitive
 
-    WCHAR *key = rebSpellWideQ(variable);
+    WCHAR *key = rebSpellWide("@", variable);
 
     DWORD val_len_plus_one = GetEnvironmentVariable(key, NULL, 0);
     if (val_len_plus_one == 0) { // some failure...
@@ -364,7 +364,7 @@ REBNATIVE(get_env)
   #else
     // Note: The Posix variant of this API is case-sensitive
 
-    char *key = rebSpellQ(variable);
+    char *key = rebSpell("@", variable);
 
     const char* val = getenv(key);
     if (val == NULL) // key not present in environment
@@ -817,7 +817,7 @@ static void kill_process(pid_t pid, int signal)
 //
 //  "Send signal to a process"
 //
-//      return: [void!]  ; !!! might this return pid or signal (?)
+//      return: []  ; !!! might this return pid or signal (?)
 //      pid [integer!]
 //          {The process ID}
 //      signal [integer!]
@@ -836,7 +836,7 @@ REBNATIVE(send_signal)
     //
     kill_process(pid, signal);
 
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
 }
 
 #endif // defined(TO_LINUX) || defined(TO_ANDROID) || defined(TO_POSIX) || defined(TO_OSX)

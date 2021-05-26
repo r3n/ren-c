@@ -12,7 +12,7 @@
 (1 = if true [1])
 
 (null? if false [])
-(null-2? if true [])
+('~void~ = ^ if true [])
 
 (error? if true [trap [1 / 0]])
 ; RETURN stops the evaluation
@@ -80,7 +80,7 @@
 
 ; recursive behaviour
 
-(null-2? if true [if false [1]])
+((the ') = ^ if true [if false [1]])
 (1 = if true [if true [1]])
 
 ; infinite recursion
@@ -102,7 +102,7 @@
 (1 = if not false [1])
 
 (null? if not true [1])
-(null-2? if not false [])
+((the ') = ^ if not false [null])
 
 (error? if not false [trap [1 / 0]])
 
@@ -126,16 +126,16 @@
 ; Lit-Branching
 (
     j: 304
-    304 = if true @j
+    304 = if true ^j
 )(
     o: make object! [b: 1020]
-    1020 = if true @o/b
+    1020 = if true ^o/b
 )(
     var: <something>
     did all [
-        null? if false @(var: <something-else> [1000 + 20])
+        null? if false ^(var: <something-else> [1000 + 20])
         var = <something>
-        1020 = if true @(var: <something-else> [1000 + 20])
+        1020 = if true ^(var: <something-else> [1000 + 20])
         var = <something-else>
     ]
 )

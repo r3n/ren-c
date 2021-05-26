@@ -70,7 +70,7 @@ clean-path: func [
     let count: 0
     let part
     parse reverse target [
-        some [
+        while [not end [
             "../"
             (count: me + 1)
             |
@@ -95,8 +95,7 @@ clean-path: func [
                     ]
                 ]
             )
-        ]
-        end
+        ]]
     ]
 
     if all [
@@ -111,7 +110,7 @@ clean-path: func [
     if not scheme [
         return path
     ]
-    
+
     return to url! head insert path unspaced [
         form scheme/scheme "://"
         if scheme/user [
@@ -155,7 +154,7 @@ read-line: function [
         system/ports/input: open [scheme: 'console]
     ]
 
-    if void? data: read system/ports/input [
+    if bad-word? data: read system/ports/input [
         ;
         ; !!! Currently VOID is returned from a port when you read it if
         ; there was a Ctrl-C that happened.  The code does not have permission
@@ -290,7 +289,7 @@ confirm: function [
         block? with
         length of with > 2
 
-        fail @with [
+        fail ^with [
             "maximum 2 arguments allowed for with [true false]"
             "got:" mold with
         ]
@@ -311,7 +310,7 @@ confirm: function [
 list-dir: function [
     "Print contents of a directory (ls)."
 
-    return: <void>
+    return: <none>
     'path [<end> file! word! path! text!]
         "Accepts %file, :variables, and just words (as dirs)"
     /l "Line of info format"
@@ -448,7 +447,7 @@ to-relative-file: function [
 detab-file: function [
     "detabs a disk file"
 
-    return: <void>
+    return: <none>
     filename [file!]
 ][
     write filename detab to text! read filename
@@ -458,7 +457,7 @@ detab-file: function [
 set-net: function [
     {sets the system/user/identity email smtp pop3 esmtp-usr esmtp-pass fqdn}
 
-    return: <void>
+    return: <none>
     bl [block!]
 ][
     if 6 <> length of bl [fail "Needs all 6 parameters for set-net"]

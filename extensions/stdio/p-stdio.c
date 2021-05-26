@@ -58,7 +58,7 @@ extern REBVAL *Read_Line(STD_TERM *t);
 // Read a line (as a sequence of bytes) from the terminal.  Handles line
 // editing and line history recall.
 //
-// If HALT is encountered (e.g. a Ctrl-C), this routine will return VOID!
+// If HALT is encountered (e.g. a Ctrl-C), this routine will return BAD-WORD!
 // If ESC is pressed, this will return a BLANK!.
 // Otherwise it will return a TEXT! of the read-in string.
 //
@@ -87,10 +87,10 @@ REBVAL *Read_Line(STD_TERM *t)
                 "fail {nullptr interruption of terminal not done yet}"
             );
         }
-        else if (rebDid("void?", rebQ(e))) {
-            line = rebVoid();
+        else if (rebDid("bad-word?", rebQ(e))) {
+            line = rebNone();
         }
-        else if (rebDidQ(e, "= newline")) {
+        else if (rebDid("@", e, "= newline")) {
             //
             // !!! This saves a line in the "history", but it's not clear
             // exactly long term what level this history should cut into
@@ -110,7 +110,7 @@ REBVAL *Read_Line(STD_TERM *t)
 
             rebElide("append", Line_History, "copy", line);
         }
-        else if (rebDidQ("match [text! char!]", e)) {  // printable
+        else if (rebDid("match [text! char!] @", e)) {  // printable
             //
             // Because we are using the "buffered" mode, the terminal will
             // accrue TEXT! in a batch until an "unbufferable" key event
@@ -119,9 +119,9 @@ REBVAL *Read_Line(STD_TERM *t)
             //
             Term_Insert(t, e);
         }
-        else if (rebDidQ("word?", e)) {  // recognized "virtual key"
+        else if (rebDid("word? @", e)) {  // recognized "virtual key"
             uint32_t c = rebUnboxChar(
-                "switch", rebQ(e), "[",
+                "switch @", e, "[",
                     "'escape [#E]",
 
                     "'up [#U]",
@@ -250,7 +250,7 @@ REBVAL *Read_Line(STD_TERM *t)
                 );
             }
         }
-        else if (rebDidQ("issue?", e)) {  // unrecognized key
+        else if (rebDid("issue? @", e)) {  // unrecognized key
             //
             // When an unrecognized key is hit, people may want to know that
             // at least the keypress was received.  Or not.  For now, output
@@ -330,9 +330,9 @@ REB_R Console_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
       #if defined(REBOL_SMART_CONSOLE)
         if (Term_IO) {  // e.g. no redirection (Term_IO is null if so)
             REBVAL *result = Read_Line(Term_IO);
-            if (rebDid("void?", rebQ(result))) {  // HALT received
+            if (rebDid("'~halt~ =", rebQ(result))) {  // HALT received
                 rebRelease(result);
-                return rebVoid();
+                return rebNone();
             }
             if (rebDid("blank?", result)) {  // ESCAPE received
                 rebRelease(result);
@@ -383,7 +383,7 @@ REB_R Console_Actor(REBFRM *frame_, REBVAL *port, const REBVAL *verb)
         // Give back a BINARY! which is as large as the portion of the buffer
         // actually used, and clear the buffer for reuse.
         //
-        return rebValueQ("copy", data, "elide clear", data); }
+        return rebValue("copy", data, "elide clear", data); }
 
       case SYM_OPEN:
         Req(req)->flags |= RRF_OPEN;

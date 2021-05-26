@@ -46,7 +46,7 @@
 
 
 #define xrebWord(cstr) \
-    rebValue("just", cstr)
+    rebValue("the", cstr)
 
 
 //=//// CONFIGURATION /////////////////////////////////////////////////////=//
@@ -471,7 +471,7 @@ REBVAL *Try_Get_One_Console_Event(STD_TERM *t, bool buffered)
             return e_buffered;  // pass anything we gathered so far first
 
         if (Read_Bytes_Interrupted(t))
-            return rebVoid();  // signal a HALT
+            return rebValue("~halt~");  // !!! Is BAD-WORD! a good choice?
 
         assert(*t->cp != '\0');
     }
@@ -510,7 +510,7 @@ REBVAL *Try_Get_One_Console_Event(STD_TERM *t, bool buffered)
                 // (This should not block.)
                 //
                 if (Read_Bytes_Interrupted(t))
-                    return rebVoid();  // signal a HALT
+                    return rebValue("~halt~");  // !!! Is BAD-WORD! good choice?
             }
             assert(*t->cp != '\0');
             encoded[i] = *t->cp;

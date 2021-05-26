@@ -278,7 +278,7 @@ static void Insert_Gobs(
 
   #ifdef DEBUG_TERM_ARRAYS
     if (IS_SER_DYNAMIC(pane))
-        Init_Trash_Debug(ARR_TAIL(pane));
+        Init_Trash(ARR_TAIL(pane));
   #endif
 
     Init_Block(ARR_AT(gob, IDX_GOB_PANE), pane); // may alrady have been set
@@ -851,10 +851,10 @@ REB_R PD_Gob(
     }
 
     if (IS_INTEGER(picker))
-        return rebValueQ(
-            rebU(NATIVE_VAL(pick)),
-                SPECIFIC(ARR_AT(gob, IDX_GOB_PANE)),
-                SPECIFIC(picker)
+        return rebValue(
+            NATIVE_VAL(pick),
+                "@", SPECIFIC(ARR_AT(gob, IDX_GOB_PANE)),
+                "@", SPECIFIC(picker)
         );
 
     return R_UNHANDLED;
@@ -968,7 +968,7 @@ REBTYPE(Gob)
             fail (Error_Index_Out_Of_Range_Raw());
         if (
             VAL_WORD_ID(verb) == SYM_CHANGE
-            && (REF(part) || REF(only) || REF(dup))
+            && (REF(part) || REF(dup))
         ){
             fail (Error_Not_Done_Raw());
         }
@@ -996,7 +996,7 @@ REBTYPE(Gob)
         if (REF(line))
             fail (Error_Bad_Refines_Raw());
 
-        if (REF(part) || REF(only) || REF(dup))
+        if (REF(part) || REF(dup))
             fail (Error_Not_Done_Raw());
 
         REBLEN len;
@@ -1048,9 +1048,9 @@ REBTYPE(Gob)
         return rebValue(
             "applique :take [",
                 "series: at", pane, rebI(index + 1),
-                "part:", rebQ(REF(part)),
-                "deep:", rebQ(REF(deep)),
-                "last:", rebQ(REF(last)),
+                "part:", REF(part),
+                "deep:", REF(deep),
+                "last:", REF(last),
             "]"
         ); }
 
@@ -1071,8 +1071,8 @@ REBTYPE(Gob)
         return nullptr;
 
     case SYM_REVERSE:
-        return rebValueQ(
-            "reverse", SPECIFIC(ARR_AT(gob, IDX_GOB_PANE))
+        return rebValue(
+            "reverse @", SPECIFIC(ARR_AT(gob, IDX_GOB_PANE))
         );
 
     default:

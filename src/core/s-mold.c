@@ -442,9 +442,9 @@ void Mold_Or_Form_Value(REB_MOLD *mo, const RELVAL *v, bool form)
     // Mold hooks take a REBCEL* and not a RELVAL*, so they expect any quotes
     // applied to have already been done.
 
-  #if !defined(NDEBUG)
-    if (IS_UNREADABLE_DEBUG(v)) {  // keylists and paramlists have unreadables
-        Append_Ascii(mo->series, "~unreadable~");
+  #if defined(DEBUG_UNREADABLE_TRASH)
+    if (IS_TRASH(v)) {  // would assert otherwise
+        Append_Ascii(mo->series, "~trash~");
         return;
     }
   #endif
@@ -569,7 +569,13 @@ bool Form_Reduce_Throws(
             if (pending)
                 Form_Value(mo, delimiter);
 
-            Form_Value(mo, out);
+            if (IS_QUOTED(out)) {
+                Unquotify(out, 1);
+                Mold_Value(mo, out);
+            }
+            else
+                Form_Value(mo, out);
+
             pending = true;
         }
     } while (NOT_END(f->feed->value));

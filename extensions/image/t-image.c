@@ -603,7 +603,7 @@ REB_R Modify_Image(REBFRM *frame_, const REBVAL *verb)
     REBINT x = index % w;  // offset on the line
     REBINT y = index / w;  // offset line
 
-    bool only = did REF(only);
+    bool only = false;
 
     // Validate that block arg is all tuple values:
     if (IS_BLOCK(arg) && Array_Has_Non_Tuple(&n, arg))
@@ -824,10 +824,7 @@ void Find_Image(REBFRM *frame_)
     REBYTE *p;
 
     if (IS_TUPLE(arg)) {
-        if (REF(only))
-            only = true;
-        else
-            only = (VAL_SEQUENCE_LEN(arg) < 4);
+        only = (VAL_SEQUENCE_LEN(arg) < 4);
 
         REBYTE pixel[4];
         Set_Pixel_Tuple(pixel, arg);
@@ -1084,8 +1081,8 @@ REBTYPE(Image)
         RETURN (value); }
 
     case SYM_APPEND:
-    case SYM_INSERT:   // insert ser val /part len /only /dup count
-    case SYM_CHANGE: { // change ser val /part len /only /dup count
+    case SYM_INSERT:
+    case SYM_CHANGE: {
         if (IS_NULLED_OR_BLANK(D_ARG(2))) {
             if (sym == SYM_APPEND) // append returns head position
                 VAL_IMAGE_POS(value) = 0;

@@ -148,9 +148,27 @@
     FLAG_LEFT_BIT(24)
 
 
-//=//// CELL_FLAG_25 //////////////////////////////////////////////////////=//
+//=//// CELL_FLAG_ISOTOPE //////////////////////////////////////////////////=//
 //
-#define CELL_FLAG_25 \
+// This flag is currently for BAD-WORD!.  If bad words like ~void~ or ~none~
+// do not carry the flag, then they act like normal values...and can appear
+// in blocks, and be handled like anything else.  But if the ISOTOPE flag is
+// set, then BAD-WORD! values in variables will return errors.  There will
+// also be other "mystery" properties of decaying or acting in ways that are
+// specific to particular BAD-WORD!s if it's an isotope.  e.g. ~null~ isotopes
+// will turn into NULL when assigned to variables, and are also falsey.
+//
+// !!! Odds are that this should be unified with CELL_FLAG_UNEVALUATED, to
+// save a bit...although it's in the reverse sense.
+//
+// !!! Thought: Could FRAME! use this bit to encode when the frame is actually
+// a frame for the IDENTITY, and the value is just something that came from
+// `make frame! ^ 10` or similar?  It would weave a bit of a tangled web for
+// things like `action of f` for such frames.  Still might be worth it to
+// lie, and that way you could make ACTION!s and FRAME!s which were really
+// just QUOTED!s under the hood.
+//
+#define CELL_FLAG_ISOTOPE \
     FLAG_LEFT_BIT(25)
 
 
@@ -310,7 +328,7 @@
     ~cast(REBFLGS, 0)
 
 #define CELL_MASK_POISON \
-    cast(REBFLGS, 0)
+    (FLAG_KIND3Q_BYTE(REB_T_UNSAFE) | FLAG_HEART_BYTE(REB_T_UNSAFE))
 
 
 //=//// CELL's `EXTRA` FIELD DEFINITION ///////////////////////////////////=//

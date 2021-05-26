@@ -62,7 +62,7 @@ sync-op: function [port body] [
     ; state.  The timeout should be triggered only when the response from
     ; the other side exceeds the timeout value.
     ;
-    while [not find [ready close] state/mode] [
+    while [not find [ready close] ^state/mode] [
         if not port? wait [state/connection port/spec/timeout] [
             fail make-http-error "Timeout"
         ]
@@ -193,7 +193,7 @@ make-http-request: func [
     result: unspaced [
         uppercase form method _
             either file? target [next mold target] [target]
-            _ either find headers 'Host: ["HTTP/1.1"] ["HTTP/1.0"] CR LF
+            _ "HTTP/" (find headers [Host:] then ["1.1"] else ["1.0"]) CR LF
     ]
     for-each [word string] headers [
         append result unspaced [mold word _ string CR LF]
@@ -213,7 +213,7 @@ make-http-request: func [
 do-request: function [
     {Queue an HTTP request to a port (response must be waited for)}
 
-    return: <void>
+    return: <none>
     port [port!]
 ][
     spec: port/spec
@@ -245,7 +245,7 @@ do-request: function [
 parse-write-dialect: function [
     {Sets PORT/SPEC fields: DEBUG, FOLLOW, METHOD, PATH, HEADERS, CONTENT}
 
-    return: <void>
+    return: <none>
     port [port!]
     block [block!]
 ][
@@ -576,7 +576,7 @@ check-data: function [
             ]
             out: port/data
 
-            while [parse data [
+            while [parse? data [
                 copy chunk-size: some hex-digits, thru crlfbin
                 mk1: here, to end
             ]][
@@ -771,7 +771,7 @@ sys/make-scheme [
             ]
             port/state/connection: conn: make port! compose [
                 scheme: (
-                    either port/spec/scheme = 'http [just 'tcp][just 'tls]
+                    either port/spec/scheme = 'http [the 'tcp][the 'tls]
                 )
                 host: port/spec/host
                 port-id: port/spec/port-id

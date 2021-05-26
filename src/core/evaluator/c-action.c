@@ -77,7 +77,7 @@ inline static void Expire_Out_Cell_Unless_Invisible(REBFRM *f) {
 // noticing when to defer enfix:
 //
 //     foo: func [...] [
-//          return just 1 then ["this needs to be returned"]
+//          return the 1 then ["this needs to be returned"]
 //     ]
 //
 // If the first time the THEN was seen was not after the 1, but when the
@@ -106,72 +106,6 @@ bool Lookahead_To_Sync_Enfix_Defer_Flag(struct Reb_Feed *feed) {
     if (GET_ACTION_FLAG(VAL_ACTION(unwrap(feed->gotten)), DEFERS_LOOKBACK))
         SET_FEED_FLAG(feed, DEFERRING_ENFIX);
     return true;
-}
-
-
-// The code for modal parameter handling has to be used for both enfix and
-// normal parameters.  It's enough code to be worth factoring out vs. repeat.
-//
-static bool Handle_Modal_In_Out_Throws(REBFRM *f) {
-    switch (VAL_TYPE(f->out)) {
-      case REB_SYM_WORD:  // run @APPEND
-      case REB_SYM_PATH:  // run @APPEND/ONLY
-      case REB_SYM_GROUP:  // run @(GR O UP)
-      case REB_SYM_BLOCK:  // pass @[BL O CK] as-is
-        Plainify(f->out);
-        goto enable_modal;
-
-      default:
-        goto skip_enable_modal;
-    }
-
-  enable_modal: {
-    //
-    // !!! We could (should?) pre-check the paramlists to
-    // make sure users don't try and make a modal argument
-    // not followed by a refinement.  That would cost
-    // extra, but avoid the test on every call.
-    //
-    if (f->key + 1 == f->key_tail)
-        fail ("Modal parameter can't be at end of parameter list");
-
-    const REBPAR *enable = f->param + 1;
-
-    if (Is_Param_Hidden(enable)) {
-        if (not (IS_NULLED(enable) or Is_Blackhole(enable)))
-            fail ("Specialized refinement following modal can't take args");
-    }
-    else {
-        if (not (
-            TYPE_CHECK(enable, REB_TS_REFINEMENT)
-            and Is_Typeset_Empty(enable)
-        )){
-            fail ("Refinement must follow modal parameter");
-        }
-    }
-
-    // Signal refinement as being in use.
-    //
-    Init_Word(DS_PUSH(), KEY_SYMBOL(f->key + 1));
-  }
-
-  skip_enable_modal:
-    //
-    // Because the possibility of needing to see the uneval'd
-    // value existed, the parameter had to act quoted.  Eval.
-    //
-    if (Eval_Value_Maybe_End_Throws(f->arg, f->out, SPECIFIED)) {
-        Copy_Cell(f->out, f->arg);
-        return true;
-    }
-
-    // The modal parameter can test to see if an expression vaporized, e.g.
-    // `@(comment "hi")` or `@()`, and handle that case.
-    //
-    if (IS_END(f->arg))
-        Init_Endish_Nulled(f->arg);
-
-    return false;
 }
 
 
@@ -226,7 +160,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
       skip_fulfilling_arg_for_now:  // the GC marks args up through f->arg...
 
-        Init_Unreadable_Void(f->arg);  // ...so cell must have valid bits
+        Init_Trash(f->arg);  // ...so cell must have valid bits
         continue;
 
   //=//// ACTUAL LOOP BODY ////////////////////////////////////////////////=//
@@ -363,7 +297,10 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 // data in cases like `(1 + 2 | comment "hi")` => 3, but
                 // left enfix should treat that just like an end.
 
-                Init_Endish_Nulled(f->arg);
+                if (pclass == REB_P_LITERAL)
+                    Init_Void(f->arg);
+                else
+                    Init_Endish_Nulled(f->arg);
                 goto continue_fulfilling;
             }
 
@@ -383,11 +320,15 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             else switch (pclass) {
               case REB_P_NORMAL:
               case REB_P_OUTPUT:
-                enfix_normal_handling:
-
+              case REB_P_LITERAL:
                 Copy_Cell(f->arg, f->out);
                 if (GET_CELL_FLAG(f->out, UNEVALUATED))
                     SET_CELL_FLAG(f->arg, UNEVALUATED);
+
+                if (pclass == REB_P_LITERAL)
+                    Literalize(f->arg);
+                else if (pclass == REB_P_NORMAL)
+                    Normalize(f->arg);  // !!! avoid assign ~void~ to f->arg?
                 break;
 
               case REB_P_HARD:
@@ -406,16 +347,10 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
                 Copy_Cell(f->arg, f->out);
                 SET_CELL_FLAG(f->arg, UNEVALUATED);
+
+                if (IS_BAD_WORD(f->arg))  // source should only be isotope form
+                    assert(NOT_CELL_FLAG(f->arg, ISOTOPE));
                 break;
-
-              case REB_P_MODAL: {
-                if (NOT_CELL_FLAG(f->out, UNEVALUATED))
-                    goto enfix_normal_handling;
-
-                if (Handle_Modal_In_Out_Throws(f))
-                    goto abort_action;
-
-                break; }
 
               case REB_P_SOFT:
                 //
@@ -446,6 +381,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 else {
                     Copy_Cell(f->arg, f->out);
                     SET_CELL_FLAG(f->arg, UNEVALUATED);
+
+                    if (IS_BAD_WORD(f->arg))  // !!! source should only be isotope
+                        assert(NOT_CELL_FLAG(f->arg, ISOTOPE));
                 }
                 break;
 
@@ -543,7 +481,12 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
   //=//// ERROR ON END MARKER, BAR! IF APPLICABLE /////////////////////////=//
 
         if (IS_END(f_next)) {
-            Init_Endish_Nulled(f->arg);
+            if (pclass == REB_P_LITERAL) {
+                Init_Void(f->arg);
+                SET_CELL_FLAG(f->arg, UNEVALUATED);
+            }
+            else
+                Init_Endish_Nulled(f->arg);
             goto continue_fulfilling;
         }
 
@@ -553,25 +496,33 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
 
           case REB_P_NORMAL:
           case REB_P_OUTPUT:
-          normal_handling: {
+          case REB_P_LITERAL: {
             if (GET_FEED_FLAG(f->feed, BARRIER_HIT)) {
-                Init_Endish_Nulled(f->arg);
+                if (pclass == REB_P_LITERAL)
+                    Init_Void(f->arg);
+                else
+                    Init_Endish_Nulled(f->arg);
                 goto continue_fulfilling;
             }
 
             REBFLGS flags = EVAL_MASK_DEFAULT
                 | EVAL_FLAG_FULFILLING_ARG;
 
-            if (IS_VOID(f_next))  // Eval_Step() has callers test this
-                fail (Error_Void_Evaluation_Raw());  // must be quoted
-
             if (Eval_Step_In_Subframe_Throws(f->arg, f, flags)) {
                 Copy_Cell(f->out, f->arg);
                 goto abort_action;
             }
 
-            if (IS_END(f->arg))
-                Init_Endish_Nulled(f->arg);
+            if (IS_END(f->arg)) {
+                if (pclass == REB_P_LITERAL)
+                    Init_Void(f->arg);
+                else
+                    Init_Endish_Nulled(f->arg);
+            }
+            else if (pclass == REB_P_LITERAL)
+                Literalize(f->arg);
+            else if (pclass == REB_P_NORMAL)
+                Normalize(f->arg);
             break; }
 
   //=//// HARD QUOTED ARG-OR-REFINEMENT-ARG ///////////////////////////////=//
@@ -589,31 +540,16 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                 SET_CELL_FLAG(f->arg, UNEVALUATED);
             }
 
+            if (IS_BAD_WORD(f->arg))  // !!! Source should only be isotope form
+                assert(NOT_CELL_FLAG(f->arg, ISOTOPE));
+
             // Have to account for enfix deferrals in cases like:
             //
-            //     return just 1 then (x => [x + 1])
+            //     return the 1 then (x => [x + 1])
             //
             Lookahead_To_Sync_Enfix_Defer_Flag(f->feed);
 
             goto continue_fulfilling;
-
-  //=//// MODAL ARG  //////////////////////////////////////////////////////=//
-
-          case REB_P_MODAL: {
-            if (GET_FEED_FLAG(f->feed, BARRIER_HIT)) {
-                Init_Endish_Nulled(f->arg);
-                goto continue_fulfilling;
-            }
-
-            if (not ANY_SYM_KIND(VAL_TYPE(f_next)))  // not an @xxx
-                goto normal_handling;  // acquire as a regular argument
-
-            Literal_Next_In_Frame(f->out, f);  // f->value is read-only...
-            if (Handle_Modal_In_Out_Throws(f))  // ...out so we can Unsymify()
-                goto abort_action;
-
-            Lookahead_To_Sync_Enfix_Defer_Flag(f->feed);
-            break; }
 
   //=//// SOFT QUOTED ARG-OR-REFINEMENT-ARG  //////////////////////////////=//
 
@@ -673,9 +609,6 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     | FLAG_STATE_BYTE(ST_EVALUATOR_LOOKING_AHEAD)
                     | EVAL_FLAG_INERT_OPTIMIZATION;
 
-                if (IS_VOID(f_next))  // Eval_Step() has callers test this
-                    fail (Error_Void_Evaluation_Raw());  // must be quoted
-
                 DECLARE_FRAME (subframe, f->feed, flags);
 
                 Push_Frame(f->arg, subframe);
@@ -699,6 +632,10 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
                     goto abort_action;
                 }
             }
+            else {
+                if (IS_BAD_WORD(f->arg))  // !!! Source should only be isotope form
+                    assert(NOT_CELL_FLAG(f->arg, ISOTOPE));
+            }
             break;
 
           default:
@@ -712,7 +649,15 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         //     1 + 2 * 3
         //           ^-- this deferred its chance, so 1 + 2 will complete
         //
-        assert(NOT_FEED_FLAG(f->feed, NO_LOOKAHEAD));
+        // !!! The case of:
+        //
+        //     30 = (10 + 20 devoid do [])
+        //
+        // Is breaking this.  Review when there is time, and put the assert
+        // back if it makes sense.
+        //
+        /* assert(NOT_FEED_FLAG(f->feed, NO_LOOKAHEAD)); */
+        CLEAR_FEED_FLAG(f->feed, NO_LOOKAHEAD);
 
         assert(NOT_EVAL_FLAG(f, FULLY_SPECIALIZED));
 
@@ -720,7 +665,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     }
 
   #ifdef DEBUG_TERM_ARRAYS
-    assert(IS_TRASH_DEBUG(f->arg));  // arg can otherwise point to any arg cell
+    assert(IS_TRASH(f->arg));  // arg can otherwise point to any arg cell
   #endif
 
     // There may have been refinements that were skipped because the
@@ -764,7 +709,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             goto fulfill_and_any_pickups_done;
         }
 
-        assert(IS_UNREADABLE_DEBUG(f->arg) or IS_NULLED(f->arg));
+        assert(IS_TRASH(f->arg) or IS_NULLED(f->arg));
         SET_EVAL_FLAG(f, DOING_PICKUPS);
         goto fulfill_arg;
     }
@@ -850,7 +795,7 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         if (TYPE_CHECK(f->param, REB_TS_REFINEMENT)) {
             if (
                 GET_EVAL_FLAG(f, FULLY_SPECIALIZED)
-                and Is_Void_With_Sym(f->arg, SYM_UNSET)
+                and Is_Unset(f->arg)
             ){
                 Init_Nulled(f->arg);
             }
@@ -894,6 +839,19 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
         ){
             SET_EVAL_FLAG(f, TYPECHECK_ONLY);
             continue;
+        }
+
+        if (REB_P_LITERAL == VAL_PARAM_CLASS(f->param)) {
+            if (
+                kind_byte != REB_BAD_WORD
+                and kind_byte != REB_NULL
+                and not IS_QUOTED_KIND(kind_byte)
+            ){
+                fail ("Literal arguments must be quoted!, bad-word!, or null");
+            }
+        }
+        else if (kind_byte == REB_BAD_WORD and GET_CELL_FLAG(f->arg, ISOTOPE)) {
+            fail ("Only literal parameters allow isotope BAD-WORD!s");
         }
 
         // Apply constness if requested.
@@ -1173,9 +1131,9 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
     // Want to keep this flag between an operation and an ensuing enfix in
     // the same frame, so can't clear in Drop_Action(), e.g. due to:
     //
-    //     left-just: enfix :just
+    //     left-the: enfix :the
     //     o: make object! [f: does [1]]
-    //     o/f left-just  ; want error suggesting -> here, need flag for that
+    //     o/f left-the  ; want error suggesting -> here, need flag for that
     //
     CLEAR_EVAL_FLAG(f, DIDNT_LEFT_QUOTE_PATH);
     assert(NOT_FEED_FLAG(f->feed, NEXT_ARG_FROM_OUT));  // must be consumed

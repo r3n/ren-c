@@ -13,7 +13,7 @@
 )
 
 (null? switch 2 [1 []])
-(null-2? switch 1 [1 []])
+((the ') = ^ switch 1 [1 [null]])
 
 (
     cases: reduce [1 head of insert copy [] trap [1 / 0]]

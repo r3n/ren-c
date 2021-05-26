@@ -67,11 +67,8 @@ REBOL [
 #null       "!!! `NULL!` isn't a datatype, `null` can't be stored in blocks"
             0           0       0       +       []
 
-void        "value that triggers errors if accessed via WORD!/PATH!/TUPLE!"
-            void        -       +       +       []
-
 blank       "placeholder unit type which acts as conditionally false"
-            blank       +       -       +       [branch]
+            blank       +       -       +       [unit branch]
 
 ; <ANY-SCALAR>
 
@@ -209,31 +206,6 @@ port        "external series, an I/O channel"
 varargs     "evaluator position for variable numbers of arguments"
             varargs     +       +       +       []
 
-; !!! At time of writing, VARARGS! is at 33...putting the following ranges
-; close to being 32.  That might be a useful number for math tricks on the
-; following sequences.  Right now there's no particularly fast test for
-; ANY_ARRAY(), ANY_PATH(), ANY_WORD()...due to those being less common than
-; testing for ANY_INERT() which requires the SYM-XXX forms to be low.
-
-; <ANY-SYM> (order matters, see UNSETIFY_ANY_XXX_KIND())
-
-sym-block   "alternative form of block (that also doesn't evaluate)"
-            array       *       *       *       [block array series branch]
-
-sym-group   "symbolic form of group! that does not evaluate"
-            array       *       *       *       [group array series branch]
-
-sym-path    "symbolic form of path! that does not evaluate"
-            sequence    *       *       *       [path sequence branch]
-
-sym-tuple   "symbolic form of tuple! that does not evaluate"
-            sequence    *       *       *       [tuple sequence branch]
-
-sym-word    "symbolic form of word! that does not evaluate"
-            word        -       *       +       [word branch]
-
-; <ANY-SYM> (order matters, see UNSETIFY_ANY_XXX_KIND())
-
 
 ; <ANY-PLAIN> (order matters, see UNSETIFY_ANY_XXX_KIND())
 
@@ -299,17 +271,68 @@ get-word    "the value of a word (variable)"
 ; </ANY-GET> (except for ISSUE!)
 
 
+; Right now there's no particularly fast test for ANY_ARRAY(), ANY_PATH(),
+; ANY_WORD()...due to those being less common than testing for ANY_INERT().
+; Review the decision.
+
+; <ANY-SYM> (order matters, see UNSETIFY_ANY_XXX_KIND())
+
+sym-block   "alternative form of block (that also doesn't evaluate)"
+            array       *       *       *       [block array series branch]
+
+sym-group   "symbolic form of group! that does not evaluate"
+            array       *       *       *       [group array series branch]
+
+sym-path    "symbolic form of path! that does not evaluate"
+            sequence    *       *       *       [path sequence branch]
+
+sym-tuple   "symbolic form of tuple! that does not evaluate"
+            sequence    *       *       *       [tuple sequence branch]
+
+sym-word    "symbolic form of word! that does not evaluate"
+            word        -       *       +       [word branch]
+
+; <ANY-SYM> (order matters, see UNSETIFY_ANY_XXX_KIND())
+
+
+; LIT! is just the lone ^ symbol, which acts like QUOTE, but with the ability
+; to pick up on the NULL-2 and invisible distinctions.
+
+lit         "quoting operator which distinguishes NULL and BAD-WORD! isotopes"
+            lit         -       -       +       [unit]
+
+
+; THE! is the lone @ symbol, which acts like THE.  It's particularly nice to
+; have for use in the API, for writing `rebDid("action? @", var)` instead of
+; needing to say `rebDid("action?" rebQ(var))`.
+
+the         "as-is operator which suppresses evaluation on the next value"
+            the         -       -       +       [unit]
+
+
 ; COMMA! has a high number with bindable types it's evaluative, and the
 ; desire is to make the ANY_INERT() test fast with a single comparison.
 
 comma       "separator between full evaluations (that is otherwise invisible)"
-            comma       -       -       +       []
+            comma       -       -       +       [unit]
 
 
 ; ACTION! is the "OneFunction" type in Ren-C https://forum.rebol.info/t/596
 
 action      "an invokable Rebol subroutine"
             action      +       +       +       [branch]
+
+
+; BAD-WORD! is not inert, because it needs to become "unfriendly" when it is
+; evaluated.
+;
+; !!! Because it does not have a binding, it is not an actual WORD!.  There
+; could be questions about whether it should be more wordlike, or if there
+; should be BAD-BLOCK! ~[]~ and it should fit into a system of
+
+bad-word    "value which evaluates to a form that triggers errors on access"
+            bad-word     -       +       +       []
+
 
 ; ============================================================================
 ; BEGIN QUOTED RANGE
@@ -326,7 +349,7 @@ quoted     "container for arbitrary levels of quoting"
 ; This is the end of the value cell enumerations (after REB_QUOTED is REB_MAX)
 ; and no valid cell should have bits in this range.
 ;
-; However, higher values are currently in use in places like typesets, 
+; However, higher values are currently in use in places like typesets,
 ; where bits that flag types are merged with bits that flag other things.
 ; These end at the 64th bit.
 ;

@@ -124,7 +124,7 @@ static void Append_To_Context(REBVAL *context, REBVAL *arg)
         }
 
         if (word + 1 == tail) {
-            Init_Void(var, SYM_VOID);
+            Init_Unset(var);
             break;  // fix bug#708
         }
         else
@@ -696,8 +696,19 @@ void MF_Context(REB_MOLD *mo, REBCEL(const*) v, bool form)
         if (IS_NULLED(var))
             Append_Ascii(s, "'");  // `field: '` would evaluate to null
         else {
-            if (IS_VOID(var) or not ANY_INERT(var))  // needs quoting
+            // We want the molded object to be able to "round trip" back to
+            // the state it's in based on reloading the values.  Currently
+            // this is conservative and doesn't put quote marks on things
+            // that don't need it because they are inert, but maybe that
+            // isn't a good idea...depends on the whole block/object model.
+            //
+            if (IS_BAD_WORD(var)) {
+                if (NOT_CELL_FLAG(var, ISOTOPE))
+                    Append_Ascii(s, "'");
+            }
+            else if (not ANY_INERT(var)) {
                 Append_Ascii(s, "'");
+            }
             Mold_Value(mo, var);
         }
     }
@@ -918,7 +929,6 @@ REBTYPE(Context)
         INCLUDE_PARAMS_OF_FIND;
         UNUSED(ARG(series));  // extracted as `c`
         UNUSED(ARG(part));
-        UNUSED(ARG(only));
         UNUSED(ARG(skip));
         UNUSED(ARG(tail));
         UNUSED(ARG(match));

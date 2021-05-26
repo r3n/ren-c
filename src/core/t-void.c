@@ -26,18 +26,18 @@
 
 
 //
-//  MF_Void: C
+//  MF_Bad_word: C
 //
-// Voids have a label to help make it clearer why an ornery error-like value
-// would be existing.
+// Bad words have a label to help make it clearer why an ornery error-like
+// value would be existing.
 //
-void MF_Void(REB_MOLD *mo, REBCEL(const*) v, bool form)
+void MF_Bad_word(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form); // no distinction between MOLD and FORM
 
     Append_Codepoint(mo->series, '~');
 
-    const REBSTR* label = VAL_VOID_LABEL(v);
+    const REBSTR* label = VAL_BAD_WORD_LABEL(v);
     Append_Utf8(mo->series, STR_UTF8(label), STR_SIZE(label));
 
     Append_Codepoint(mo->series, '~');
@@ -45,11 +45,11 @@ void MF_Void(REB_MOLD *mo, REBCEL(const*) v, bool form)
 
 
 //
-//  MAKE_Void: C
+//  MAKE_Bad_word: C
 //
 // Can be created from a label.
 //
-REB_R MAKE_Void(
+REB_R MAKE_Bad_word(
     REBVAL *out,
     enum Reb_Kind kind,
     option(const REBVAL*) parent,
@@ -58,35 +58,34 @@ REB_R MAKE_Void(
     assert(not parent);
     UNUSED(parent);
 
-    if (IS_WORD(arg))
-        return Init_Void_Core(out, VAL_WORD_SYMBOL(arg));
+    if (IS_WORD(arg))  // !!! Should this be an isotope or not?
+        return Init_Bad_Word_Core(out, VAL_WORD_SYMBOL(arg), CELL_MASK_NONE);
 
     fail (Error_Bad_Make(kind, arg));
 }
 
 
 //
-//  TO_Void: C
+//  TO_Bad_word: C
 //
 // TO is disallowed, e.g. you can't TO convert an integer of 0 to a blank.
 //
-REB_R TO_Void(REBVAL *out, enum Reb_Kind kind, const REBVAL *data) {
+REB_R TO_Bad_word(REBVAL *out, enum Reb_Kind kind, const REBVAL *data) {
     UNUSED(out);
     fail (Error_Bad_Make(kind, data));
 }
 
 
 //
-//  CT_Void: C
+//  CT_Bad_word: C
 //
-// To make VOID! potentially more useful in dialecting, the spellings are used
-// in comparison.  This makes this code very similar to CT_Word(), so it
-// is shared.
+// To make BAD-WORD! more useful, the spellings are used in comparison.  This
+// makes this code very similar to CT_Word(), so it is shared.
 //
-REBINT CT_Void(REBCEL(const*) a, REBCEL(const*) b, bool strict)
+REBINT CT_Bad_word(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
-    const REBSYM* label_a = VAL_VOID_LABEL(a);
-    const REBSYM* label_b = VAL_VOID_LABEL(b);
+    const REBSYM* label_a = VAL_BAD_WORD_LABEL(a);
+    const REBSYM* label_b = VAL_BAD_WORD_LABEL(b);
 
     return Compare_Spellings(label_a, label_b, strict);
 }
@@ -95,7 +94,7 @@ REBINT CT_Void(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 //
 //  REBTYPE: C
 //
-REBTYPE(Void)
+REBTYPE(Bad_word)
 {
     REBVAL *voided = D_ARG(1);
 
@@ -106,7 +105,7 @@ REBTYPE(Void)
 
         switch (VAL_WORD_ID(ARG(property))) {
           case SYM_LABEL:
-            return Init_Word(D_OUT, VAL_VOID_LABEL(voided));
+            return Init_Word(D_OUT, VAL_BAD_WORD_LABEL(voided));
 
           default:
             break;

@@ -488,7 +488,7 @@ void Get_Var_May_Fail(
     REBVAL *out,
     const RELVAL *source,  // ANY-WORD! or ANY-PATH! (maybe quoted)
     REBSPC *specifier,
-    bool any,  // should a VOID! value be gotten normally vs. error
+    bool any,  // transform stable voids into isotopes without erroring
     bool hard  // should GROUP!s in paths not be evaluated
 ){
     enum Reb_Kind kind = CELL_KIND(VAL_UNESCAPED(source));
@@ -516,11 +516,17 @@ void Get_Var_May_Fail(
     else
         fail (Error_Bad_Value_Core(source, specifier));
 
-    if (IS_VOID(out) and not any)
-        fail (Error_Need_Non_Void_Core(source, specifier, out));
+    if (IS_BAD_WORD(out)) {
+        if (GET_CELL_FLAG(out, ISOTOPE)) {
+            if (not any)
+                fail (Error_Bad_Word_Get_Core(source, specifier, out));
+        }
+    }
 
-    if (not any)  // default to not letting NULL-2 out unless /ANY is used
-        Decay_If_Nulled(out);
+    // !!! Variables should not store null isotopes, but they currently can...
+    // look into a systemic answer of how and where to stop this.
+    //
+    Decay_If_Nulled(out);
 }
 
 
@@ -532,7 +538,7 @@ void Get_Var_May_Fail(
 //      return: [<opt> any-value!]
 //      source "Word or path to get, or block of words or paths"
 //          [<blank> any-word! any-sequence! block!]
-//      /any "Retrieve ANY-VALUE! (e.g. do not error on VOID!)"
+//      /any "Retrieve ANY-VALUE! (e.g. do not error on plain BAD-WORD!)"
 //      /hard "Do not evaluate GROUP!s in PATH! (assume pre-COMPOSE'd)"
 //  ]
 //
@@ -567,8 +573,8 @@ REBNATIVE(get)
             did REF(any),
             did REF(hard)
         );
-        if (IS_NULLED(temp))
-            Init_Void(dest, SYM_NULLED);  // blocks can't contain nulls
+        if (IS_NULLED(temp))  // blocks can't contain nulls
+            Init_Bad_Word_Core(dest, Canon(SYM_NULL), CELL_MASK_NONE);
         else
             Copy_Cell(dest, temp);
     }
@@ -581,7 +587,7 @@ REBNATIVE(get)
 //
 //  get*: native [
 //
-//  {Gets the value of a word or path, allows VOID!}
+//  {Gets the value of a word or path, allows BAD-WORD!}
 //
 //      return: [<opt> any-value!]
 //      source "Word or path to get"
@@ -600,7 +606,7 @@ REBNATIVE(get_p)
         D_OUT,
         ARG(source),
         SPECIFIED,
-        true,  // allow VOID!, e.g. GET/ANY
+        true,  // allow BAD-WORD!, e.g. GET/ANY
         false  // evaluate GROUP!s, e.g. not GET/HARD
     );
     return D_OUT;
@@ -621,6 +627,9 @@ void Set_Var_May_Fail(
 ){
     if (Is_Blackhole(target))  // name for a space-bearing ISSUE! ('#')
         return;
+
+    if (Is_Heavy_Nulled(setval))
+        setval = NULLED_CELL;
 
     enum Reb_Kind kind = CELL_KIND(VAL_UNESCAPED(target));
 
@@ -672,9 +681,9 @@ void Set_Var_May_Fail(
 //
 //      return: [<opt> any-value!]
 //          {Will be the values set to, or void if any set values are void}
-//      target [blackhole! any-word! any-path! block! quoted!]
+//      target [blackhole! any-word! any-sequence! block! quoted!]
 //          {Word or path, or block of words and paths}
-//      value [<opt> any-value!]
+//      value [<opt> <literal> any-value!]
 //          "Value or block of values (NULL means unset)"
 //      /hard "Do not evaluate GROUP!s in PATH! (assume pre-COMPOSE'd)"
 //      /single "If target and value are blocks, set each to the same value"
@@ -700,7 +709,7 @@ REBNATIVE(set)
     INCLUDE_PARAMS_OF_SET;
 
     REBVAL *target = ARG(target);
-    REBVAL *value = ARG(value);
+    REBVAL *value = Unliteralize(ARG(value));
 
     if (not IS_BLOCK(target)) {
         Set_Var_May_Fail(
@@ -759,7 +768,7 @@ REBNATIVE(set)
 //
 //  try: native [
 //
-//  {Turn nulls into blanks, all non-voids pass through (see also: OPT)}
+//  {Turn nulls into blanks, everything else passes through (see also: OPT)}
 //
 //      return: "blank if input was null, or original value otherwise"
 //          [any-value!]
@@ -770,10 +779,12 @@ REBNATIVE(try)
 {
     INCLUDE_PARAMS_OF_TRY;
 
-    if (IS_NULLED(ARG(optional)))
+    REBVAL *optional = ARG(optional);
+
+    if (IS_NULLED(optional))
         return Init_Blank(D_OUT);
 
-    RETURN (ARG(optional));  // Accepts VOID! for generality (once it didn't)
+    RETURN (optional);
 }
 
 
@@ -782,7 +793,7 @@ REBNATIVE(try)
 //
 //  {Convert blanks to nulls, pass through most other values (See Also: TRY)}
 //
-//      return: "null on blank, void if input was null, else original value"
+//      return: "null on blank, ~nulled~ if input was NULL, or original value"
 //          [<opt> any-value!]
 //      optional [<opt> <blank> any-value!]
 //  ]
@@ -791,15 +802,12 @@ REBNATIVE(opt)
 {
     INCLUDE_PARAMS_OF_OPT;
 
-    if (IS_VOID(ARG(optional)))
-        fail ("OPT cannot accept VOID! values");
-
-    // !!! Experimental idea: opting a null gives you a void.  You generally
+    // !!! Experimental: opting a null gives you a bad word.  You generally
     // don't put OPT on expressions you believe can be null, so this permits
     // creating a likely error in those cases.  To get around it, OPT TRY
     //
     if (IS_NULLED(ARG(optional)))
-        return Init_Void(D_OUT, SYM_NULLED);
+        return Init_Curse_Word(D_OUT, SYM_NULL);
 
     RETURN (ARG(optional));
 }
@@ -878,7 +886,7 @@ REBNATIVE(enfixed)
             " https://forum.rebol.info/t/1156"
         );
 
-    REBVAL *copy = rebValueQ("copy", ARG(action));
+    REBVAL *copy = rebValue("copy @", ARG(action));
     SET_ACTION_FLAG(VAL_ACTION(copy), ENFIXED);
     return copy;
 }
@@ -933,7 +941,7 @@ REBNATIVE(identity) // sample uses: https://stackoverflow.com/q/3136338
 //
 //  {Releases the underlying data of a value so it can no longer be accessed}
 //
-//      return: [void!]
+//      return: []
 //      memory [any-series! any-context! handle!]
 //  ]
 //
@@ -951,7 +959,7 @@ REBNATIVE(free)
         fail ("Cannot FREE already freed series");
 
     Decay_Series(s);
-    return Init_Void(D_OUT, SYM_VOID); // !!! Could return freed value
+    return Init_None(D_OUT); // !!! Could return freed value
 }
 
 
@@ -1596,11 +1604,11 @@ inline static bool Is_Set(const REBVAL *location)
 inline static bool Is_Defined(const REBVAL *location)
 {
     if (ANY_WORD(location))
-        return not IS_VOID(Lookup_Word_May_Fail(location, SPECIFIED));
+        return not IS_BAD_WORD(Lookup_Word_May_Fail(location, SPECIFIED));
 
     DECLARE_LOCAL (temp); // result may be generated
     Get_Path_Core(temp, location, SPECIFIED);
-    return not IS_VOID(temp);
+    return not IS_BAD_WORD(temp);
 }
 
 
@@ -1650,7 +1658,7 @@ REBNATIVE(unset_q)
 //      return: [logic!]
 //      location [any-word! any-path!]
 //  ][
-//      not void? get/any location
+//      not bad-word? get/any location
 //  ]
 //
 REBNATIVE(defined_q)
@@ -1669,7 +1677,7 @@ REBNATIVE(defined_q)
 //      return: [logic!]
 //      location [any-word! any-path!]
 //  ][
-//      void? get/any location
+//      bad-word? get/any location
 //  ]
 //
 REBNATIVE(undefined_q)
@@ -1681,14 +1689,12 @@ REBNATIVE(undefined_q)
 
 
 //
-//  null?: native/body [
+//  null?: native [
 //
 //  "Tells you if the argument is not a value"
 //
 //      return: [logic!]
 //      optional [<opt> any-value!]
-//  ][
-//      null = type of :optional
 //  ]
 //
 REBNATIVE(null_q)
@@ -1700,51 +1706,102 @@ REBNATIVE(null_q)
 
 
 //
-//  null-2: native [
+//  heavy: native [
 //
-//  {Make the heavy form of NULL (can't be WORD!-fetched, must be ACTION!)}
+//  {Make the heavy form of NULL (passes through all other values)}
 //
-//      return: [<opt>]
+//      return: [<opt> any-value!]
+//      optional [<opt> <literal> any-value!]
 //  ]
 //
-REBNATIVE(null_2) {
-    INCLUDE_PARAMS_OF_NULL_2;
+REBNATIVE(heavy) {
+    INCLUDE_PARAMS_OF_HEAVY;
 
-    return Init_Heavy_Nulled(D_OUT);
+    Move_Cell(D_OUT, Unliteralize(ARG(optional)));
+
+    if (IS_NULLED(D_OUT))
+        Init_Heavy_Nulled(D_OUT);
+
+    return D_OUT;
 }
 
 
 //
-//  null-2?: native [
+//  light: native [
 //
-//  "Tells you if the argument is the heavy isotope of NULL (triggers THEN)"
+//  {Make the light form of NULL (passes through all other values)}
 //
-//      return: [logic!]
-//      optional [<opt> any-value!]
+//      return: [<opt> any-value!]
+//      optional [<opt> <literal> any-value!]
 //  ]
 //
-REBNATIVE(null_2_q)
+REBNATIVE(light) {
+    INCLUDE_PARAMS_OF_LIGHT;
+
+    Move_Cell(D_OUT, Unliteralize(ARG(optional)));
+
+    Decay_If_Nulled(D_OUT);
+
+    return D_OUT;
+}
+
+
+//
+//  none: native [
+//
+//  {Make the "unfriendly" ~none~ value}
+//
+//      return: [bad-word!]
+//  ]
+//
+REBNATIVE(none) {
+    INCLUDE_PARAMS_OF_NONE;
+
+    return Init_None(D_OUT);
+}
+
+
+//
+//  friendly: native [
+//
+//  "Make BAD-WORD!s friendly, passing through all other values"
+//
+//      return: [<opt> any-value!]
+//      optional [<opt> <literal> any-value!]
+//  ]
+//
+REBNATIVE(friendly)
 {
-    INCLUDE_PARAMS_OF_NULL_2_Q;
+    INCLUDE_PARAMS_OF_FRIENDLY;
 
-    return Init_Logic(D_OUT, Is_Heavy_Nulled(ARG(optional)));
+    Move_Cell(D_OUT, Unliteralize(ARG(optional)));
+
+    if (IS_BAD_WORD(D_OUT))
+        CLEAR_CELL_FLAG(D_OUT, ISOTOPE);
+
+    return D_OUT;
 }
 
 
 //
-//  isotope?: native [
+//  unfriendly: native [
 //
-//  {Determine if a NULL is an isotope}
+//  "Make BAD-WORD!s unfriendly, passing through all other values"
 //
-//      return: [logic!]
-//      var [word!]
+//      return: [<opt> any-value!]
+//      optional [<opt> <literal> any-value!]
 //  ]
 //
-REBNATIVE(isotope_q) {
-    INCLUDE_PARAMS_OF_ISOTOPE_Q;
+REBNATIVE(unfriendly)
+{
+    INCLUDE_PARAMS_OF_UNFRIENDLY;
 
-    const REBVAL *var = Lookup_Word_May_Fail(ARG(var), SPECIFIED);
-    return Init_Logic(D_OUT, Is_Heavy_Nulled(var));
+    Move_Cell(D_OUT, Unliteralize(ARG(optional)));
+
+    if (IS_BAD_WORD(D_OUT))
+        SET_CELL_FLAG(D_OUT, ISOTOPE);
+
+    return D_OUT;
 }
 
 
@@ -1762,29 +1819,34 @@ REBNATIVE(voidify)
     INCLUDE_PARAMS_OF_VOIDIFY;
 
     if (IS_NULLED(ARG(optional)))
-        return Init_Void(D_OUT, SYM_NULLED);
+        return Init_Curse_Word(D_OUT, SYM_NULL);
 
     RETURN (ARG(optional));
 }
 
 
+
 //
 //  devoid: native [
 //
-//  "Turn voids into nulls, passing through all other values"
+//  "Make non-isotope ~void~ vanish, passing through all other values"
 //
-//      return: [<opt> any-value!]
-//      optional [<opt> any-value!]
+//      return: [<opt> <invisible> any-value!]
+//      optional [<opt> <literal> any-value!]
 //  ]
 //
 REBNATIVE(devoid)
 {
     INCLUDE_PARAMS_OF_DEVOID;
 
-    if (IS_VOID(ARG(optional)))
-        return Init_Nulled(D_OUT);
+    REBVAL *v = ARG(optional);
 
-    RETURN (ARG(optional));
+    // not quoted, so wasn't isotope...regular BAD-WORD! for examination
+    //
+    if (IS_BAD_WORD(v) and VAL_BAD_WORD_ID(v) == SYM_VOID)
+        return D_OUT;
+
+    RETURN (Unliteralize(v));
 }
 
 
@@ -1808,7 +1870,7 @@ REBNATIVE(nothing_q)
 
     return Init_Logic(
         D_OUT,
-        IS_VOID(ARG(value))  // Should unset be also considered "nothing"?
+        IS_BAD_WORD(ARG(value))  // Should unset be also considered "nothing"?
             or IS_NULLED_OR_BLANK(ARG(value))
     );
 }

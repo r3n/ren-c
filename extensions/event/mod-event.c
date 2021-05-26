@@ -35,7 +35,7 @@
 //
 //  {Make the EVENT! datatype work with GENERIC actions, comparison ops, etc}
 //
-//      return: [void!]
+//      return: []
 //  ]
 //
 REBNATIVE(register_event_hooks)
@@ -64,7 +64,7 @@ REBNATIVE(register_event_hooks)
 
     Startup_Event_Scheme();
 
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
 }
 
 
@@ -73,7 +73,7 @@ REBNATIVE(register_event_hooks)
 //
 //  {Remove behaviors for EVENT! added by REGISTER-EVENT-HOOKS}
 //
-//      return: [void!]
+//      return: []
 //  ]
 //
 REBNATIVE(unregister_event_hooks)
@@ -93,7 +93,7 @@ REBNATIVE(unregister_event_hooks)
     Builtin_Type_Hooks[k][IDX_TO_HOOK] = cast(CFUNC*, &TO_Unhooked);
     Builtin_Type_Hooks[k][IDX_MOLD_HOOK] = cast(CFUNC*, &MF_Unhooked);
 
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
 }
 
 
@@ -352,7 +352,7 @@ REBNATIVE(wait_p)  // See wrapping function WAIT in usermode code
     }
     else {
       #if !defined(NDEBUG)
-        Init_Unreadable_Void(D_SPARE);
+        Init_Trash(D_SPARE);
       #endif
     }
 
@@ -502,7 +502,7 @@ REBNATIVE(wake_up)
         DECLARE_LOCAL (verb);
         Init_Word(verb, Canon(SYM_ON_WAKE_UP));
         const REBVAL *r = Do_Port_Action(frame_, ARG(port), verb);
-        assert(IS_VOID(r));
+        assert(IS_BAD_WORD(r));
         UNUSED(r);
     }
 

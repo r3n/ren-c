@@ -15,7 +15,7 @@
 (not null? 1)
 
 ; Early designs for NULL did not let you get or set them from plain WORD!
-; Responsibility for kind of "ornery-ness" this shifted to VOID!, as NULL
+; Responsibility for kind of "ornery-ness" this shifted to BAD-WORD!, as NULL
 ; took on increasing roles as the "true NONE!" and became the value for
 ; unused refinements.
 ;
@@ -36,36 +36,38 @@
     'arg-required = e/id
 )
 
-; There are two "isotopes" of NULL (NULL-1 and NULL-2).
-; Both answer to being NULL?  A variable assigned with NULL-2 will decay
-; to a regular NULL when accessed via a WORD!/GET-WORD!/etc.
+; Both the ~null~ isotope and "true" null answer to being NULL? (the isotope
+; decays in normal parameters, so the NULL? function doesn't know the
+; difference).  A variable assigned with a ~null~ isotope will decay to a
+; regular ~null~ when accessed via a WORD!/GET-WORD!/etc.
 ;
-; The specific role of NULL-2 is to be reactive with THEN and not ELSE, so
-; that branches may be purposefully NULL.
+; The specific role of ~null~ isotopes is to be reactive with THEN and not
+; ELSE, so that failed branches may be purposefully NULL.
 [
-    (null? null)
-    (null? null-2)
-    (null-1? null)
-    (null-2? null-2)
+    (null = ^ null)
+    (null? heavy null)
+    ((the ') = ^ heavy null)
 
-    (x: null-2, null-1? x)
-    (x: null-2, null-1? :x)
+    (x: heavy null, null = ^ x)
+    (x: heavy null, null = ^ :x)
 
     (304 = (null then [1020] else [304]))
-    (1020 = (null-2 then [1020] else [304]))
+    (1020 = (heavy null then [1020] else [304]))
 ]
 
-; Conditionals return NULL-1 on failure, and NULL-2 on a branch that executes
-; and evaluates to either NULL-1 or NULL-2.  If the branch wishes to pass
-; the null "as-is" it should use the @ forms.
+; Conditionals return NULL on failure, and ~null~ isotope on a branch that
+; executes and evaluates to either NULL or ~null~ isotope.  If the branch
+; wishes to pass the null "as-is" it should use the ^ forms.
 [
-    (null-2? if true [null])
-    (null-2? if true [null-2])
-    (null-2? if true [])
-    ('~custom~ = if true ['~custom~])
+    ((the ') = ^ if true [null])
+    ((the ') = ^ if true [heavy null])
+    ('~void~ = ^ if true [])
+    ('~custom~ = ^ if true [~custom~])
+    (''~custom~ = ^ if true ['~custom~])
 
-    (null-1? if true @[null])
-    (null-2? if true @[null-2])
-    (null? if true @[])
-    ('~custom~ = if true @['~custom~])
+    (null = ^ if true ^[null])
+    ((the ') = ^ if true ^[heavy null])
+    ('~void~ = ^ if true ^[])
+    ('~custom~ = ^ if true ^[~custom~])
+    (''~custom~ = ^ if true ^['~custom~])
 ]

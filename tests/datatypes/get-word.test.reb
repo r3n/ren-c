@@ -13,11 +13,11 @@
 )
 
 [#1477
-    ((match get-path! just :/) = (load-value ":/"))
+    ((match get-path! the :/) = (load-value ":/"))
 
-    ((match get-path! just ://) = (load-value "://"))
+    ((match get-path! the ://) = (load-value "://"))
 
-    ((match get-path! just :///) = (load-value ":///"))
+    ((match get-path! the :///) = (load-value ":///"))
 ]
 
 ; Terminal dotted access inhibits action invocation, while slashed access

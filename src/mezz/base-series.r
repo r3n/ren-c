@@ -37,7 +37,7 @@ last: redescribe [
     {Returns the last value of a series.}
 ](
     specialize adapt :pick [
-        picker: length of get just location:
+        picker: length of get 'location
     ][
         picker: <removed-parameter>
     ]
@@ -88,13 +88,13 @@ join: function [
     result: switch type of :value [
         block! [append base reduce .identity :value]
         group! [
-            fail @base "Can't JOIN a GROUP! onto a series (use AS BLOCK!)."
+            fail ^base "Can't JOIN a GROUP! onto a series (use AS BLOCK!)."
         ]
         action! [
-            fail @base "Can't JOIN an ACTION! onto a series (use APPEND)."
+            fail ^base "Can't JOIN an ACTION! onto a series (use APPEND)."
         ]
     ] else [
-        append/only base :value
+        append base try ^value
     ]
 
     if type [
@@ -236,7 +236,7 @@ trim: function [
 
     case/all [
         head_TRIM [
-            parse series [remove [any rule] to end]
+            parse series [remove [while rule] to end]
         ]
 
         tail_TRIM [
@@ -264,44 +264,37 @@ trim: function [
     ;
     indent: _
     if auto [
-        parse series [
+        parse* series [
             ; Don't count empty lines, (e.g. trim/auto {^/^/^/    asdf})
-            remove [any LF]
+            remove [while LF]
 
             (indent: 0)
             s: here, some rule, e: here
             (indent: (index of e) - (index of s))
-
-            end
         ]
     ]
 
     line-start-rule: compose/deep [
-        remove [((if indent [[1 indent]] else ['any])) rule]
+        remove [((if indent [[1 indent]] else ['while])) rule]
     ]
 
     parse series [
         line-start-rule
-        any [
-            while [
-                ahead [any rule [newline | end]]
-                remove [any rule]
-                [newline line-start-rule]
-                    |
-                skip
-            ]
-        ]
-
-        end
+        while [not end [
+            ahead [while rule [newline | end]]
+            remove [while rule]
+            newline line-start-rule
+                |
+            skip
+        ]]
     ]
 
     ; While trimming with /TAIL takes out any number of newlines, plain TRIM
     ; in R3-Alpha and Red leaves at most one newline at the end.
     ;
     parse series [
-        remove [any newline]
+        remove [while newline]
         while [newline remove [some newline end] | skip]
-        end
     ]
 
     return series

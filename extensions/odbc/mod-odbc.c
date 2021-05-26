@@ -273,7 +273,7 @@ enum CharColumnEncoding char_column_encoding = CHAR_COL_UTF16;
 //
 //  {Set the encoding for CHAR, CHAR(n), VARCHAR(n), LONGVARCHAR fields}
 //
-//      return: [void!]
+//      return: []
 //      encoding "Either UTF-8, Latin-1, or UCS-2"
 //          [word!]
 //  ]
@@ -295,7 +295,7 @@ REBNATIVE(odbc_set_char_encoding)
         "]"
     ));
 
-    return rebVoid();
+    return rebNone();
 }
 
 
@@ -428,8 +428,8 @@ REBNATIVE(open_statement)
     ODBC_INCLUDE_PARAMS_OF_OPEN_STATEMENT;
 
     REBVAL *connection = ARG(connection);
-    REBVAL *hdbc_value = rebValueQ(
-        "ensure handle! pick", connection, "'hdbc"
+    REBVAL *hdbc_value = rebValue(
+        "ensure handle! pick @", connection, "'hdbc"
     );
     SQLHDBC hdbc = VAL_HANDLE_POINTER(SQLHDBC, hdbc_value);
     rebRelease(hdbc_value);
@@ -690,9 +690,9 @@ SQLRETURN ODBC_BindParameter(
         // means it could give bad displays or length calculations if
         // codepoints > 0xFFFF are used.
         //
-        unsigned int num_wchars_no_term = rebSpellIntoWideQ(nullptr, 0, v);
+        unsigned int num_wchars_no_term = rebSpellIntoWide(nullptr, 0, v);
         SQLWCHAR *chars = rebAllocN(SQLWCHAR, num_wchars_no_term + 1);
-        unsigned int check = rebSpellIntoWideQ(chars, num_wchars_no_term, v);
+        unsigned int check = rebSpellIntoWide(chars, num_wchars_no_term, v);
         assert(check == num_wchars_no_term);
         UNUSED(check);
 
@@ -1507,7 +1507,7 @@ REBNATIVE(copy_odbc)
     // compares-0 based row against num_rows, so -1 is chosen to never match
     // and hence mean "as many rows as available"
     //
-    SQLLEN num_rows = rebUnbox("any [", rebQ(REF(part)), "-1]");
+    SQLLEN num_rows = rebUnbox("any [", REF(part), "-1]");
 
     REBVAL *results = rebValue(
         "make block!", rebI(num_rows == -1 ? 10 : num_rows)
@@ -1625,10 +1625,10 @@ REBNATIVE(copy_odbc)
             }
 
             REBVAL *temp = ODBC_Column_To_Rebol_Value(col);
-            rebElide("append/only", record, rebR(temp));
+            rebElide("append", record, "quote", rebR(temp));
         }
 
-        rebElide("append/only", results, rebR(record));
+        rebElide("append", results, "quote", rebR(record));
         ++row;
     }
 

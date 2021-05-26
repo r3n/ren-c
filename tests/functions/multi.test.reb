@@ -17,11 +17,11 @@
 [
     (test: func [x y: z:] [
         if not null? y [
-            assert [void? get/any y]
+            assert [bad-word? friendly get/any y]
             set y <y-result>
         ]
         if not null? z [
-            assert [void? get/any z]
+            assert [bad-word? friendly get/any z]
             set z <z-result>
         ]
 
@@ -61,7 +61,7 @@
     (
         a: b: c: null
         did all [
-            <y-result> = [a @b c]: test 1020
+            <y-result> = [a ^b c]: test 1020
             a = 304
             b = <y-result>
             c = <z-result>
@@ -69,7 +69,7 @@
     )(
         a: b: c: null
         did all [
-            304 = [@a b c]: test 1020
+            304 = [^a b c]: test 1020
             a = 304
             b = <y-result>
             c = <z-result>
@@ -77,7 +77,7 @@
     )(
         a: b: c: null
         did all [
-            <z-result> = [a b @(first [c])]: test 1020
+            <z-result> = [a b ^(first [c])]: test 1020
             a = 304
             b = <y-result>
             c = <z-result>
@@ -85,7 +85,7 @@
     )(
         a: b: c: null
         did all [
-            <z-result> = [a b @(#)]: test 1020
+            <z-result> = [a b ^(#)]: test 1020
             a = 304
             b = <y-result>
             c = null

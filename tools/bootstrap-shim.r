@@ -56,7 +56,7 @@ trap [
     ;
     do %../scripts/make-file.r  ; Experimental!  Trying to replace PD_File...
 
-    ; OPT has behavior of turning NULLs into VOID! to keep you from optioning
+    ; OPT has behavior of turning NULLs into ~nulled~ to keep you from opting
     ; something you don't need to, but with refinement changes bootstrap code
     ; would get ugly if it had to turn every OPT of a refinement into OPT TRY.
     ; Bypass the voidification for the refinement sake.
@@ -69,13 +69,67 @@ trap [
     ; https://forum.rebol.info/t/just-vs-lit-literal-literally/1453
     ; bootstrap executable on GitHub CI doesn't have this change
     ;
-    if undefined? 'just [
-        just: :literal
+    if undefined? 'the [
+        the: :literal
+
+        ; Workaround the <void> => <none> spec change, for same version
+
+        func: adapt :func [
+            if find spec <none> [
+                spec: replace (copy spec) <none> <void>
+            ]
+        ]
+
+        meth: enfixed adapt :meth [
+            if find spec <none> [
+                spec: replace (copy spec) <none> <void>
+            ]
+        ]
+
+        function: adapt :function [
+            if find spec <none> [
+                spec: replace (copy spec) <none> <void>
+            ]
+        ]
+
+        any-inert!: make typeset! [text! tag! issue! binary! char! object! file!]
+
+        append: adapt :append [
+            value: case [
+                only [:value]
+                blank? :value [null]
+                block? :value [:value]
+                match any-inert! :value [:value]
+                fail ^value ["APPEND takes block, blank, ANY-INERT!"]
+            ]
+        ]
+
+        insert: adapt :insert [
+            value: case [
+                only [:value]
+                blank? :value [null]
+                block? :value [:value]
+                match any-inert! :value [:value]
+                fail ^value ["INSERT takes block, blank, ANY-INERT!"]
+            ]
+        ]
+
+        change: adapt :change [
+            value: case [
+                only [:value]
+                blank? :value [null]
+                block? :value [:value]
+                match any-inert! :value [:value]
+                fail ^value ["CHANGE takes block, blank, ANY-INERT!"]
+            ]
+        ]
+
+        parse?: chain [:lib/parse | :did]
     ]
 
     ; LOAD changed to have no /ALL so enforcing getting a block is weird
     ;
-    if find parameters of :load /all [
+    if find parameters of :load [/all] [
         load-all: :load/all
         load-value: :load  ; imperfect...works for rebmake
     ] else [
@@ -91,6 +145,42 @@ load-value: :load
 load-all: :load/all
 
 
+any-inert!: make typeset! [text! tag! issue! binary! char! object! file!]
+
+append: adapt :append [
+    if not only [
+        value: opt case [
+            blank? :value [_]
+            block? :value [:value]
+            match any-inert! :value [:value]
+            fail/where ["APPEND takes block, blank, ANY-INERT!"] 'value
+        ]
+    ]
+]
+
+insert: adapt :insert [
+    if not only [
+        value: opt case [
+            blank? :value [_]
+            block? :value [:value]
+            match any-inert! :value [:value]
+            fail/where ["INSERT takes block, blank, ANY-INERT!"] 'value
+        ]
+    ]
+]
+
+change: adapt :change [
+    if not only [
+        value: opt case [
+            blank? :value [_]
+            block? :value [:value]
+            match any-inert! :value [:value]
+            fail/where ["CHANGE takes block, blank, ANY-INERT!"] 'value
+        ]
+    ]
+]
+
+
 ; Lambda was redefined to `->` to match Haskell/Elm vs. `=>` for JavaScript.
 ; It is lighter to look at, but also if the symbol `<=` is deemed to be
 ; "less than or equal" there's no real reason why `=>` shouldn't be "equal
@@ -104,8 +194,7 @@ load-all: :load/all
 do compose [(to set-word! first [->]) enfix :lambda]
 unset first [=>]
 
-; SET was changed to accept VOID!, use SET VAR NON VOID! (...EXPRESSION...)
-; if that is what was intended.
+; SET was changed to accept BAD-WORD! isotopes
 ;
 set: specialize :lib/set [opt: true]
 
@@ -115,16 +204,16 @@ print: func [value] [
     lib/print either value == newline [""][value]
 ]
 
-
-; NON is a new helpful opposite to ENSURE
+; PARSE is being changed to a more powerful interface that returns synthesized
+; parse products.  So just testing for matching or not is done with PARSE?,
+; to avoid conflating successful-but-null-bearing-parses with failure.
 ;
-non: func [type [<opt> datatype!] value [<opt> any-value!]] [
-    if :type = type of :value [
-        fail ["NON Didn't Expect Value to be of type" type else [<null>]]
-    ]
-    return :value
+parse?: chain [:lib/parse | :did]
+parse: chain [
+    :lib/parse
+    |
+    func [x [<opt> any-series! bar!]] [if :x ['~use-parse?-for-logic~]]
 ]
-
 
 ; Enfixedness was conceived as not a property of an action itself, but of a
 ; particular relationship between a word and an action.  While this had some
@@ -145,7 +234,7 @@ enfixed: enfix :enfix
 ; which could be also thought of as typos.  This was okay because NULL access
 ; would cause errors through word or path access.  As NULL became more
 ; normalized, the idea of an "unset" variable (no value) was complemented with
-; "undefined" variables (set to a VOID! value).  Older Ren-C conflated these.
+; "undefined" variables (set to ~unset~ value).  Older Ren-C conflated these.
 ;
 defined?: :set?
 undefined?: :unset?
@@ -167,11 +256,11 @@ collect-lets: func [
             item/1 = 'let [
                 item: next item
                 if match [set-word! word! block!] item/1 [
-                    append lets item/1
+                    lib/append lets item/1
                 ]
             ]
             value? match [block! group!] item/1 [
-                append lets collect-lets item/1
+                lib/append lets collect-lets item/1
             ]
         ]
     ]
@@ -262,6 +351,18 @@ modernize-action: function [
                     keep/only spec/1
                 ]
 
+                if spec/1 = <none> [  ; new semantics: <none> -> ~none~
+                    keep/only <void>  ; old cue for returning garbage
+                    spec: my next
+                    continue
+                ]
+
+                if spec/1 = <void> [
+                    keep/only []  ; old cue for invisibility
+                    spec: my next
+                    continue
+                ]
+
                 ; Substitute BLANK! for any <blank> found, and save some code
                 ; to inject for that parameter to return null if it's blank
                 ;
@@ -310,7 +411,7 @@ function: adapt :function [set [spec body] modernize-action spec body]
 
 meth: enfixed adapt :meth [set [spec body] modernize-action spec body]
 method: func [/dummy] [
-    fail 'dummy "METHOD deprecated temporarily, use METH"
+    fail ^dummy "METHOD deprecated temporarily, use METH"
 ]
 
 trim: adapt :trim [  ; there's a bug in TRIM/AUTO in 8994d23
@@ -331,10 +432,10 @@ mutable: func [x [any-value!]] [
     :x
 ]
 
-just: :quote  ; Renamed due to the QUOTED! datatype
+the: :quote  ; Renamed due to the QUOTED! datatype
 quote: func [x [<opt> any-value!]] [
     switch type of x [
-        null [just ()]
+        null [the ()]
         word! [to lit-word! x]
         path! [to lit-path! x]
 
@@ -558,10 +659,10 @@ dequote: func [x] [
 ; If there is no SOURCE/2, it gets NULL...which it turns into a blank because
 ; there was no <opt> in match.
 ;
-; But then if that blank matches, it gives a VOID! so you don't get misled
+; But then if that blank matches, it gives ~falsey~ so you don't get misled
 ; in tests exactly like this one.  (!)
 ;
-; Temporarily make void matches just return true for duration of the zip.
+; Temporarily make falsey matches just return true for duration of the zip.
 ; Also, make PRINT accept FILE! and TEXT! so the /VERBOSE option will work.
 ;
 zip: enclose :zip func [f] [
@@ -581,7 +682,7 @@ zip: enclose :zip func [f] [
 
     lib/match: func [type value [<opt> any-value!]] [
         let answer
-        if void? set* 'answer match type value [
+        if bad-word? set* 'answer match type value [
             return true
         ]
         return get 'answer

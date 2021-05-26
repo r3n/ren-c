@@ -95,9 +95,11 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
     switch (heart) {
       case REB_0_END:
       case REB_NULL:
-      case REB_VOID:
+      case REB_BAD_WORD:
       case REB_BLANK:
       case REB_COMMA:
+      case REB_LIT:
+      case REB_THE:
         break;
 
       case REB_LOGIC:
@@ -388,26 +390,6 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
         panic ("REB_QUOTED with (KIND3Q_BYTE() % REB_64) > 0");
 
     //=//// BEGIN INTERNAL TYPES ////////////////////////////////////////=//
-
-      case REB_G_XYF:
-        //
-        // This is a compact type that stores floats in the payload, and
-        // miscellaneous information in the extra.  None of it needs GC
-        // awareness--the cells that need GC awareness use ordinary values.
-        // It's to help pack all the data needed for the GOB! into one
-        // allocation and still keep it under 8 cells in size, without
-        // having to get involved with using HANDLE!.
-        //
-        break;
-
-      case REB_V_SIGN_INTEGRAL_WIDE:
-        //
-        // Similar to the above.  Since it has no GC behavior and the caller
-        // knows where these cells are (stealing space in an array) there is
-        // no need for a unique type, but it may help in debugging if these
-        // values somehow escape their "details" arrays.
-        //
-        break;
 
       case REB_CUSTOM:  // !!! Might it have an "integrity check" hook?
         break;

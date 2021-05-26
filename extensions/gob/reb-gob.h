@@ -40,10 +40,10 @@
 // To keep memory usage in the same order of magnitude as R3-Alpha, the GOB!'s
 // array is only 7 cells in length.  This allows it to fit into the 8 cell
 // memory pool, when the END marker is taken into account.  To achieve this
-// goal, creative use is made of "pseudotype" REB_G_XYF cells--to allow the
-// packing of floats and flags into cells that don't participate in GC.  This
-// gives an approximation of "struct-like" compactness for that inert data,
-// while still giving the GC the insight via normal sells into what to guard.
+// goal, creative use is made of REB_BYTES cells--to allow the packing of
+// floats and flags into cells that don't participate in GC.  This gives an
+// approximation of "struct-like" compactness for that inert data, while still
+// giving the GC the insight via normal cells into what to guard.
 //
 ////=// NOTES ////////////////////////////////////////////////////////////=//
 //
@@ -64,7 +64,7 @@
 // The GC knows to mark these because of SERIES_INFO_LINK_NODE_NEEDS_MARK
 // and SERIES_INFO_MISC_NODE_NEEDS_MARK.
 //
-// The offset, size, old_offset and old_size cells are REB_G_XYF cells that
+// The offset, size, old_offset and old_size cells are REB_BYTES cells that
 // are GC-inert.  They use their payloads for x and y coordinates, but the
 // extra slot is used for other things.
 //
@@ -153,8 +153,7 @@ inline static REBVAL *Init_XYF(
     REBD32 x,  // 32-bit floating point type, typically just `float`...
     REBD32 y   // there's no standard: https://stackoverflow.com/a/18705626/
 ){
-    RESET_CELL(out, REB_G_XYF, CELL_MASK_NONE);
-    mutable_HEART_BYTE(out) = REB_LOGIC;  // fools Is_Bindable()
+    RESET_CELL(out, REB_BYTES, CELL_MASK_NONE);
     VAL_XYF_X(out) = x;
     VAL_XYF_Y(out) = y;
     return cast(REBVAL*, out);

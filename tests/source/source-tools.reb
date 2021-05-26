@@ -106,7 +106,7 @@ rebsource: context [
     log-emit: function [
         {Append a COMPOSE'd block to a log block, clearing any new-line flags}
 
-        return: <void>
+        return: <none>
         log [block!]
         label [tag!]
         body [block!]
@@ -125,7 +125,7 @@ rebsource: context [
                 for-each source list/source-files [
                     if find whitelisted source [continue]
 
-                    keep analyse/file source
+                    keep try analyse/file source
                 ]
             ]
         ]
@@ -188,15 +188,15 @@ rebsource: context [
                     emit <eof-eol-missing> [(file)]
                 ]
 
-                emit-proto: function [return: <void> proto] [
+                emit-proto: function [return: <none> proto] [
                     if not block? proto-parser/data [return]
 
                     do in c-parser-extension [
                         if last-func-end [
                             all [
-                                parse last-func-end [
+                                parse? last-func-end [
                                     function-spacing-rule
-                                    position:
+                                    position: here
                                     to end
                                 ]
                                 same? position proto-parser/parse-position
@@ -343,7 +343,7 @@ rebsource: context [
                     seek :bol  ; !!! GET-WORD! for bootstrap (SEEK is no-op)
                 ]
 
-                any [
+                while [
                     to stop-char
                     position: here
                     [
@@ -440,7 +440,7 @@ rebsource: context [
 
         lbrace: [and punctuator "{"]
         rbrace: [and punctuator "}"]
-        braced: [lbrace any [braced | not rbrace skip] rbrace]
+        braced: [lbrace while [braced | not rbrace skip] rbrace]
 
         function-spacing-rule: (
             bind/copy standard/function-spacing c-lexical/grammar
@@ -450,7 +450,7 @@ rebsource: context [
 
         append grammar/format-func-section [
             last-func-end:
-            any [nl | eol | wsp]
+            while [nl | eol | wsp]
         ]
 
         append/only grammar/other-segment just (

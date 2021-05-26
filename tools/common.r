@@ -242,8 +242,8 @@ for-each-record: function [
 
         spec: collect [
             for-each column-name headings [
-                keep column-name
-                keep compose/only [just (table/1)]
+                keep/only column-name
+                keep compose/only [the (table/1)]
                 table: next table
             ]
         ]
@@ -314,12 +314,12 @@ parse-args: function [
         either name [
             append ret reduce [name value]
         ][; standalone-arg
-            append standalone value
+            append/only standalone value
         ]
     ]
     if empty? standalone [return ret]
-    append ret '|
-    append ret standalone
+    append/only ret '|
+    append/only ret standalone
 ]
 
 uppercase-of: func [
@@ -346,7 +346,7 @@ propercase-of: func [
 ]
 
 write-if-changed: function [
-    return: <void>
+    return: <none>
     dest [file!]
     content [text! block!]
 ][
@@ -428,7 +428,7 @@ stripload: function [
         while [  ; https://github.com/rebol/rebol-issues/issues/1401
             newline [while [comment-or-space-rule remove newline]]
             |
-            [ahead [any space ";"]] comment-or-space-rule
+            [ahead [while space ";"]] comment-or-space-rule
             |
             "^^{"  ; (actually `^{`) escaped brace, never count
             |
@@ -494,7 +494,7 @@ stripload: function [
                     not find str {"}
                     not find str "/"
                 ] then [
-                    keep as word! str
+                    keep/only as word! str
                 ]
                 t: newline-pos
             ]

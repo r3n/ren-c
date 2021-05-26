@@ -17,7 +17,7 @@
 (null = match :even? 3)
 
 
-(void? match blank! _)
+('~falsey~ = ^ match blank! _)
 (null = match blank! 10)
 (null = match blank! false)
 
@@ -25,16 +25,16 @@
 ; !!! There was once special accounting for where the quoting level of the
 ; test would match the quoting level of the rule:
 ;
-;    (just 'foo = match just 'word! just 'foo)
-;    (null = match just 'word! just foo)
+;    (the 'foo = match the 'word! the 'foo)
+;    (null = match the 'word! the foo)
 ;
 ;    quoted-word!: quote word!
-;    (''foo = match ['quoted-word!] just ''foo)
-;    (null = match ['quoted-word!] just '''foo)
-;    ('''foo = match just '['quoted-word!] just '''foo)
+;    (''foo = match ['quoted-word!] the ''foo)
+;    (null = match ['quoted-word!] the '''foo)
+;    ('''foo = match the '['quoted-word!] the '''foo)
 ;
 ;    even-int: 'integer!/[:even?]
-;    (just '304 = match just '[block!/3 even-int] just '304)
+;    (the '304 = match the '[block!/3 even-int] the '304)
 ;
 ; This idea was killed off in steps; one step made it so that MATCH itself did
 ; not take its argument literally so it would not see quotes.  That made it
@@ -58,17 +58,17 @@
 (null = match [block!/3 integer!/[:even?]] 303)
 
 
-; Falsey things are turned to VOID! in order to avoid cases like:
+; Falsey things are turned to BAD-WORD! in order to avoid cases like:
 ;
 ;     if match logic! flag [...]
 ;
-; But can still be tested for value? since they are VOID!, and can be used
+; But can still be tested for then? since they are BAD-WORD!, and can be used
 ; with THEN and ELSE.
 [
-    (void? match null null)
-    (void? match blank! blank)
+    ('~falsey~ = ^ match null null)
+    ('~falsey~ = ^ match blank! blank)
     (true = match logic! true)
-    (void? match logic! false)
+    ('~falsey~ = ^ match logic! false)
 ]
 
 [
@@ -86,16 +86,22 @@
     (10 = ensure integer! 10)
 ]
 
-; NON is an inverted form of ENSURE, that fails when the argument *matches*
+; NON is an inverted form of MATCH, that fails when the argument *matches*
+; It is a specialization of MATCH/NOT
 [
-    (error? trap [non action! :append])
+    (null = non action! :append)
     (10 = non action! 10)
 
-    (error? trap [non integer! 10])
+    (null = non integer! 10)
     (:append = non integer! :append)
 
     (10 = non null 10)
+
+    ; !!! Review the special handling of this case...no good result can be
+    ; returned to signal this failure.  Currently it just errors.
+    ;
     (error? trap [non null null])
+    (error? trap [non logic! false])
 ]
 
 
@@ -114,15 +120,7 @@
     ]
     true)
 
-    ; PARSE was a favored example because getting the PARSE input was useful.
-    ; But now that's the default operation of PARSE.  Simulate a LOGIC!
-    ; returning PARSE to show the benefit.
-    ;
-    (
-        parse?: chain [:parse | :did]
-        true
-    )
-    ("aaa" = match+ parse? "aaa" [some "a"])
+    ("aaa" = match+ match-parse "aaa" [some "a"])
     (null = match+ parse "aaa" [some "b"])
 ]
 
@@ -148,13 +146,12 @@
                 if action? get test [
                     f: make frame! args
                     first-arg: get in f first parameters of action of f
-                    either-match false do f [return first-arg]
-                    return null
+                    return ((match true do f) then ^first-arg)
                 ]
             ]
         ]
 
-        either-match :(take args) (take args-normal) @null
+        match :(take args) (take args-normal) else ^null
     ]
     true)
 

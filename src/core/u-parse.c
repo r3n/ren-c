@@ -34,7 +34,7 @@
 // the parser were unified with the frame model of recursing the evaluator...
 // but that was the only true big change.
 //
-// However, a full redesign has been started with %scripts/uparse.reb.  This
+// However, a full redesign has been started with %src/mezz/uparse.reb.  This
 // is in the spirit of "parser combinators" as defined in many other languages,
 // but brings in the PARSE dialect's succinct symbolic nature.  That design is
 // extremely slow, however--and will need to be merged in with some of the
@@ -249,9 +249,10 @@ enum parse_flags {
     PF_REMOVE = 1 << 9,
     PF_INSERT = 1 << 10,
     PF_CHANGE = 1 << 11,
-    PF_ANY_OR_SOME = 1 << 12,
+    PF_LOOPING = 1 << 12,
+    PF_FURTHER = 1 << 13,  // must advance parse input to count as a match
 
-    PF_ONE_RULE = 1 << 13,  // signal to only run one step of the parse
+    PF_ONE_RULE = 1 << 14,  // signal to only run one step of the parse
 
     PF_MAX = PF_ONE_RULE
 };
@@ -355,9 +356,9 @@ static bool Subparse_Throws(
 
     // Locals in frame would be void on entry if called by action dispatch.
     //
-    Init_Void(Prep_Cell(ARG(num_quotes)), SYM_UNSET);
-    Init_Void(Prep_Cell(ARG(position)), SYM_UNSET);
-    Init_Void(Prep_Cell(ARG(save)), SYM_UNSET);
+    Init_Unset(Prep_Cell(ARG(num_quotes)));
+    Init_Unset(Prep_Cell(ARG(position)));
+    Init_Unset(Prep_Cell(ARG(save)));
 
     // !!! By calling the subparse native here directly from its C function
     // vs. going through the evaluator, we don't get the opportunity to do
@@ -721,12 +722,12 @@ static REB_R Parse_One_Rule(
         // We try to allow some conveniences when parsing strings based on
         // how items render, e.g.:
         //
-        //     >> did parse "ab<c>10" ['ab <c> '10]
+        //     >> parse? "ab<c>10" ['ab <c> '10]
         //     == #[true]
         //
         // It can be less visually noisy than:
         //
-        //     >> did parse "ab<c>10" ["ab" {<c>} "10"]
+        //     >> parse? "ab<c>10" ["ab" {<c>} "10"]
         //     == #[true]
         //
         // !!! The concept is based somewhat on what was legal in FIND for
@@ -1487,22 +1488,29 @@ REBNATIVE(subparse)
 
             switch (cmd) {
               case SYM_WHILE:
+                P_FLAGS |= PF_LOOPING;
                 assert(mincount == 1 and maxcount == 1);  // true on entry
                 mincount = 0;
+                maxcount = INT32_MAX;
+                FETCH_NEXT_RULE(f);
+                P_FLAGS |= PF_LOOPING;
+                goto pre_rule;
+
+              case SYM_SOME:
+                assert(mincount == 1 and maxcount == 1);  // true on entry
+                P_FLAGS |= PF_LOOPING;
                 maxcount = INT32_MAX;
                 FETCH_NEXT_RULE(f);
                 goto pre_rule;
 
               case SYM_ANY:
-                assert(mincount == 1 and maxcount == 1);  // true on entry
-                mincount = 0;
-                goto sym_some;
+                fail (
+                    "Please replace PARSE ANY with WHILE or WHILE FURTHER: "
+                    "https://forum.rebol.info/t/1540/12"
+                );
 
-              case SYM_SOME:
-                assert(mincount == 1 and maxcount == 1);  // true on entry
-              sym_some:
-                P_FLAGS |= PF_ANY_OR_SOME;
-                maxcount = INT32_MAX;
+              case SYM_FURTHER:  // require advancement
+                P_FLAGS |= PF_FURTHER;
                 FETCH_NEXT_RULE(f);
                 goto pre_rule;
 
@@ -1600,21 +1608,23 @@ REBNATIVE(subparse)
 
                 FETCH_NEXT_RULE(f);  // e.g. skip the KEEP word!
 
-                // !!! We follow the R3-Alpha principle of not using
-                // PATH! dispatch here, so it's `keep only` instead of
-                // `keep/only`.  But is that any good?  Review.
-                //
-                bool only;
-                if (IS_WORD(P_RULE) and VAL_WORD_ID(P_RULE) == SYM_ONLY) {
-                    only = true;
-                    FETCH_NEXT_RULE(f);
-                }
-                else
-                    only = false;
-
                 REBLEN pos_before = P_POS;
 
                 rule = Get_Parse_Value(P_SAVE, P_RULE, P_RULE_SPECIFIER);
+
+                // If you say KEEP ^(whatever) then that acts like /ONLY did
+                //
+                bool only;
+                if (ANY_SYM_KIND(VAL_TYPE(rule))) {
+                    if (rule != P_SAVE) {  // move to mutable location
+                        Derelativize(P_SAVE, rule, P_RULE_SPECIFIER);
+                        rule = P_SAVE;
+                    }
+                    Plainify(P_SAVE);  // take the ^ off
+                    only = true;
+                }
+                else
+                    only = false;
 
                 if (IS_GROUP(rule)) {
                     //
@@ -1653,6 +1663,10 @@ REBNATIVE(subparse)
                 else {  // Ordinary rule (may be block, may not be)
 
                     DECLARE_FRAME (subframe, f->feed, EVAL_MASK_DEFAULT);
+
+                    // Want the subframe to see the BLOCK!, not ^[...]
+                    //
+                    f->feed->value = rule;
 
                     bool interrupted;
                     assert(IS_END(D_OUT));  // invariant until finished
@@ -1837,11 +1851,23 @@ REBNATIVE(subparse)
                 goto pre_rule;
 
               case SYM_RETURN:
-                fail ("RETURN removed from PARSE, use (THROW ...)");
+                fail ("RETURN removed from PARSE, see UPARSE return value");
+
+              // !!! HERE looks like a no-op, but if it's to the right of a
+              // SET-WORD! then it will be assigned to that variable by the
+              // set word code.  So this case is hit only when it's not to
+              // the right of a set-word.  That's a no-op until native PARSE
+              // has synthesized rule results.  But for the moment, a special
+              // case is noticed at the top level PARSE* to return the current
+              // position for how far a parse gets.
+              //
+              case SYM_HERE:
+                FETCH_NEXT_RULE(f);  // skip the HERE word
+                goto pre_rule;
 
               case SYM_SEEK: {
                 FETCH_NEXT_RULE(f);  // skip the SEEK word
-                // !!! what about `seek @(first x)` ?
+                // !!! what about `seek ^(first x)` ?
                 HANDLE_SEEK_RULE_UPDATE_BEGIN(f, P_RULE, P_RULE_SPECIFIER);
                 FETCH_NEXT_RULE(f);  // e.g. skip the `x` in `seek x`
                 goto pre_rule; }
@@ -2175,7 +2201,7 @@ REBNATIVE(subparse)
                     // !!! Review faster way of sharing the AS transform.
                     //
                     Derelativize(D_SPARE, into, P_INPUT_SPECIFIER);
-                    into = rebValueQ("as block!", D_SPARE);
+                    into = rebValue("as block! @", D_SPARE);
                 }
                 else if (
                     not ANY_SERIES_KIND(CELL_KIND(VAL_UNESCAPED(into)))
@@ -2303,18 +2329,16 @@ REBNATIVE(subparse)
         if (count < 0)
             count = INT32_MAX;  // the forever case
 
-        P_POS = cast(REBLEN, i);
-
-        if (i == P_INPUT_LEN and (P_FLAGS & PF_ANY_OR_SOME)) {
-            //
-            // ANY and SOME auto terminate on e.g. `some [... | end]`.
-            // But WHILE is conceptually a synonym for a self-recursive
-            // rule and does not consider it a termination.  See:
-            //
-            // https://github.com/rebol/rebol-issues/issues/1268
-            //
+        // If FURTHER was used then the parse must advance the input; it can't
+        // be at the saem position.
+        //
+        if (P_POS == cast(REBINT, i) and (P_FLAGS & PF_FURTHER)) {
+            if (not (P_FLAGS & PF_LOOPING))
+                Init_Nulled(ARG(position));  // need to fail rule, not loop
             break;
         }
+
+        P_POS = cast(REBLEN, i);
     }
 
     // !!! This out of bounds check is necessary because GROUP!s execute
@@ -2492,58 +2516,47 @@ REBNATIVE(subparse)
 
             if (P_FLAGS & (PF_INSERT | PF_CHANGE)) {
                 count = (P_FLAGS & PF_INSERT) ? 0 : count;
-                bool only = false;
                 if (IS_END(P_RULE))
                     fail (Error_Parse_End());
-
-                if (IS_WORD(P_RULE)) {  // check for ONLY flag
-                    SYMID cmd = VAL_CMD(P_RULE);
-                    switch (cmd) {
-                      case SYM_ONLY:
-                        only = true;
-                        FETCH_NEXT_RULE(f);
-                        if (IS_END(P_RULE))
-                            fail (Error_Parse_End());
-                        break;
-
-                      case SYM_0: // not a "parse command" word, keep going
-                        break;
-
-                      default: // other commands invalid after INSERT/CHANGE
-                        fail (Error_Parse_Rule());
-                    }
-                }
 
                 // new value...comment said "CHECK FOR QUOTE!!"
                 rule = Get_Parse_Value(P_SAVE, P_RULE, P_RULE_SPECIFIER);
                 FETCH_NEXT_RULE(f);
 
-                // If a GROUP!, then execute it first.  See #1279
+                // If you say KEEP ^(whatever) then that acts like /ONLY did
                 //
-                DECLARE_LOCAL (evaluated);
-                if (IS_GROUP(rule)) {
-                    REBSPC *derived = Derive_Specifier(
-                        P_RULE_SPECIFIER,
-                        rule
-                    );
-                    if (Do_Any_Array_At_Throws(
-                        evaluated,
-                        rule,
-                        derived
-                    )){
-                        Copy_Cell(D_OUT, evaluated);
-                        goto return_thrown;
+                bool only;
+                if (ANY_SYM_KIND(VAL_TYPE(rule))) {
+                    if (rule != P_SAVE) {  // move to mutable location
+                        Derelativize(P_SAVE, rule, P_RULE_SPECIFIER);
+                        rule = P_SAVE;
                     }
+                    Plainify(P_SAVE);  // take the ^ off
+                    only = true;
+                }
+                else
+                    only = false;
 
-                    rule = evaluated;
+                if (not IS_GROUP(rule))
+                    fail ("Only (...) or ^(...) in old PARSE's CHANGE/INSERT");
+            
+                DECLARE_LOCAL (evaluated);
+                REBSPC *derived = Derive_Specifier(
+                    P_RULE_SPECIFIER,
+                    rule
+                );
+                if (Do_Any_Array_At_Throws(
+                    evaluated,
+                    rule,
+                    derived
+                )){
+                    Copy_Cell(D_OUT, evaluated);
+                    goto return_thrown;
                 }
 
                 if (IS_SER_ARRAY(P_INPUT)) {
-                    DECLARE_LOCAL (specified);
-                    Derelativize(specified, rule, P_RULE_SPECIFIER);
-
                     REBLEN mod_flags = (P_FLAGS & PF_INSERT) ? 0 : AM_PART;
-                    if (not only and Splices_Without_Only(specified))
+                    if (not only and ANY_ARRAY(evaluated))
                         mod_flags |= AM_SPLICE;
 
                     // Note: We could check for mutability at the start
@@ -2558,19 +2571,13 @@ REBNATIVE(subparse)
                         (P_FLAGS & PF_CHANGE)
                             ? SYM_CHANGE
                             : SYM_INSERT,
-                        specified,
+                        evaluated,
                         mod_flags,
                         count,
                         1
                     );
-
-                    if (IS_QUOTED(rule))
-                        Unquotify(ARR_AT(a, P_POS - 1), 1);
                 }
                 else {
-                    DECLARE_LOCAL (specified);
-                    Derelativize(specified, rule, P_RULE_SPECIFIER);
-
                     P_POS = begin;
 
                     REBLEN mod_flags = (P_FLAGS & PF_INSERT) ? 0 : AM_PART;
@@ -2580,7 +2587,7 @@ REBNATIVE(subparse)
                         (P_FLAGS & PF_CHANGE)
                             ? SYM_CHANGE
                             : SYM_INSERT,
-                        specified,
+                        evaluated,
                         mod_flags,
                         count,
                         1
@@ -2652,14 +2659,12 @@ REBNATIVE(subparse)
 
 
 //
-//  parse: native [
+//  parse*: native [
 //
-//  "Parse series according to grammar rules, return last match position"
+//  "Parse series according to grammar rules"
 //
-//      return: "null if rules failed, else terminal position of match"
-//          [<opt> any-series!]
-//      progress: "<output> Allow partial matches; returns progress position"
-//          [<opt> any-series!]
+//      return: "TBD: parse product, currently either ~parsed~ or NULL"
+//          [<opt> bad-word! any-series!]
 //
 //      input "Input series to parse"
 //          [<blank> any-series!]
@@ -2668,15 +2673,41 @@ REBNATIVE(subparse)
 //      /case "Uses case-sensitive comparison"
 //      /inside "Context to add to rules (and subrules)"
 //          [any-context!]
+//      /fully "Require parse to reach end, see PARSE specialization"
 //  ]
 //
-REBNATIVE(parse)
+REBNATIVE(parse_p)
 //
 // https://forum.rebol.info/t/1084
 {
-    INCLUDE_PARAMS_OF_PARSE;
+    INCLUDE_PARAMS_OF_PARSE_P;
 
     REBVAL *input = ARG(input);
+    REBVAL *rules = ARG(rules);
+
+    const RELVAL *rules_tail;
+    const RELVAL *rules_at = VAL_ARRAY_AT(&rules_tail, rules);
+
+    // !!! Look for the special pattern `parse ... [collect [x]]` and delegate
+    // to a fabricated `parse [temp: collect [x]]` so we can return temp.
+    // This hack is just to give a sense of the coming benefit of synthesized
+    // parse rules, to help realize why PARSE? vs PARSE vs PARSE* exist.
+    if (
+        rules_at != rules_tail
+        and rules_at + 1 != rules_tail
+        and rules_at + 2 == rules_tail
+        and IS_WORD(rules_at) and VAL_WORD_ID(rules_at) == SYM_COLLECT
+        and IS_BLOCK(rules_at + 1)
+    ){
+        REBCTX *frame_ctx = Context_For_Frame_May_Manage(frame_);
+        return rebValue(
+            "let temp",
+            "let f: copy", CTX_ARCHETYPE(frame_ctx),
+            "f.rules: [temp: collect", rules_at + 1, "]",
+            "do f",
+            "temp"
+        );
+    }
 
     if (not ANY_SERIES_KIND(CELL_KIND(VAL_UNESCAPED(input))))
         fail ("PARSE input must be an ANY-SERIES! (use AS BLOCK! for PATH!)");
@@ -2686,9 +2717,9 @@ REBNATIVE(parse)
     // explicitly add the rule on when it follows such links.
     //
     if (REF(inside))
-        Virtual_Bind_Patchify(ARG(rules), VAL_CONTEXT(ARG(inside)), REB_WORD);
+        Virtual_Bind_Patchify(rules, VAL_CONTEXT(ARG(inside)), REB_WORD);
 
-    DECLARE_FRAME_AT (subframe, ARG(rules), EVAL_MASK_DEFAULT);
+    DECLARE_FRAME_AT (subframe, rules, EVAL_MASK_DEFAULT);
 
     bool interrupted;
     if (Subparse_Throws(
@@ -2710,52 +2741,39 @@ REBNATIVE(parse)
         return R_THROWN;
     }
 
-    REBVAL *progress = ARG(progress);
+    if (IS_NULLED(D_OUT))
+        return nullptr;  // the match failed
 
-    if (IS_NULLED(D_OUT)) {
-        if (IS_TRUTHY(progress)) {
-            //
-            // While returning NULL in this case might be nice for letting the
-            // caller test only the progress to know about the success of a
-            // partial match, setting it to VOID! helps pave the way for a
-            // future in which a failed partial match could tell you how far
-            // it got in the input before failing.
-            //
-            Init_Void(D_SPARE, SYM_VOID);
-            rebElideQ("set", progress, D_SPARE);
-        }
-        return nullptr;
-    }
-
-    REBLEN index = VAL_UINT32(D_OUT);  // index reached by subparse
+    REBLEN index = VAL_UINT32(D_OUT);
     assert(index <= VAL_LEN_HEAD(input));
 
-    if (not IS_TRUTHY(progress)) {
-        //
-        // Not asking for how far a parse got implies that the parse must
-        // reach the complete end of input in order to have succeeded.
-        //
-        if (index == VAL_LEN_HEAD(input))
-            RETURN (input);
-
-        return nullptr;
+    if (REF(fully)) {  // match succeeded, but we also want to reach the tail
+        if (index != VAL_LEN_HEAD(input))
+            return nullptr;  // index did not reach tail
     }
 
-    // !!! Current policy is to try to return the same number of quotes as
-    // the input.  VAL_INDEX() allows reading indices out of REBCEL which
-    // are guaranteed unescaped (hence you won't be falsely reading out of
-    // the data of a REB_QUOTED container).  But REBCEL is read only, so
-    // the writes must be done to a RELVAL.  We must dequote/requote to
-    // make sure we don't write to a REB_QUOTED or shared contained cell.
+    // !!! R3-Alpha parse design had no means to bubble up a "synthesized"
+    // rule product.  But that's important in the new design.  Hack in support
+    // for the single case of when the last rule in the block was HERE and
+    // returning the parse position.
     //
-    Copy_Cell(D_SPARE, ARG(input));
-    REBLEN num_quotes = Dequotify(D_SPARE);  // take quotes out
-    VAL_INDEX_UNBOUNDED(D_SPARE) = index;  // cell guaranteed not REB_QUOTED
-    Quotify(D_SPARE, num_quotes);  // put quotes back
+    if (
+        rules_at != rules_tail  // position on input wasn't []
+        and IS_WORD(rules_tail - 1)  // last element processed was a WORD!
+        and VAL_WORD_ID(rules_tail - 1) == SYM_HERE  // the word was HERE
+    ){
+        Copy_Cell(D_OUT, ARG(input));
+        REBLEN num_quotes = Dequotify(D_OUT);  // take quotes out
+        VAL_INDEX_UNBOUNDED(D_OUT) = index;  // cell guaranteed not REB_QUOTED
+        return Quotify(D_OUT, num_quotes);  // put quotes back
+    }
 
-    rebElideQ("set", progress, D_SPARE);
-
-    RETURN (ARG(input));  // main return value is input at original position
+    // !!! Give back a value that triggers a THEN clause and won't trigger an
+    // ELSE clause.  See UPARSE for the redesign that will be applied to more
+    // native code in the future.  But this is just to get people out of the
+    // habit of writing `IF PARSE ...`
+    //
+    return rebValue("'~use-PARSE?-for-logic~");
 }
 
 

@@ -501,7 +501,7 @@ void Startup_Interning(void)
 // available during scanning.  But scanning is what loads the %words.r symbol
 // list!  Break the Catch-22 by manually interning the symbol used.
 //
-// (Same issue applies to the symbol in ~unreadable~ in release builds, used
+// (Same issue applies to the symbol in ~trash~ in release builds, used
 // e.g. by the data stack initialization.  In debug builds NULL is used to
 // detect the errors on reads.)
 //
@@ -515,12 +515,9 @@ void Startup_Early_Symbols(void)
     assert(PG_Dot_1_Canon == nullptr);
     PG_Dot_1_Canon = Intern_UTF8_Managed(cb_cast(dot1), strsize(dot1));
 
-    const char *unreadable = "unreadable";
-    assert(PG_Unreadable_Canon == nullptr);
-    PG_Unreadable_Canon = Intern_UTF8_Managed(
-        cb_cast(unreadable),
-        strsize(unreadable)
-    );
+    const char *trash = "trash";
+    assert(PG_Trash_Canon == nullptr);
+    PG_Trash_Canon = Intern_UTF8_Managed(cb_cast(trash), strsize(trash));
 }
 
 
@@ -571,8 +568,8 @@ void Startup_Symbols(REBARR *words)
             assert(canon == PG_Slash_1_Canon);  // make sure it lined up!
         else if (sym == SYM__DOT_1_)
             assert(canon == PG_Dot_1_Canon);
-        else if (sym == SYM_UNREADABLE)
-            assert(canon == PG_Unreadable_Canon);
+        else if (sym == SYM_TRASH)
+            assert(canon == PG_Trash_Canon);
 
         // More code was loaded than just the word list, and it might have
         // included alternate-case forms of the %words.r words.  Walk any
@@ -622,7 +619,7 @@ void Shutdown_Symbols(void)
 
     PG_Slash_1_Canon = nullptr;
     PG_Dot_1_Canon = nullptr;
-    PG_Unreadable_Canon = nullptr;
+    PG_Trash_Canon = nullptr;
 }
 
 

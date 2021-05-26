@@ -158,12 +158,12 @@ REBNATIVE(setlocale)
         "]"
     );
 
-    int cat = rebUnboxQ("select", map, ARG(category), "else [-1]");
+    int cat = rebUnbox("select", map, "@", ARG(category), "else [-1]");
     rebRelease(map);
 
     if (cat == -1)
-        rebJumpsQ(
-            "fail [{Invalid locale category:}", ARG(category), "]"
+        rebJumps(
+            "fail [{Invalid locale category:} @", ARG(category), "]"
         );
 
     char *value_utf8 = rebSpell(ARG(value));

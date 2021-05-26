@@ -66,7 +66,7 @@ sys/make-scheme [
             event: first event-list
             port: event/port
 
-            any [not only | find ports port] then [
+            any [not only, find ports port] then [
                 remove event-list  ; avoid overflow from WAKE-UP calling WAIT
 
                 if wake-up port event [

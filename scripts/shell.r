@@ -87,7 +87,7 @@ shell: func [
     ; the environment might change by the time it is reached.
     ;
     let shellify-tag: func [value [any-value!]] [
-        either-match/not tag! value [
+        non tag! value else [
             if system/version/4 = 3 [   ; Windows
                 unspaced ["%" as text! value "%"]
             ] else [
@@ -107,7 +107,7 @@ shell: func [
                 item: do item
             ]
 
-            either-match/not tag! item [shellify-tag item]
+            ensure/not tag! item [shellify-tag item]
         ]
     ]
 
@@ -142,7 +142,7 @@ shell: func [
             if splice = false [return true]
             if splice = true [return false]  ; e.g. even TEXT! has no quotes
             return text? item  ; plain `$ ls "/foo"` puts quotes on "/foo"
-        ] 
+        ]
 
         item: switch type of item [
             blank! [continue]  ; !!! should you have to use #_ for undercore?

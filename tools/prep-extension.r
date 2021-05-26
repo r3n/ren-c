@@ -132,14 +132,14 @@ native-defs: collect [
         (
             keep make natdef compose/only [
                 export: (n-export)
-                name: just (to word! n-name)
+                name: the (to word! n-name)
                 spec: (n-spec)  ; includes NATIVE or NATIVE/BODY
                 platforms: (try copy n-platforms)
             ]
         )
     ]
 
-    parse native-list [any native-rule end] else [
+    parse native-list [while native-rule end] else [
         fail [
             "Malformed native found in extension specs" mold native-list
         ]
@@ -164,7 +164,7 @@ for-each native native-defs [
         for-each plat native/platforms [
             case [
                 word? plat [; could be os-base or os-name
-                    if find reduce [config/os-name config/os-base] plat [
+                    if find/only reduce [config/os-name config/os-base] plat [
                         throw true
                     ]
                 ]
@@ -184,7 +184,7 @@ for-each native native-defs [
     num-natives: num-natives + 1
 
     if native/export [
-        append native-list 'export
+        append/only native-list 'export
 
         ; !!! This used to add to an "export-list" in the header of a module
         ; whose source was entirely generated.  The idea was that there could
@@ -207,7 +207,7 @@ for-each native native-defs [
         ; http://www.rebol.net/r3blogs/0300.html
         ;
         comment [
-            append export-list to word! native/name
+            append/only export-list to word! native/name
             ...
             compose/only [
                 Module [
@@ -292,10 +292,10 @@ e1/write-emitted
 script-name: copy c-src
 parse script-name [
     some [thru "/"]
-    change "mod-" "ext-"
+    change "mod-" ("ext-")
     to "."
-    change "." "-init."
-    change ["c" end | "cpp" end] "reb"
+    change "." ("-init.")
+    change ["c" end | "cpp" end] ("reb")
 ] else [
     fail [
         "Extension main file should have naming pattern %mod-xxx.c(pp),"
@@ -309,10 +309,10 @@ parse script-name [
 inc-name: second split-path c-src
 is-cpp: false
 parse inc-name [
-    change "mod-" "tmp-mod-"
+    change "mod-" ("tmp-mod-")
     to "."
-    change "." "-init."
-    change ["c" end | "cpp" end] "c"  ; !!! Keep as .cpp if it is?
+    change "." ("-init.")
+    change ["c" end | "cpp" end] ("c")  ; !!! Keep as .cpp if it is?
 ] else [
     fail [
         "Extension main file should have naming pattern %mod-xxx.c(pp),"

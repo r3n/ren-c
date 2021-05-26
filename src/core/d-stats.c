@@ -98,9 +98,9 @@ REBNATIVE(stats)
 //
 //  {Provide access to services in <valgrind/callgrind.h>}
 //
-//      return: [void!]
-//      'instruction [word!]
-//          {Currently just either ON or OFF}
+//      return: []
+//      'instruction "Currently just either ON or OFF"
+//          [word!]
 //  ]
 //
 REBNATIVE(callgrind)
@@ -140,7 +140,7 @@ REBNATIVE(callgrind)
       default:
         fail ("Currently CALLGRIND only supports ON and OFF");
     }
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
   #else
     UNUSED(ARG(instruction));
     fail ("This executable wasn't compiled with INCLUDE_CALLGRIND_NATIVE");

@@ -47,7 +47,7 @@
 //   to leak and clear it on the cell (it is NODE_FLAG_MARKED and could be
 //   misinterpreted--very easily so as VAR_MARKED_HIDDEN!)
 //
-// * The usermode REEVAL function chooses to make `reeval comment "hi"` VOID!
+// * The usermode REEVAL function chooses to make `reeval comment "hi"` ~void~
 //   rather than to raise an error.  However, the non-"Maybe_Stale" versions
 //   of code here have another option...which is to give the result as END.
 //   Currently this is what all the Eval_Step() routines which aren't stale
@@ -104,7 +104,13 @@
 enum {
     ST_EVALUATOR_INITIAL_ENTRY = 0,
     ST_EVALUATOR_LOOKING_AHEAD,
-    ST_EVALUATOR_REEVALUATING
+    ST_EVALUATOR_REEVALUATING,
+    ST_EVALUATOR_GET_WORD,
+    ST_EVALUATOR_SYM_WORD,
+    ST_EVALUATOR_GROUP,
+    ST_EVALUATOR_SYM_GROUP,
+    ST_EVALUATOR_PATH_OR_TUPLE,
+    ST_EVALUATOR_SYM_PATH_OR_SYM_TUPLE
 };
 
 
@@ -357,7 +363,7 @@ inline static bool Eval_Step_In_Any_Array_At_Throws(
 // *and* check that you ended properly.  It means this function will need
 // two different signatures (and so will each caller of this routine).
 //
-inline static bool Eval_Step_In_Va_Throws_Core(
+inline static bool Eval_Step_In_Va_Maybe_Stale_Throws(
     REBVAL *out,  // must be initialized, won't change if all empty/invisible
     REBFLGS feed_flags,
     const void *p,
@@ -369,7 +375,7 @@ inline static bool Eval_Step_In_Va_Throws_Core(
     DECLARE_FRAME (f, feed, eval_flags | EVAL_FLAG_ALLOCATED_FEED);
 
     Push_Frame(out, f);
-    bool threw = Eval_Throws(f);
+    bool threw = Eval_Maybe_Stale_Throws(f);
 
     bool too_many = (eval_flags & EVAL_FLAG_NO_RESIDUE)
         and NOT_END(feed->value);  // feed will be freed in Drop_Frame()
@@ -391,7 +397,7 @@ inline static bool Eval_Step_In_Va_Throws_Core(
 }
 
 
-inline static bool Eval_Value_Maybe_End_Throws(
+inline static bool Eval_Value_Maybe_Stale_Throws(
     REBVAL *out,
     const RELVAL *value,  // e.g. a BLOCK! here would just evaluate to itself!
     REBSPC *specifier
@@ -400,11 +406,6 @@ inline static bool Eval_Value_Maybe_End_Throws(
         Derelativize(out, value, specifier);
         return false;  // fast things that don't need frames (should inline)
     }
-
-    // We need the const bits on this value to apply, so have to use a low
-    // level call.
-
-    SET_END(out);
 
     // Passes `first` so can't use DECLARE_ARRAY_FEED
     REBFED *feed = Alloc_Feed();
@@ -420,7 +421,7 @@ inline static bool Eval_Value_Maybe_End_Throws(
     DECLARE_FRAME (f, feed, EVAL_MASK_DEFAULT | EVAL_FLAG_ALLOCATED_FEED);
 
     Push_Frame(out, f);
-    bool threw = Eval_Throws(f);
+    bool threw = Eval_Maybe_Stale_Throws(f);
     Drop_Frame(f);
 
     return threw;
@@ -438,7 +439,8 @@ inline static bool Eval_Value_Throws(
     const RELVAL *value,  // note this is not `unstable`, direct pointer used
     REBSPC *specifier
 ){
-    if (Eval_Value_Maybe_End_Throws(out, value, specifier))
+    SET_END(out);
+    if (Eval_Value_Maybe_Stale_Throws(out, value, specifier))
         return true;
 
     if (IS_END(out))

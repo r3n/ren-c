@@ -37,7 +37,7 @@
     did all [
         r: make-rule
         "a" = do first first first r  ; sanity check with plain DO
-        parse "a" r  ; this was where the problem was
+        parse? "a" r  ; this was where the problem was
     ]
 )
 
@@ -72,7 +72,7 @@
 
 [
     (
-        group: append '() use [x y] [x: 10, y: 20, '((x + y))]
+        group: append '() use [x y] [x: 10, y: 20, [((x + y))]]
         group = '(((x + y)))
     )
 
@@ -143,7 +143,7 @@
     ;
     (11 = do bind use [x] [x: 10, '(x + 1)] make object! [x: 20])
     (
-        e: trap [bind use [x] [x: 10, just (x + 1)] make object! [x: 20]]
+        e: trap [bind use [x] [x: 10, the (x + 1)] make object! [x: 20]]
         e/id = 'const-value
     )
 ]

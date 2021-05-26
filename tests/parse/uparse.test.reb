@@ -104,7 +104,7 @@
 ; it delegates the recognition to the parse engine, meaning that rules do not
 ; have to be put into blocks as often.
 [
-    (["aaaa"] = uparse ["aaaa"] [into text! some 2 "a"])
+    ("a" = uparse ["aaaa"] [into text! some 2 "a"])
     (null = uparse ["aaaa"] [into text! some 3 "a"])
 ]
 
@@ -164,20 +164,35 @@
 )
 
 
-; ACROSS is UPARSE's version of historical PARSE COPY.  But it is available as
-; a SYM-BLOCK! as well for a shorthand.
+; ACROSS is UPARSE's version of historical PARSE COPY.
+; !!! It is likely that this will change back, due to making peace with the
+; ambiguity that COPY represents as a term, given all the other ambiguities.
 [
     (did all [
         uparse? "aaabbb" [x: across some "a", y: across [some "b"]]
         x = "aaa"
         y = "bbb"
     ])
+]
 
-    (did all [
-        uparse? "aaabbb" [x: @[some "a"], y: @[some "b"]]
-        x = "aaa"
-        y = "bbb"
+
+; SYM-BLOCK! runs a rule, but with "literalizing" result semantics.  If it
+; was invisible, it gives ~void~.  This helps write higher level tools
+; that might want to know about invisibility status.
+[
+    (did all  [
+        then? uparse "" [synthesized: ^[]]  ; NULL-2 result (success)
+        '~void~ = synthesized
     ])
+    (did all  [
+        then? uparse "" [synthesized: ^[('~void~)]]  ; not-NULL result
+        (the '~void~) = synthesized  ; friendly if user made it friendly
+    ])
+    (did all  [
+        then? uparse "" [synthesized: ^[(~void~)]]  ; not-NULL result
+        '~void~ = synthesized  ; user didn't quote it, so suggests unfriendly
+    ])
+    ((the '~friendly~) = ^(uparse [~friendly~] [bad-word!]))
 ]
 
 
@@ -186,7 +201,7 @@
 ; needed for capturing the current position.
 [(
     did all [
-        uparse? "aaabbb" [some "a", pos: here, some "b"]
+        uparse? "aaabbb" [some "a", pos: <here>, some "b"]
         pos = "bbb"
     ]
 )(
@@ -194,7 +209,7 @@
         uparse? "<<<stuff>>>" [
             left: across some "<"
             (n: length of left)
-            x: between here n ">"
+            x: between <here> n ">"
         ]
         x = "stuff"
     ]
@@ -232,9 +247,9 @@
     x: <before>
     did all [
         uparse? "aaa" [x: collect [some [
-            keep (if false [<not kept>])
-            keep skip
-            keep (if true [<kept>])
+            keep (try if false [<not kept>])
+            keep <any>
+            keep (try if true [<kept>])
         ]]]
         x = [#a <kept> #a <kept> #a <kept>]
     ]
@@ -245,11 +260,9 @@
     (["a" "a" "a"] = uparse "aaa" [collect [some keep "a"]])
     (["a"] = uparse "aaa" [collect [keep some "a"]])
 
-    ; There is a KEEP/ONLY feature which is part of a half-baked attempt at
-    ; generic combinator refinements.
 (
     result: uparse "abbbbabbab" [collect [
-        some [keep "a", keep/only collect [some keep "b" keep (<hi>)]]
+        some [keep "a", keep ^[collect [some keep "b" keep (<hi>)]]]
     ]]
     result = ["a" ["b" "b" "b" "b" <hi>] "a" ["b" "b" <hi>] "a" ["b" <hi>]]
 )]
@@ -310,8 +323,8 @@
     if true [
        let filename: "demo.txt"
        using uparse filename [
-            emit base: between here "."
-            emit extension: @[thru end]
+            emit base: between <here> "."
+            emit extension: across [thru <end>]
         ] else [
             fail "Not a file with an extension"
         ]
@@ -335,7 +348,7 @@
     ]
 )(
     did all [
-        uparse? ["aaa"] [into skip [x: across some "a"]]
+        uparse? ["aaa"] [into <any> [x: across some "a"]]
         x = "aaa"
     ]
 )(
@@ -349,7 +362,7 @@
     did all [
         uparse? [| | while while while | | |] [
             content: between some '| some '|
-            into (content) [x: collect [some keep 'while]]
+            into (content) [x: collect [some keep ^['while]]]
         ]
         x = [while while while]
     ]
@@ -371,7 +384,7 @@
             "("
             change [to ")"] [
                 collect [
-                    some ["a" keep ("A") | skip]
+                    some ["a" keep ("A") | <any>]
                 ]
             ]
             ")"
@@ -436,15 +449,27 @@
 ;    ]
 ;
 ;    did all [
-;        "a" = uparse "a" ["a", data: some @(gen)]
+;        "a" = uparse "a" ["a", data: some ^(gen)]
 ;        data = [1 2 3]
 ;    ]
 ;)]
 
 
 ; UPARSE can be used where "heavy" nulls produced by the rule products do not
-; trigger ELSE, but match failures do.  To conflate the two, the /VERBATIM
-; switch (or modal block) can be used.
+; trigger ELSE, but match failures do.
+;
+; !!! Is it worth it to add a way to do something like ^[...] block rules to
+; say you don't want the NULL-2, or does that just confuse things?  Is it
+; better to just rig that up from the outside?
+;
+;     uparse data rules then result -> [
+;         ; If RESULT is null we can react differently here
+;     ] else [
+;         ; This is a match failure null
+;     ]
+;
+; Adding additional interface complexity onto UPARSE may not be worth it when
+; it's this easy to work around.
 [
     (
         x: uparse "aaa" [some "a" (null)] else [fail "Shouldn't be reached"]
@@ -455,11 +480,6 @@
         uparse "aaa" [some "b"] else [did-not-match: true]
         did-not-match
     )
-    (
-        acted-like-not-match: false
-        uparse "aaa" @[some "a" (null)] else [acted-like-not-match: true]
-        acted-like-not-match
-    )
 ]
 
 ; NOT NOT should be equivalent to AHEAD
@@ -467,6 +487,7 @@
 ; As does Haskell Parsec, e.g. (notFollowedBy . notFollowedBy != lookAhead)
 ; https://github.com/haskell/parsec/issues/8
 [
+    ("a" = match-uparse "a" [[ahead "a"] "a"])
     ("a" = match-uparse "a" [[not not "a"] "a"])
 ]
 
@@ -481,21 +502,21 @@
     ("at least 1" = uparse "a" [further [opt "a" opt "b"] ("at least 1")])
     ("at least 1" = uparse "a" [further [opt "a" opt "b"] ("at least 1")])
     ("at least 1" = uparse "ab" [further [opt "a" opt "b"] ("at least 1")])
+
+    (uparse? "" [while further [to <end>]])
 ]
 
 
 [(
-    uparse? "baaabccc" [into [between "b" "b"] [some "a" end] to end]
+    uparse? "baaabccc" [into [between "b" "b"] [some "a" <end>] to <end>]
 )(
-    not uparse? "baaabccc" [into [between "b" "b"] ["a" end] to end]
+    not uparse? "baaabccc" [into [between "b" "b"] ["a" <end>] to <end>]
 )(
-    not uparse? "baaabccc" [into [between "b" "b"] ["a"] to end]
+    not uparse? "baaabccc" [into [between "b" "b"] ["a"] to <end>]
 )(
-    uparse? "baaabccc" [into [between "b" "b"] ["a" to end] "c" to end]
+    uparse? "baaabccc" [into [between "b" "b"] ["a" to <end>] "c" to <end>]
 )(
-    uparse? "aaabccc" [into [across to "b"] [some "a"] to end]
-)(
-    uparse? "aaabccc" [into @[to "b"] [some "a"] to end]
+    uparse? "aaabccc" [into [across to "b"] [some "a"] to <end>]
 )]
 
 
@@ -503,7 +524,7 @@
 [(
     x: match-uparse "aaabbb" [
         some "a"
-        into here ["bbb" (b: "yep, Bs")]
+        into <here> ["bbb" (b: "yep, Bs")]
         "bbb" (bb: "Bs again")
     ]
     did all [
@@ -514,7 +535,7 @@
 )(
     x: match-uparse "aaabbbccc" [
         some "a"
-        into here ["bbb" to end (b: "yep, Bs")]
+        into <here> ["bbb" to <end> (b: "yep, Bs")]
         "bbb" (bb: "Bs again")
         "ccc" (c: "Here be Cs")
     ]
@@ -532,7 +553,7 @@
 ; out in terms of how to make [2 4 rule] range between 2 and 4 occurrences,
 ; as that breaks the combinator pattern at this time.
 [
-    (uparse? "" [0 skip])
+    (uparse? "" [0 <any>])
     (uparse? "a" [1 "a"])
     (uparse? "aa" [2 "a"])
 ]
@@ -541,9 +562,13 @@
 ; TO and THRU would be too costly to be implicitly value bearing by making
 ; copies; you need to use ACROSS.
 [(
-    "b" = uparse "aaabbb" [thru "b" elide to end]
+    "" = uparse "abc" [to <end>]
 )(
-    "b" = uparse "aaabbb" [to "b" elide to end]
+    '~void~ = ^(uparse "abc" [elide to <end>])  ; ornery void
+)(
+    "b" = uparse "aaabbb" [thru "b" elide to <end>]
+)(
+    "b" = uparse "aaabbb" [to "b" elide to <end>]
 )]
 
 
@@ -593,13 +618,13 @@
     (3 = uparse "aaa" [tally "a"])
 
     (null = uparse "aaa" [tally "b"])  ; doesn't finish parse
-    (0 = uparse "aaa" [tally "b" to end])  ; must be at end
+    (0 = uparse "aaa" [tally "b" elide to <end>])  ; must be at end
     (0 = uparse* "aaa" [tally "b"])  ; alternately, use non-force-completion
 
     (did all [
         uparse "<<<stuff>>>" [
             n: tally "<"
-            inner: between here n ">"
+            inner: between <here> n ">"
         ]
         inner = "stuff"
     ])
@@ -618,22 +643,22 @@
         let arg
         uparse args [while [
             "-a", access-dir: [
-                end (true)
+                <end> (true)
                 | "true" (true)
                 | "false" (false)
-                | dir: skip, (to-file dir)
+                | dir: <any>, (to-file dir)
             ]
             |
-            ["-h" | "-help" | "--help" (-help, quit)]
+            ["-h" | "-help" | "--help" || (-help, quit)]
             |
             verbose: [
                 "-q" (0)
                 | "-v" (2)
             ]
             |
-            port: into skip integer!
+            port: into <any> integer!
             |
-            arg: skip (root-dir: to-file arg)
+            arg: <any> (root-dir: to-file arg)
         ]]
         else [
             return null
@@ -652,19 +677,23 @@
 ]
 
 
-; SYM-WORD!, SYM-GROUP!, and SYM-PATH! are all used for literal matching.
+; THE-WORD!, THE-GROUP!, and THE-PATH! are all used for literal matching.
 ; This means to match against the input but don't treat what's given as a rule.
-[(
-    x: [some rule]
-    data: [[some rule] [some rule]]
-    uparse? data [some @x]
-)(
-    data: [[some rule] [some rule]]
-    uparse? data [some @([some rule])]
-)(
-    obj: make object! [x: [some rule]]
-    uparse? data [some @obj.x]
-)]
+;
+; !!! These @-types don't exist yet due to not enough type numbers, but will
+; be making a comeback.
+;
+; [(
+;    x: [some rule]
+;    data: [[some rule] [some rule]]
+;    uparse? data [some @x]
+;)(
+;    data: [[some rule] [some rule]]
+;    uparse? data [some @([some rule])]
+;)(
+;    obj: make object! [x: [some rule]]
+;    uparse? data [some @obj.x]
+;)]
 
 
 ; Invisibles are another aspect of UPARSE...where you can have a rule match
@@ -704,7 +733,46 @@
     ("c" = uparse "ac" ["a" | "b" || "c"])
     ("c" = uparse "bc" ["a" | "b" || "c"])
     (null = uparse "xc" ["a" | "b" || "c"])
+
+    ("c" = uparse "ac" ["a" || "b" | "c"])
+    ("b" = uparse "ab" ["a" || "b" | "c"])
+    (null = uparse "ax" ["a" || "b" | "c"])
 ]
+
+
+; No-op rules need thought in UPARSE, in terms of NULL/BLANK! behavior.  But
+; empty string should be a no-op on string input, and an empty rule should
+; always match.
+[
+    (uparse? "" [[]])
+    ("" = uparse "" [""])
+]
+
+
+; ACTION! combinators are a new idea that if you end a PATH! in a /, then it
+; will assume you mean to call an ordinary function.
+[(
+    -1 = uparse [1] [negate/ integer!]
+)(
+    data: copy ""
+    did all [
+        "aa" = uparse ["a"] [append/dup/ (data) text! (2)]
+        data = "aa"
+    ]
+)(
+    data: copy ""
+    uparse ["abc" <reverse> "DEF" "ghi"] [
+        while [
+            append/ (data) [
+                '<reverse> reverse/ copy/ text!
+                | text!
+            ]
+        ]
+    ]
+    data = "abcFEDghi"
+)(
+    ["a" "b"] = uparse ["a" "b" <c>] [collect [some keep text!] elide/ tag!]
+)]
 
 
 ; UPARSE2 should have a more comprehensive test as part of Redbol, but until
@@ -726,7 +794,7 @@
     (
         x: null
         did all [
-            true = uparse2 "aaabbbccc" [to "b" set x some "b" thru end]
+            true = uparse2 "aaabbbccc" [to "b" set x some "b" thru <end>]
             x = #"b"
         ]
     )

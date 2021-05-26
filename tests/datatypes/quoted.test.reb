@@ -5,12 +5,12 @@
 
 (
     unset 'a
-    set just '''''a <seta>
-    <seta> = get dequote just ''a
+    set the '''''a <seta>
+    <seta> = get dequote the ''a
 )(
     unset 'a
-    set just 'a <seta>
-    <seta> = get dequote just '''''''a
+    set the 'a <seta>
+    <seta> = get dequote the '''''''a
 )(
     unset [a b]
     set reduce dequote ['''''a ''b] [<seta> <setb>]
@@ -38,14 +38,14 @@
 
 (
     x: 10
-    set just 'x: 20
+    set the 'x: 20
     x = 20
 )(
     x: 10
     y: _
     foo: function [] [
-        set just 'x: 20
-        set just 'y x
+        set the 'x: 20
+        set the 'y x
     ]
     foo
     (x = 10) and (y = 20)
@@ -55,14 +55,14 @@
 
 (
     x: 10
-    set just ''''''x: 20
+    set the ''''''x: 20
     x = 20
 )(
     x: 10
     y: _
     foo: function [] [
-        set just '''''''x: 20
-        set just '''''''y x
+        set the '''''''x: 20
+        set the '''''''y x
     ]
     foo
     (x = 10) and (y = 20)
@@ -108,9 +108,9 @@
     ['1 '(2 + 3) '[4 + 5] 'a/+/b 'c/+/d: ':e/+/f]
 )
 
-(just '[a b c] = quote [a b c])
-(just '(a b c) == quote just (a b c))
-(not (just '[A B C] == quote [a b c]))
+(the '[a b c] = quote [a b c])
+(the '(a b c) == quote the (a b c))
+(not (the '[A B C] == quote [a b c]))
 ('''[a b c] !== '''''[a b c])
 ('''[a b c] == '''[a b c])
 ('''[a b c] <> '''''[a b c])
@@ -121,40 +121,40 @@
     (<x> = quote/depth <x> 0)
 ]
 
-(quoted! = kind of just 'foo)  ; low level "KIND"
-((quote word!) = type of just 'foo)  ; higher-level "TYPE"
-((type of just ''[a b c]) = quote/depth block! 2)
+(quoted! = kind of the 'foo)  ; low level "KIND"
+((quote word!) = type of the 'foo)  ; higher-level "TYPE"
+((type of the ''[a b c]) = quote/depth block! 2)
 
 
 ; REQUOTE is a reframing action that removes quoting levels and then puts
 ; them back on to the result.
 
-((just ''''3) == requote add just ''''1 2)
+((the ''''3) == requote add the ''''1 2)
 
-((just '''[b c d]) == requote find ''''[a b c d] 'b)
+((the '''[b c d]) == requote find ''''[a b c d] [b])
 
-(null == requote find ''''[a b c d] 'q)  ; nulls exempt
+(null == requote find ''''[a b c d] [q])  ; nulls exempt
 
-((just '(1 2 3 <four>)) == requote append ''(1 2 3) <four>)
+((the '(1 2 3 <four>)) == requote append ''(1 2 3) <four>)
 
-('''a/b/c/d/e/f = requote join just '''a/b/c 'd/e/f)
+('''a/b/c/d/e/f = requote join the '''a/b/c 'd/e/f)
 
-((just '[1]) = (requote parse just '[1] [some integer!]))
+((the '[1]) = (requote match-parse the '[1] [some integer!]))
 
 
 ; COPY should be implemented for all types, QUOTED! included.
 ;
-((just '''[a b c]) == copy just '''[a b c])
+((the '''[a b c]) == copy the '''[a b c])
 
 
 ; All escaped values are truthy, regardless of what it is they are escaping
 
-(did just '_)
-(did just '#[false])
-(did just ')
-(did just ''''''''_)
-(did just ''''''''#[false])
-(did just '''''''')
+(did the '_)
+(did the '#[false])
+(did the ')
+(did the ''''''''_)
+(did the ''''''''#[false])
+(did the '''''''')
 
 
 ; An escaped word that can't fit in a cell and has to do an additional
@@ -190,7 +190,7 @@
         pa/th
         set/pa/th
         :get/pa/th
-        (just (group))
+        (the (group))
         [block]
         #{AE1020BD0304EA}
         "text"
@@ -253,7 +253,7 @@
 
 (
     did all [
-        void? x: '~void~
-        void? get/any 'x
+        bad-word? x: '~void~
+        bad-word? get/any 'x
     ]
 )

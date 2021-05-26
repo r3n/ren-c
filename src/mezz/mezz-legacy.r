@@ -17,12 +17,41 @@ REBOL [
 ]
 
 
-; We are in the evaluation period of deciding if JUST is a more literate short
-; term than LIT for getting values literally.  But LIT is used some places
-; (like <json>) so keep it for compatibility until a decision is reached.
+; LIT now has new meanings, but is used some places (like <json>) until the
+; "THE" change has propagated completely.
 ; https://forum.rebol.info/t/just-vs-lit-literal-literally/1453
 ;
-lit: :just
+lit: :the
+
+
+; !!! Compatibility for VOID!, remove as time goes on.  BAD-WORD! has come
+; to stay.
+;
+void!: bad-word!
+void?: :bad-word?
+
+
+; !!! As a first step of removing the need for APPEND/ONLY (and friends), this
+; moves the behavior into mezzanine code for testing.
+
+onlify: func [
+    {Add /ONLY behavior to APPEND, INSERT, CHANGE}
+    action [action!]
+    /param [word!]
+][
+    param: default ['value]
+    adapt (augment :action [/only]) compose/deep [
+        all [only, any-array? series] then [
+            (param): ^(param)
+        ]
+        ; ...fall through to normal handling
+    ]
+]
+
+append: my onlify
+insert: my onlify
+change: my onlify
+find: my onlify/param 'pattern
 
 
 ; See notes on the future where FUNC and FUNCTION are synonyms (same will be
@@ -31,7 +60,7 @@ lit: :just
 ; https://forum.rebol.info/t/rethinking-auto-gathered-set-word-locals/1150
 ;
 method: func [/dummy] [
-    fail @dummy [
+    fail ^dummy [
         {The distinction between FUNC vs. FUNCTION, and METH vs. METHOD was}
         {the gathering of SET-WORD! as locals.  This behavior led to many}
         {problems with gathering irrelevant locals in the frame (e.g. any}
@@ -44,27 +73,19 @@ method: func [/dummy] [
 
 
 REBOL: function [] [
-    fail @return [
+    fail ^return [
         "The REBOL [] header of a script must be interpreted by LOAD (and"
         "functions like DO).  It cannot be executed directly."
     ]
 ]
 
 eval: function [] [
-    fail @return [
+    fail ^return [
         "EVAL is now REEVAL (EVAL is slated to be a synonym for EVALUATE):"
         https://forum.rebol.info/t/eval-evaluate-and-reeval-reevaluate/1173
     ]
 ]
 
-void: func [] [
-    fail @return [
-        "VOID is not a function, so that `action! <> type of get/any 'void`"
-        "You can now choose freely ~ for unlabeled void, or labeled as ~xxx~"
-        https://forum.rebol.info/t/another-lingering-idea-named-void-s/1383
-        "(Note that `void: ~void~` would cause errors on referencing VOID.)"
-    ]
-]
 
 ; The pattern `foo: enfix function [...] [...]` is probably more common than
 ; enfixing an existing function, e.g. `foo: enfix :add`.  Hence making a
@@ -125,11 +146,11 @@ context: specialize :make [type: object!]
 
 
 uneval: func [] [
-    fail @return "QUOTE has replaced UNEVAL"
+    fail ^return "QUOTE has replaced UNEVAL"
 ]
 
 =>: func [] [
-    fail @return "=> for lambda has been replaced by ->"
+    fail ^return "=> for lambda has been replaced by ->"
 ]
 
 ; To be more visually pleasing, properties like LENGTH can be extracted using
@@ -195,7 +216,7 @@ comment [
 prin: function [
     "Print without implicit line break, blocks are SPACED."
 
-    return: <void>
+    return: <none>
     value [<opt> any-value!]
 ][
     write-stdout switch type of :value [
@@ -209,7 +230,7 @@ prin: function [
 
 
 join-of: func [] [
-    fail @return [
+    fail ^return [
         "JOIN has returned to Rebol2 semantics, JOIN-OF is no longer needed"
         https://forum.rebol.info/t/its-time-to-join-together/1030
     ]
@@ -269,7 +290,7 @@ forever: :cycle
 
 
 apply: func [.dummy] [
-    fail @dummy [
+    fail ^dummy [
         {APPLY is being reverted to a reimagination of the positional}
         {APPLY from Rebol2/R3-Alpha, but with a different way of dealing with}
         {refinements.  The Ren-C APPLY experiment has been moved to the name}
@@ -282,7 +303,7 @@ apply: func [.dummy] [
 
 hijack :find adapt copy :find [
     if reverse or (last) [
-        fail @reverse [
+        fail ^reverse [
             {/REVERSE and /LAST on FIND have been deprecated.  Use FIND-LAST}
             {or FIND-REVERSE specializations: https://forum.rebol.info/t/1126}
         ]

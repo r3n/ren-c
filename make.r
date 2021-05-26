@@ -85,7 +85,7 @@ args: parse-args system/script/args  ; either from command line or DO/ARGS
 ; now args are ordered and separated by bar:
 ; [NAME VALUE ... '| COMMAND ...]
 ;
-if commands: try find args '| [
+if commands: try find/only args '| [
     options: copy/part args commands
     commands: next commands
 ]
@@ -143,7 +143,7 @@ for-each [name value] options [
                 ]
                 all [
                     not empty? user-ext
-                    find [+ - *] user-ext/1
+                    find/only [+ - *] user-ext/1
                 ] then [
                     value: take user-ext
                 ]
@@ -286,7 +286,7 @@ gen-obj: func [
     ; version of the standard.  Note if the particular file is third party and
     ; can only be compiled as C, we may have overridden that above.
     ;
-    insert flags opt switch standard [
+    insert flags try switch standard [
         'c [
             _
         ]
@@ -373,7 +373,7 @@ gen-obj: func [
     ; Still we'd like to get the best information from any good ones, so
     ; they're turned off on a case-by-case basis.
     ;
-    append flags opt switch rigorous [
+    append flags try switch rigorous [
         #[true] 'yes 'on 'true [
             compose [
                 <gnu:-Werror> <msc:/WX>  ; convert warnings to errors
@@ -385,7 +385,7 @@ gen-obj: func [
                 ; warnings unless you're at c99 or higher, or C++.
                 ;
                 (
-                    if not find [c gnu89] standard [
+                    if not find/only [c gnu89] standard [
                         <gnu:--pedantic>
                     ]
                 )
@@ -638,14 +638,14 @@ gen-obj: func [
 
     ; Now add the flags for the project overall.
     ;
-    append flags opt F
+    append flags try F
 
     ; Now add build flags overridden by the inclusion of the specific file
     ; (e.g. third party files we don't want to edit to remove warnings from)
     ;
     if block? s [
         for-each flag next s [
-            append flags opt (switch flag [  ; weird bootstrap ELSE needs ()
+            append flags try (switch flag [  ; weird bootstrap ELSE needs ()
                 <no-uninitialized> [
                     [
                         <gnu:-Wno-uninitialized>
@@ -772,10 +772,8 @@ parse-ext-build-spec: function [
     if in ext 'options [
         ensure block! ext/options
         parse ext/options [
-            any [
-                word! block! opt text! set config: group! end
-                | end
-                | (print "wrong format for options") return false
+            while [
+                word! block! opt text! set config: group!
             ]
         ] else [
             fail ["Could not parse extension build spec" mold spec]
@@ -887,8 +885,8 @@ targets: [
 target-names: make block! 16
 for-each x targets [
     if lit-word? x [
-        append target-names dequote x
-        append target-names '|
+        append/only target-names dequote x
+        append/only target-names '|
     ] else [
         take/last target-names
         append target-names newline
@@ -990,7 +988,7 @@ CURRENT VALUE:
 
 ; dynamically fill help topics list ;-)
 replace help-topics/usage "HELP-TOPICS" ;\
-    form append map-each x help-topics [either text? x ['|] [x]] 'all
+    form append/only map-each x help-topics [either text? x ['|] [x]] 'all
 
 help: function [topic [text! blank!]] [
     topic: try attempt [to-word topic]
@@ -1026,7 +1024,7 @@ if launched-from-root [
 ]
 
 set-exec-path: func [
-    return: <void>
+    return: <none>
     tool [object!]
     path
 ][
@@ -1039,7 +1037,7 @@ set-exec-path: func [
 ]
 
 parse user-config/toolset [
-    any [
+    while [
         'gcc opt set cc-exec [file! | text! | blank!] (
             rebmake/default-compiler: rebmake/gcc
         )
@@ -1065,11 +1063,12 @@ parse user-config/toolset [
                 set-exec-path rebmake/default-strip strip-exec
             ]
         )
-        | pos: here (
-            if not tail? pos [fail ["failed to parse toolset at:" mold pos]]
-        )
-    ] end
+    ]
+    pos: here
+] else [
+    fail ["failed to parse toolset at:" mold pos]
 ]
+
 
 ; sanity checking the compiler and linker
 
@@ -1237,7 +1236,7 @@ cfg-cplusplus: false  ; gets set to true if linked as c++ overall
 ; Example. Mingw32 does not have access to windows console api prior to vista.
 ;
 cfg-pre-vista: false
-append app-config/definitions opt switch user-config/pre-vista [
+append app-config/definitions switch user-config/pre-vista [
     #[true] 'yes 'on 'true [
         cfg-pre-vista: true
         compose [
@@ -1253,7 +1252,7 @@ append app-config/definitions opt switch user-config/pre-vista [
 ]
 
 
-append app-config/ldflags opt switch user-config/static [
+append app-config/ldflags switch user-config/static [
     _ 'no 'off 'false #[false] [
         ;pass
         _
@@ -1323,13 +1322,14 @@ append app-config/definitions reduce [
     unspaced ["TO_" uppercase replace/all to-text system-config/os-name "-" "_"]
 ]
 
-; Add user settings
+; Add user settings (already can be BLANK!, use TRY to emphasize they should
+; be NULL, but older bootstrap executable did not support it)
 ;
-append app-config/definitions opt user-config/definitions
-append app-config/includes opt user-config/includes
-append app-config/cflags opt user-config/cflags
-append app-config/libraries opt user-config/libraries
-append app-config/ldflags opt user-config/ldflags
+append app-config/definitions try user-config/definitions
+append app-config/includes try user-config/includes
+append app-config/cflags try user-config/cflags
+append app-config/libraries try user-config/libraries
+append app-config/ldflags try user-config/ldflags
 
 libr3-core: make rebmake/object-library-class [
     name: 'libr3-core
@@ -1447,7 +1447,7 @@ for-each [label list] reduce [
 all-extensions: join builtin-extensions dynamic-extensions
 
 add-project-flags: func [
-    return: <void>
+    return: <none>
     project [object!]
     /I "includes" [block!]
     /D "definitions" [block!]
@@ -1502,7 +1502,7 @@ process-module: func [
     assert [mod/class = #extension]
     ret: make rebmake/object-library-class [
         name: mod/name
-        depends: map-each s (append reduce [mod/source] opt mod/depends) [
+        depends: map-each s (append reduce [mod/source] try mod/depends) [
             case [
                 match [file! block!] s [
                     gen-obj/dir s make-file [(repo-dir) extensions /]
@@ -1565,9 +1565,9 @@ for-each ext builtin-extensions [
 
     append ext-objs mod-obj: process-module ext
 
-    append app-config/libraries opt mod-obj/libraries
-    append app-config/searches opt ext/searches
-    append app-config/ldflags opt ext/ldflags
+    append app-config/libraries try mod-obj/libraries
+    append app-config/searches try ext/searches
+    append app-config/ldflags try ext/ldflags
 
     ; Modify module properties
     add-project-flags/I/D/c/O/g mod-obj
@@ -1726,7 +1726,7 @@ prep: make rebmake/entry-class [
 ; this will make sure `%objs/generic/` is in there.
 
 add-new-obj-folders: function [
-    return: <void>
+    return: <none>
     objs
     folders
     <local>
@@ -1765,7 +1765,7 @@ add-new-obj-folders ext-objs folders
 ; files and explain why those files are together.
 ;
 for-each [category entries] file-base [
-    if find [generated made] category [
+    if find/only [generated made] category [
         continue  ; these categories are taken care of elsewhere
     ]
     switch type of entries [
@@ -1849,11 +1849,11 @@ for-each ext dynamic-extensions [
     mod-objs: make block! 8
     for-each mod ext/modules [
         append mod-objs mod-obj: process-module mod
-        append ext-libs opt mod-obj/libraries
+        append ext-libs try mod-obj/libraries
         append ext-includes app-config/includes
 
-        append ext-ldflags opt mod/ldflags
-        append ext-includes opt mod/includes
+        append ext-ldflags try mod/ldflags
+        append ext-includes try mod/includes
 
         ; Modify module properties
         add-project-flags/I/D/c/O/g mod-obj

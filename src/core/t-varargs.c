@@ -140,7 +140,7 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
     const RELVAL *vararg,
     enum Reb_Param_Class pclass  // REB_P_DETECT to use what's in the vararg
 ){
-    TRASH_CELL_IF_DEBUG(out);
+    REFORMAT_CELL_IF_DEBUG(out);
 
     const REBKEY *key;
     const REBPAR *param = Param_For_Varargs_Maybe_Null(&key, vararg);
@@ -182,6 +182,9 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
         // this argument happens.  Review if that should be an error.
 
         switch (pclass) {
+        case REB_P_LITERAL:
+            fail ("Variadic literal parameters not yet implemented");
+
         case REB_P_NORMAL: {
             REBFLGS flags = EVAL_MASK_DEFAULT | EVAL_FLAG_FULFILLING_ARG;
 
@@ -223,9 +226,6 @@ bool Do_Vararg_Op_Maybe_End_Throws_Core(
             SET_CELL_FLAG(out, UNEVALUATED);
             VAL_INDEX_UNBOUNDED(shared) += 1;
             break;
-
-        case REB_P_MODAL:
-            fail ("Variadic modal parameters not yet implemented");
 
         case REB_P_MEDIUM:
             fail ("Variadic medium parameters not yet implemented");

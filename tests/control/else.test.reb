@@ -48,7 +48,7 @@
 
 ; Hard quotes need to account for enfix deferral
 (
-    foo: func [y] [return just 1 then (x -> [x + y])]
+    foo: func [y] [return the 1 then (x -> [x + y])]
     bar: func [y] [return 1 then (x -> [x + y])]
     did all [
         11 = foo 10
@@ -58,10 +58,16 @@
 
 ; The above should work whether you use a GROUP! or not (-> quote left wins)
 (
-    foo: func [y] [return just 1 then x -> [x + y]]
+    foo: func [y] [return the 1 then x -> [x + y]]
     bar: func [y] [return 1 then x -> [x + y]]
     did all [
         11 = foo 10
         1 = bar 10
     ]
 )
+
+(
+    <isotope> = (' then [<isotope>])  ; ' decays to isotope null
+)
+
+(' then x -> [null = ^x])  ; isotope decays as argument to lambda

@@ -960,7 +960,7 @@ void Swap_Series_Content(REBSER* a, REBSER* b)
 //  swap-contents: native [
 //      {Low-level operation for swapping the underlying data for two series.}
 //
-//      return: [void!]
+//      return: []
 //      series1 [any-series!]
 //      series2 [any-series!]
 //  ]
@@ -985,7 +985,7 @@ REBNATIVE(swap_contents)
     REBSER *s2 = VAL_SERIES_ENSURE_MUTABLE(ARG(series2));
     Swap_Series_Content(s1, s2);
 
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
 }
 
 
@@ -1255,14 +1255,14 @@ void Assert_Pointer_Detection_Working(void)
     // the potential absence of NODE_FLAG_CELL or NODE_FLAG_NODE, they make
     // four good ways that a random Copy_Cell() might fail in the debug
     // build.  It could also become useful if one wanted a more "serious"
-    // form of trashing than TRASH_CELL_IF_DEBUG().
+    // form of trashing than REFORMAT_CELL_IF_DEBUG().
     //
-  #ifdef DEBUG_TRASH_MEMORY
+  #ifdef DEBUG_REFORMAT_CELLS
     DECLARE_LOCAL (freed_cell);
     freed_cell->header.bits =
         NODE_FLAG_NODE | NODE_FLAG_FREE | NODE_FLAG_CELL
-        | FLAG_KIND3Q_BYTE(REB_T_TRASH)
-        | FLAG_HEART_BYTE(REB_T_TRASH);
+        | FLAG_KIND3Q_BYTE(REB_T_UNSAFE)
+        | FLAG_HEART_BYTE(REB_T_UNSAFE);
     assert(Detect_Rebol_Pointer(freed_cell) == DETECTED_AS_FREED_CELL);
   #endif
 

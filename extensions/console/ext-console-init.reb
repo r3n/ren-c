@@ -7,7 +7,7 @@ REBOL [
     Options: []  ; !!! If ISOLATE, wouldn't see LIB/PRINT changes, etc.
 
     Rights: {
-        Copyright 2016-2018 Ren-C Open Source Contributors
+        Copyright 2016-2021 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -74,7 +74,7 @@ console!: make object! [
     repl: true  ; used to identify this as a console! object
     is-loaded: false  ; if true then this is a loaded (external) skin
     was-updated: false  ; if true then console! object found in loaded skin
-    last-result: '~startup~  ; last evaluated result (sent by HOST-CONSOLE)
+    last-result: ~startup~  ; last evaluated result (sent by HOST-CONSOLE)
 
     === APPEARANCE (can be overridden) ===
 
@@ -90,7 +90,7 @@ console!: make object! [
   ABOUT   - Information about your Rebol}
 
     print-greeting: meth [
-        return: <void>
+        return: <none>
         {Adds live elements to static greeting content (build #, version)}
     ][
         boot-print [
@@ -102,7 +102,7 @@ console!: make object! [
         boot-print greeting
     ]
 
-    print-prompt: meth [return: <void>] [
+    print-prompt: meth [return: <none>] [
         ;
         ; Note: See example override in skin in the Debugger extension, which
         ; adds the stack "level" number and "current" function name.
@@ -114,25 +114,131 @@ console!: make object! [
         write-stdout space
     ]
 
-    print-result: meth [return: <void> v [<opt> any-value!]] [
-        switch match void! last-result: get/any 'v [
-            null [
-                ; not a void, fall through to other printing
-            ]
-            '~void~ [
-                return  ; understood this *specific* void as output *nothing*
-            ]
-        ] else [  ; any other labeled VOID!
-            print [result mold get/any 'v]
+    print-result: meth [
+        return: <none>
+        ^v "Value (done with literal parameter to discern isotope status)"
+            [<opt> any-value!]
+    ] [
+        last-result: unquote v  ; keeps bad word isotope flag (except ~null~'s)
+
+        === PLAIN BAD WORDS (typically would fail on WORD!/PATH! access) ===
+
+        if v = '~void~ [
+            ;
+            ; ~void~ is an intent of invisibility.  This happens when an
+            ; expression's entire results vaporize:
+            ;
+            ;     >> comment "hi" elide 1 + 2
+            ;
+            ; Some functions that run arbitrary code and other functions will
+            ; return it even though they don't "vaporize" by default:
+            ;
+            ;     >> do [comment "all this code" comment "is invisible"]
+            ;
+            ; But if the system notices that the expression on the whole would
+            ; not vaporize, the result of such a relayer (like DO) is changed
+            ; from ~void~ to ~stale~:
+            ;
+            ;     >> 1 + 2 do [comment "DO is invisible, but whole line isn't"]
+            ;     == ~stale~
+            ;
+            ; At the moment you get this by just hitting enter or any other
+            ; variation of empty whitespace, in addition to `>> comment "hi"`
+            ; or other all-invisible evaluations.  It just cycles the prompt
+            ; and shows no output for cleanliness, but perhaps if the input
+            ; was non-trivial it should say `; invisible` ?
+            ;
             return
         ]
 
+        if v = '~none~ [
+            ;
+            ; We also suppress display of the ~none~ state, which is the
+            ; default return value from RETURN with no arguments.  It is for
+            ; situations that don't have useful values to give back, but do
+            ; not want to commit to invisibility so callsites depend on it.
+            ;
+            ; Even if something never wanted to change its result, not being
+            ; actually invisible has benefits:
+            ;
+            ;     >> 1 + 2 help append
+            ;
+            return
+        ]
+
+        if bad-word? v [  ; gets isotope from stable form
+            ;
+            ; All other non-isotope bads are printed as normal output values.
+            ; They can be LOAD-ed naturally, so this seems consistent:
+            ;
+            ;     >> x: ~something~
+            ;     == ~something~  ; isotope
+            ;
+            ; The "unnatural" aspect only happens when you access them without
+            ; using GET/ANY or literalize them with ^x:
+            ;
+            ;     >> x
+            ;     ** Error: x is the isotope form of ~something~
+            ;
+            ; But the console seems like it's giving you the right feedback to
+            ; show it undecorated.
+            ;
+            print [result mold v space space "; isotope"]
+            return
+        ]
+
+        === NULL ISOTOPES ===
+
+        if v = null [  ; not an isotope, e.g. can trigger ELSE
+            ;
+            ; Key to NULL's purpose is that it lacks any value representation,
+            ; and only exists as an evaluation product you can store in a
+            ; variable.  So there's nothing we can print like `== null` (which
+            ; would look like the WORD! null), and no special syntax exists for
+            ; them...that's by design.
+            ;
+            ; It might seem that giving no output would be the most natural
+            ; case for such a situation.  But it provides more grounding to
+            ; show *something*, so we are tricky here in the text medium and
+            ; display a line in comment form, without the ==.  It has settled
+            ; into being a good compromise for the situation...helping to
+            ; ground users in what is going on.
+            ;
+            print "; null"
+            return
+        ]
+
+        if v = the ' [
+            ;
+            ; Because ~null~ produces true NULL from evaluation (and not an
+            ; ~null~ isotope), the only way to get ~null~ isotopes is by
+            ; decaying a lone ' ("quoted null").  But due to the properties
+            ; of ~null~ isotopes, if you unquote this you'll be producing
+            ; something that non-literalizing routines would see as NULL.
+            ;
+            ; So handle this case now, before the UNQUOTE.
+            ;
+            print "== ~null~  ; isotope"
+            return
+        ]
+
+        === ORDNARY RETURN VALUES (^ parameter convention passes as quoted) ===
+
+        v: unquote v  ; Now handle everything else
+
         case [
-            null? :v [  ; no representation, use comment
-                print ["; null" if isotope? 'v [#-2]]
+            bad-word? :v [
+                ;
+                ; If the ^ processed a value into a ~quoted~ BAD-WORD!, that's
+                ; the "friendly" form.  These can be accessed from variables
+                ; without triggering an error.  We don't label them since
+                ; they are the "normal" ones.
+                ;
+                print [result mold v]
             ]
 
             free? :v [
+                ;
                 ; Molding a freed value would cause an error...which is
                 ; usually okay (you shouldn't be working with freed series)
                 ; but if we didn't special case it here, the error would seem
@@ -227,7 +333,7 @@ console!: make object! [
 
     add-shortcut: meth [
         {Add/Change console shortcut}
-        return: <void>
+        return: <none>
         name [any-word!] "Shortcut name"
         block [block!] "Command(s) expanded to"
     ][
@@ -239,7 +345,7 @@ console!: make object! [
 start-console: func [
     "Called when a REPL is desired after command-line processing, vs quitting"
 
-    return: <void>
+    return: <none>
     /skin "Custom skin (e.g. derived from MAKE CONSOLE!) or file"
         [file! object!]
     <static>
@@ -348,7 +454,7 @@ ext-console-impl: func [
     prior "BLOCK! or GROUP! that last invocation of HOST-CONSOLE requested"
         [blank! block! group!]
     result "Quoted result from evaluating PRIOR, or non-quoted error"
-        [blank! quoted! error!]
+        [<opt> blank! quoted! bad-word! error!]
     resumable "Is the RESUME function allowed to exit this console"
         [logic!]
     skin "Console skin to use if the console has to be launched"
@@ -372,14 +478,14 @@ ext-console-impl: func [
     ][
         switch type of item [
             issue! [
-                if not empty? instruction [append/line instruction ',]
+                if not empty? instruction [append/line instruction [,]]
                 insert instruction item
             ]
             text! [
                 append/line instruction compose [comment (item)]
             ]
             block! [
-                if not empty? instruction [append/line instruction ',]
+                if not empty? instruction [append/line instruction [,]]
                 append/line instruction compose/deep <*> item
             ]
             fail
@@ -488,8 +594,8 @@ ext-console-impl: func [
         result/id = 'no-catch
         :result/arg2 = :quit  ; throw's /NAME
     ] then [
-        return switch type of get* 'result/arg1 [
-            void! [0]  ; plain QUIT, no /WITH, call that success
+        return switch type of friendly get* 'result/arg1 [
+            bad-word! [0]  ; plain QUIT, no /WITH, call that success
 
             logic! [either :result/arg1 [0] [1]]  ; logic true is success
 
@@ -606,12 +712,18 @@ ext-console-impl: func [
         return <prompt>
     ]
 
-    assert [quoted? :result]
-
     === {HANDLE RESULT FROM EXECUTION OF CODE ON USER'S BEHALF} ===
 
+    ensure [<opt> quoted! bad-word!] result
+
     if group? prior [
-        emit [system/console/print-result (<*> get/any 'result)]
+        ;
+        ; Working with COMPOSE here is a bit tricky because we can't compose
+        ; in a NULL.  So we have to do a quoted form and then unquote it in
+        ; the invocation.  This is more pleasing than making PRINT-RESULT
+        ; speak in a quoted protocol for the sake of sensing isotopes.
+        ;
+        emit [system/console/print-result unquote (<*> quote result)]
         return <prompt>
     ]
 
@@ -649,7 +761,7 @@ ext-console-impl: func [
         ; APIs on windows, on a keystroke-by-keystroke basis vs reading a
         ; whole line at a time.
         ;
-        emit [system/console/print-result '~void~]
+        emit [system/console/print-result ~void~]
         return <prompt>
     ]
 
@@ -742,7 +854,7 @@ ext-console-impl: func [
 
 why: func [
     "Explain the last error in more detail."
-    return: <void>
+    return: <none>
     'err [<end> word! path! error!] "Optional error value"
 ][
     let err: default [system/state/last-error]
@@ -762,7 +874,7 @@ why: func [
 
 upgrade: func [
     "Check for newer versions."
-    return: <void>
+    return: <none>
 ][
     ; Should this be a console-detected command, like Q, or is it meaningful
     ; to define this as a function you could call from code?

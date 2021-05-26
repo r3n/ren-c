@@ -46,7 +46,7 @@ Expect crashes and mayhem.  But see BACKTRACE, RESUME, and STEP.}
     focus-frame: _
     focus-index: _
 
-    print-greeting: meth [return: <void>] [
+    print-greeting: meth [return: <none>] [
         ;
         ; We override in order to avoid printing out the redundant Rebol
         ; version information (and to print the greeting only once, which
@@ -298,7 +298,7 @@ backtrace*: function [
 backtrace: function [
     {Prints out a backtrace at the current location}
 
-    return: <void>
+    return: <none>
 ][
     ; We could backtrace relative to `binding of 'return`, but this would
     ; mean `>> if true [backtrace]` would see that IF in the trace.
@@ -337,7 +337,7 @@ interrupt: adapt :breakpoint* [
 
 debug: function [
     {Dialect for interactive debugging, see documentation for details}
-    return: <void>
+    return: <none>
     'value [<opt> integer! frame! action! block!]
         {Stack level to inspect or dialect block, or enter debug mode}
 ][
@@ -354,7 +354,7 @@ debug: function [
 ]
 
 
-locals: function [return: <void>] [
+locals: function [return: <none>] [
     print [debug-console-skin/focus-frame]
 ]
 

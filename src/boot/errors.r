@@ -77,14 +77,12 @@ Syntax: [
 
 Script: [
     no-value:           [:arg1 {has no value}]
-    need-non-void:      [:arg1 {is} :arg2 {(use GET/ANY to GET voids)}]
+    bad-word-get:       [:arg1 {is} :arg2 {isotope (see ^^(...) and GET/ANY)}]
     need-non-null:      [:arg1 {needs a value, can't be null}]
     need-non-end:       [{end was reached while trying to set} :arg1]
     not-bound:          [:arg1 {word is not bound to a context}]
     no-relative:        [:arg1 {word is bound relative to context not on stack}]
     not-in-context:     [:arg1 {is not in the specified context}]
-
-    void-evaluation:    "VOID! cells cannot be evaluated (use `var: '~void~`)"
 
     assertion-failure:  [{assertion failure:} :arg1]
 
@@ -111,7 +109,7 @@ Script: [
 
     sequence-too-short: {ANY-PATH! and ANY-TUPLE! must have more than 2 items}
     bad-sequence-item:  [{Value is not a valid ANY-SEQUENCE! element:} :arg1]
-    cant-decorate-type: [{Cannot apply `:` or `@` decoration to:} :arg1]
+    cant-decorate-type: [{Cannot apply `:` or `^` decoration to:} :arg1]
 
     action-with-dotted: {ACTION! used with dotted sequence access form}
     inert-with-slashed: {ANY-INERT! used with slashed sequence access form}
@@ -162,9 +160,8 @@ Script: [
     bad-func-arg:       [{function argument} :arg1 {is not valid}]
 
     needs-return-opt:   [:arg1 {can't return null (see RETURN: [<opt> ...])}]
-    needs-return-value: [:arg1 {can't return void! (see RETURN: <void>)}]
     bad-return-type:    [:arg1 {doesn't have RETURN: enabled for} :arg2]
-    bad-invisible:      [:arg1 {doesn't have invisible RETURN @() enabled}]
+    bad-invisible:      [:arg1 {doesn't have invisible RETURN enabled}]
 
     unintended-literal: [{Likely unintended literal, use quote/group:} :arg1]
 
@@ -246,7 +243,7 @@ Script: [
     conflicting-key:    [:arg1 {key conflicts; use SELECT or PUT with /CASE}]
 
     block-conditional:  [{Literal block used as conditional} :arg1]
-    void-conditional:   [{VOID! values are not conditionally true or false}]
+    bad-conditional:    [{BAD-WORD! values aren't conditionally true or false}]
     non-block-branch:   [{Evaluated non-block/function used as branch} :arg1]
     block-switch:       [{Literal block used as switch value} :arg1]
 

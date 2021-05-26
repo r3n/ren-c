@@ -14,7 +14,7 @@ REBOL [
 verify: function [
     {Verify all the conditions in the passed-in block are conditionally true}
 
-    return: <elide>
+    return: <void>
     conditions [block!]
         {Conditions to check}
     <local> result
@@ -25,19 +25,21 @@ verify: function [
             continue
         ]
 
-        any [void? :result, not :result] then [
+        result: friendly get/any 'result  ; workaround
+
+        any [bad-word? :result, not :result] then [
             ;
             ; including commas in the failure report looks messy, skip them
             ;
             while [', = first conditions] [conditions: my next]
 
-            fail @conditions make error! [
+            fail ^conditions make error! [
                 type: 'Script
                 id: 'assertion-failure
                 arg1: compose [
                     ((copy/part conditions pos)) ** (case [
                         unset? 'result ['null]
-                        void? result ['void]
+                        bad-word? result [quote result]
                         blank? result ['blank]
                         result = false ['false]
                     ])
@@ -156,7 +158,7 @@ net-log: func [txt /C /S][txt]
 net-trace: function [
     "Switch between using a no-op or a print operation for net-tracing"
 
-    return: <void>
+    return: <none>
     val [logic!]
 ][
     either val [

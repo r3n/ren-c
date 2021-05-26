@@ -20,7 +20,7 @@ REBOL [
 assert: func* [
     {Ensure conditions are conditionally true if hooked by debugging}
 
-    return: <elide>
+    return: <void>
     conditions [block!]
         {Block of conditions to evaluate and test for logical truth}
 ][
@@ -46,7 +46,7 @@ maybe: enfixed func* [
         ; While DEFAULT requires a BLOCK!, MAYBE does not.  Catch mistakes
         ; such as `x: maybe [...]`
         ;
-        fail @optional [
+        fail ^optional [
             "Literal" type of :optional "used w/MAYBE, use () if intentional"
         ]
     ]
@@ -127,55 +127,55 @@ func: func* [
     ;
     new-spec: clear copy spec
 
-    new-body: _
-    statics: _
-    defaulters: _
+    new-body: null
+    statics: null
+    defaulters: null
     var: <dummy>  ; enter PARSE with truthy state (gets overwritten)
-    loc: _
-    with-return: _
+    loc: null
+    with-return: null
 
-    parse spec [any [
-        <void> (append new-spec <void>)
+    parse spec [while [
+        <none> (append new-spec <none>)
     |
-        <elide> (append new-spec <elide>)
+        <void> (append new-spec <void>)
     |
         :(if var '[  ; so long as we haven't reached any <local> or <with> etc.
             set var: [any-word! | any-path! | quoted!] (
-                append new-spec var  ; need quote level as-is in new spec
+                append new-spec ^var  ; need quote level as-is in new spec
 
                 var: dequote var
                 case [
                     match [get-path! path!] var [
                         if (length of var != 2) or (_ <> first var) [
-                            fail ["Bad path in spec:" var]
+                            fail ["Bad path in spec:" ^var]
                         ]
-                        append exclusions var/2  ; exclude args/refines
+                        append exclusions ^var.2  ; exclude args/refines
                     ]
 
                     any-word? var [
-                        append exclusions var  ; exclude args/refines
+                        append exclusions ^var  ; exclude args/refines
                     ]
 
                     true [  ; QUOTED! could have been anything
-                        fail ["Bad spec item" var]
+                        fail ["Bad spec item" ^var]
                     ]
                 ]
             )
             |
             set other: block! (
-                append/only new-spec other  ; data type blocks
+                append new-spec ^other  ; data type blocks
             )
             |
             copy other some text! (
-                append/only new-spec spaced other  ; spec notes
+                append new-spec spaced other  ; spec notes
             )
         ] else [
             [false]
         ])
     |
         set loc: tuple! (  ; locals legal anywhere
-            append exclusions to word! loc
-            append new-spec loc
+            append exclusions ^ to word! loc
+            append new-spec ^loc
         )
     |
         other: here
@@ -184,12 +184,12 @@ func: func* [
                 fail [
                     ; <where> spec
                     ; <near> other
-                    "Default value not paired with argument:" (mold other/1)
+                    "Default value not paired with argument:" (mold other.1)
                 ]
             ]
             defaulters: default [copy []]
             append defaulters compose [
-                (var): default '(do other/1)
+                (var): default '(do other.1)
             ]
         )
     |
@@ -197,9 +197,9 @@ func: func* [
         false  ; failing here means rolling over to next rule
     |
         <local>
-        any [set var: word! set other: opt group! (
-            append new-spec to tuple! var
-            append exclusions var
+        while [set var: word! set other: opt group! (
+            append new-spec ^ to tuple! var
+            append exclusions ^var
             if other [
                 defaulters: default [copy []]
                 append defaulters compose [  ; always sets
@@ -214,19 +214,19 @@ func: func* [
                 copy/deep body
             ]
         )
-        any [
+        while [
             set other: [object! | word! | path!] (
                 if not object? other [other: ensure any-context! get other]
                 bind new-body other
                 for-each [key val] other [
-                    append exclusions key
+                    append exclusions ^key
                 ]
             )
         ]
     |
-        <with> any [
+        <with> while [
             set other: [word! | path!] (
-                append exclusions other
+                append exclusions ^other
 
                 ; Definitional returns need to be signaled even if FUNC, so
                 ; the FUNC* doesn't automatically generate one.
@@ -243,9 +243,9 @@ func: func* [
                 copy/deep body
             ]
         )
-        any [
+        while [
             set var: word! (other: _) opt set other: group! (
-                append exclusions var
+                append exclusions ^var
                 append statics compose [
                     (as set-word! var) ((other))
                 ]
@@ -256,14 +256,14 @@ func: func* [
         end accept
     |
         other: here (
-            print mold other/1
             fail [
                 ; <where> spec
                 ; <near> other
-                "Invalid spec item:" (mold other/1)
+                "Invalid spec item:" (mold ^other.1)
+                "in spec" ^spec
             ]
         )
-    ] end]
+    ]]
 
     ; Gather the SET-WORD!s in the body, excluding the collected ANY-WORD!s
     ; that should not be considered.  Note that COLLECT is not defined by
@@ -281,10 +281,10 @@ func: func* [
     ; COLLECT-WORDS interface to efficiently give this result.
     ;
     for-each loc locals [
-        append new-spec to tuple! loc
+        append new-spec ^ to tuple! loc
     ]
 
-    append new-spec opt with-return  ; if FUNC* suppresses return generation
+    append new-spec try with-return  ; if FUNC* suppresses return generation
 
     ; The constness of the body parameter influences whether FUNC* will allow
     ; mutations of the created function body or not.  It's disallowed by
@@ -294,7 +294,7 @@ func: func* [
     if const? body [new-body: const new-body]
 
     func* new-spec either defaulters [
-        append/only defaulters as group! any [new-body body]
+        append defaulters ^ as group! any [new-body body]
     ][
         any [new-body body]
     ]
@@ -380,7 +380,7 @@ redescribe: func [
     let note: _
     parse spec [
         opt [
-            copy description any text! (
+            copy description while text! (
                 description: spaced description
                 all [
                     description = {}
@@ -397,7 +397,7 @@ redescribe: func [
                 ]
             )
         ]
-        any [
+        while [
             set param: [
                 word! | get-word! | lit-word! | set-word!
                 | ahead path! into [word! blank!]
@@ -525,7 +525,7 @@ so: enfixed func [
     feed [<opt> <end> any-value! <variadic>]
 ][
     if not condition [
-        fail @condition make error! [
+        fail ^condition make error! [
             type: 'Script
             id: 'assertion-failure
             arg1: compose [((:condition)) so]
@@ -541,6 +541,12 @@ so: enfixed func [
 tweak :so 'postpone on
 
 
+matches: enfixed redescribe [
+    {Check value using tests (match types, TRUE or FALSE, or filter action)}
+](
+    chain [:match | :then?]
+)
+
 matched: enfixed redescribe [
     "Assert that the left hand side--when fully evaluated--MATCHES the right"
 ](
@@ -549,7 +555,7 @@ matched: enfixed redescribe [
         let value: :f/value  ; returned value
 
         if not do f [
-            fail @f make error! [
+            fail ^f make error! [
                 type: 'Script
                 id: 'assertion-failure
                 arg1: compose [(:value) matches (:test)]
@@ -560,7 +566,7 @@ matched: enfixed redescribe [
 )
 tweak :matched 'postpone on
 
-; Rare case where a `?` variant is useful, to avoid VOID! on falsey matches
+; Rare case where a `?` variant is useful, to avoid BAD-WORD! on falsey matches
 match?: chain [:match | :value?]
 
 
@@ -569,7 +575,7 @@ was: enfixed redescribe [
 ](
     func [left [<opt> any-value!] right [<opt> any-value!]] [
         if :left != :right [
-            fail @return make error! [
+            fail ^return make error! [
                 type: 'Script
                 id: 'assertion-failure
                 arg1: compose [(:left) is (:right)]
@@ -608,57 +614,37 @@ gunzip: redescribe [
 ensure: redescribe [
     {Pass through value if it matches test, otherwise trigger a FAIL}
 ](
-    specialize :either-match [
-        branch: func [arg [<opt> any-value!]] [
-            ;
-            ; !!! Can't use FAIL/WHERE until there is a good way to SPECIALIZE
-            ; a conditional with a branch referring to invocation parameters:
+    enclose :match* func [f] [  ; don't plain MATCH safety (voidifies results)
+        let value: :f.value  ; DO makes frame arguments unavailable
+        do f else [
+            ; !!! Can't use FAIL/WHERE until we can implicate the callsite.
             ;
             ; https://github.com/metaeducation/ren-c/issues/587
             ;
             fail [
                 "ENSURE failed with argument of type"
-                    type of get* 'arg else ["NULL"]
+                    type of get* 'value else ["NULL"]
             ]
         ]
     ]
 )
 
 non: redescribe [
-    {Pass through value if it *doesn't* match test, otherwise trigger a FAIL}
+    {Pass through value if it *doesn't* match test (e.g. MATCH/NOT)}
 ](
-    specialize :either-match [
-        not: #
-        branch: func [arg [<opt> any-value!]] [
-            ;
-            ; !!! Can't use FAIL/WHERE until there is a good way to SPECIALIZE
-            ; a conditional with a branch referring to invocation parameters:
-            ;
-            ; https://github.com/metaeducation/ren-c/issues/587
-            ;
-            fail [
-                "NON failed with argument of type"
-                    (type of get* 'arg) else ["NULL"]
-            ]
-        ]
-    ]
+    :match/not
 )
 
-really: func [
+; !!! For a time this was THE, until it took its unevaluating role.  It is
+; now called ENSURE-VALUE until a better name is thought of.
+;
+ensure-value: func [
     {FAIL if value is null, otherwise pass it through}
 
     return: [any-value!]
-    value [any-value!]  ; always checked for null, since no <opt>
+    value [any-value!]  ; not <opt>!
 ][
-    ; While DEFAULT requires a BLOCK!, REALLY does not.  Catch mistakes such
-    ; as `x: really [...]`
-    ;
-    if semiquoted? 'value [
-        fail @value [
-            "Literal" type of :value "used w/REALLY, use () if intentional"
-        ]
-    ]
-
+    ; Note: Doesn't check explicitly for NULL, as parameter is not marked <opt>
     :value
 ]
 
@@ -682,7 +668,7 @@ find-last: redescribe [
 ](
     adapt :find-reverse [
         if not any-series? series [
-            fail @series "Can only use FIND-LAST on ANY-SERIES!"
+            fail ^series "Can only use FIND-LAST on ANY-SERIES!"
         ]
 
         series: tail of series  ; can't use plain TAIL due to /TAIL refinement
@@ -697,7 +683,7 @@ attempt: func [
     code [block! action!]
 ][
     trap [
-        return @(do code else [null])  ; want NULL-2 if was NULL
+        return/isotope (do code else [null])  ; want NULL-2 if was NULL
     ]
     return null
 ]
@@ -781,7 +767,7 @@ lock-of: redescribe [
 eval-all: func [
     {Evaluate any number of expressions and discard them}
 
-    return: <elide>
+    return: <void>
     expressions [<opt> any-value! <variadic>]
         {Any number of expressions on the right.}
 ][
@@ -792,7 +778,7 @@ eval-all: func [
 ; These constructs used to be enfix to complete their left hand side.  Yet
 ; that form of completion was only one expression's worth, when they wanted
 ; to allow longer runs of evaluation.  "Invisible functions" (those which
-; `return: <elide>`) permit a more flexible version of the mechanic.
+; `return: <void>`) permit a more flexible version of the mechanic.
 
 <|: tweak copy :eval-all 'postpone on
 |>: tweak enfixed :shove 'postpone on
@@ -883,14 +869,14 @@ module: func [
     ]
     let mod: into
 
-    if find spec/options 'extension [
+    if find spec/options just extension [
         append mod 'lib-base ; specific runtime values MUST BE FIRST
     ]
 
     if not spec/type [spec/type: 'module] ; in case not set earlier
 
     ; Collect 'export keyword exports, removing the keywords
-    if find body 'export [
+    if find body [export] [
         if not block? select spec 'exports [
             append spec compose [exports (make block! 10)]
         ]
@@ -915,7 +901,7 @@ module: func [
 
     ; Collect 'hidden keyword words, removing the keywords. Ignore exports.
     let hidden: _
-    if find body 'hidden [
+    if find body [hidden] [
         hidden: make block! 10
         ; Note: Exports are not hidden, silently for now
         parse body [while [
@@ -944,7 +930,7 @@ module: func [
     ; Add exported words at top of context (performance):
     if block? select spec 'exports [bind/new spec/exports mod]
 
-    if find spec/options 'isolate [
+    if find spec/options [isolate] [
         ;
         ; All words of the module body are module variables:
         ;
@@ -986,7 +972,7 @@ cause-error: func [
     ; Filter out functional values:
     iterate args [
         if action? first args [
-            change/only args meta-of first args
+            change args ^(meta-of first args)
         ]
     ]
 
@@ -1000,9 +986,12 @@ cause-error: func [
 ]
 
 
+; Note that in addition to this definition of FAIL, there is an early-boot
+; definition which runs if a FAIL happens before this point, which panics and
+; gives more debug information.
+;
 ; !!! Should there be a special bit or dispatcher used on the FAIL to ensure
-; it does not continue running?  `return: []` has been freed up as it no
-; longer means invisible...
+; it does not continue running?  `return: <divergent>`?
 ;
 ; Though HIJACK would have to be aware of it and preserve the rule.
 ;
@@ -1153,7 +1142,7 @@ read-lines: func [
         [ [to (delimiter) remove (delimiter) pos: here] ]
     ][
         [
-            to crlf any [
+            to crlf while [
                 ["^M" and not "^/"]
                 to crlf
             ] (if not keep ['remove]) ["^/" | "^M^/"] pos: here

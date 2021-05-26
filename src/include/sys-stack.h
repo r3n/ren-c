@@ -210,7 +210,7 @@ inline static STKVAL(*) DS_PUSH(void) {
     if (DS_Movable_Top == DS_Movable_Tail)
         Expand_Data_Stack_May_Fail(STACK_EXPAND_BASIS);
     else
-        TRASH_CELL_IF_DEBUG(DS_Movable_Top);
+        REFORMAT_CELL_IF_DEBUG(DS_Movable_Top);
     return DS_Movable_Top;
 }
 
@@ -220,7 +220,7 @@ inline static STKVAL(*) DS_PUSH(void) {
 //
 // Since it's known that END markers were never pushed, a pop can just leave
 // whatever bits had been previously pushed, dropping only the index.  The
-// only END marker will be the one indicating the tail of the stack.  
+// only END marker will be the one indicating the tail of the stack.
 //
 
 #ifdef NDEBUG
@@ -234,7 +234,7 @@ inline static STKVAL(*) DS_PUSH(void) {
       #ifdef DEBUG_EXTANT_STACK_POINTERS
         assert(TG_Stack_Outstanding == 0);  // in the future, pop may disrupt
       #endif
-        Init_Unreadable_Void(DS_TOP); // mostly trashy but safe for NOT_END()
+        Init_Trash(DS_TOP); // mostly trashy but safe for NOT_END()
         --DS_Index;
         --DS_Movable_Top;
     }

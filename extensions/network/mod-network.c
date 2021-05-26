@@ -44,8 +44,8 @@ enum Transport_Types {
 //
 static void Query_Net(REBVAL *out, REBVAL *port, struct devreq_net *sock)
 {
-    REBVAL *info = rebValueQ(
-        "copy ensure object! (", port, ")/scheme/info"
+    REBVAL *info = rebValue(
+        "copy ensure object! (@", port, ")/scheme/info"
     );  // shallow copy
 
     REBCTX *ctx = VAL_CONTEXT(info);
@@ -278,7 +278,7 @@ static REB_R Transport_Actor(
                 or req->command == RDC_CLOSE
             );
 
-        return Init_Void(D_OUT, SYM_VOID); }
+        return Init_None(D_OUT); }
 
       case SYM_READ: {
         INCLUDE_PARAMS_OF_READ;
@@ -410,7 +410,7 @@ static REB_R Transport_Actor(
         //
         TRASH_POINTER_IF_DEBUG(req->common.data);
         req->common.binary = rebValue(
-            "as binary! copy/part", data, rebQ(REF(part))
+            "as binary! copy/part", data, REF(part)
         );
 
         // Because requests can be handled asynchronously, we won't
@@ -445,7 +445,7 @@ static REB_R Transport_Actor(
         if (not (req->modes & RST_LISTEN) or (req->modes & RST_UDP))
             fail ("TAKE is only available on TCP LISTEN ports");
 
-        return rebValueQ(
+        return rebValue(
             "take/part/(", REF(deep), ")/(", REF(last), ")",
                 CTX_VAR(ctx, STD_PORT_CONNECTIONS),
                 REF(part)
@@ -516,7 +516,7 @@ REBNATIVE(register_network_device)
     NETWORK_INCLUDE_PARAMS_OF_REGISTER_NETWORK_DEVICE;
 
     OS_Register_Device(&Dev_Net);
-    return Init_Void(D_OUT, SYM_VOID);
+    return Init_None(D_OUT);
 }
 
 
@@ -577,7 +577,7 @@ REBNATIVE(get_udp_actor_handle)
 //
 //  {Join (or leave) an IPv4 multicast group}
 //
-//      return: [<void>]
+//      return: []
 //      port [port!]
 //          {An open UDP port}
 //      group [tuple!]
@@ -621,7 +621,7 @@ REBNATIVE(set_udp_multicast)
     if (result < 0)
         rebFail_OS (result);
 
-    return nullptr;
+    return rebVoid();
 }
 
 
@@ -630,7 +630,7 @@ REBNATIVE(set_udp_multicast)
 //
 //  {Set the TTL of a UDP port}
 //
-//      return: [<void>]
+//      return: []
 //      port [port!]
 //          {An open UDP port}
 //      ttl [integer!]
@@ -661,5 +661,5 @@ REBNATIVE(set_udp_ttl)
     if (result < 0)
         rebFail_OS (result);
 
-    return nullptr;
+    return rebVoid();
 }
