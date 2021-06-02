@@ -53,6 +53,16 @@
     ]
 )
 
+(
+    g1: make gob! []
+    g2: make gob! []
+    append g1 g2
+    did all [
+        g2.parent = g1
+        g1.parent = null
+    ]
+)
+
 [#1797 (
     a: make gob! []
     repend a [
