@@ -1082,7 +1082,7 @@ REBTYPE(Gob)
         REBVAL *pane = SPECIFIC(ARR_AT(gob, IDX_GOB_PANE));
         return rebValue(
             "applique :take [",
-                "series: at", pane, rebI(index + 1),
+                "series: at", rebQ(pane), rebI(index + 1),
                 "part:", REF(part),
                 "deep:", REF(deep),
                 "last:", REF(last),
