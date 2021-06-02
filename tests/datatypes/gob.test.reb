@@ -1,5 +1,26 @@
-; datatypes/gob.r
-; minimum
+; %gob.test.reb
+;
+; GOB! is a compressed form of object which was part of R3-Alpha to serve
+; purposes something like browser DOM nodes.  They automatically manage parent
+; and child linkages.  They have a fixed set of fields (including those related
+; to coordinates, styles, and effects) but one of those fields provides for
+; storing arbitrary data.
+;
+; Because R3-Alpha's GUI was never finalized, GOB!s had limited use in the
+; core.  Hence they were not well-tested.  Ren-C has kept the type around,
+; while moving its implementation out of the core...so it is an example of how
+; one might define a new datatype in an extension.
+;
+; https://forum.rebol.info/t/user-defined-datatype-discussion/1203
+;
+; Proposals for a more generic NODE! type have been put forth, which would
+; make more sense than having so many flags hardcoded for GUI purposes:
+;
+; https://forum.rebol.info/t/multiply-linked-lists/1441
+; https://github.com/red/red/wiki/%5BPROP%5D-Node!-datatype
+;
+
+
 (gob? make gob! [])
 (gob! = type of make gob! [])
 
@@ -50,6 +71,16 @@
         append gob make gob! 3x4
         1 = length of gob
         gob/1/offset = 3x4
+    ]
+)
+
+(
+    g1: make gob! []
+    g2: make gob! []
+    append g1 g2
+    did all [
+        g2.parent = g1
+        g1.parent = null
     ]
 )
 

@@ -54,7 +54,11 @@ const struct {
 REBINT CT_Gob(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
     UNUSED(strict);
-    return VAL_GOB(a) == VAL_GOB(b) && VAL_GOB_INDEX(a) == VAL_GOB_INDEX(b);
+    if (VAL_GOB(a) != VAL_GOB(b))
+        return VAL_GOB(a) > VAL_GOB(b) ? 1 : -1;  // !!! For sorting?
+    if (VAL_GOB_INDEX(a) != VAL_GOB_INDEX(b))
+        return VAL_GOB_INDEX(a) > VAL_GOB_INDEX(b) ? 1 : -1;
+    return 0;
 }
 
 //
@@ -525,76 +529,92 @@ static bool Did_Set_GOB_Var(REBGOB *gob, const RELVAL *word, const REBVAL *val)
 
 
 //
-//  Get_GOB_Var: C
+//  Did_Get_GOB_Var: C
 //
-// !!! Things like this Get_GOB_Var routine could be replaced with ordinary
-// OBJECT!-style access if GOB! was an ANY-CONTEXT.
+// Returns true if the field name is a known GOB! property.  `out` may be set
+// to a NULL cell even for known fields, if not applicable to this GOB!'s type. 
 //
-static REBVAL *Get_GOB_Var(
+static bool Did_Get_GOB_Var(
     RELVAL *out,
     REBGOB *gob,
     const RELVAL *word
 ){
     switch (VAL_WORD_ID(word)) {
       case SYM_OFFSET:
-        return Init_Pair_Dec(out, GOB_X(gob), GOB_Y(gob));
+        Init_Pair_Dec(out, GOB_X(gob), GOB_Y(gob));
+        break;
 
       case SYM_SIZE:
-        return Init_Pair_Dec(out, GOB_W(gob), GOB_H(gob));
+        Init_Pair_Dec(out, GOB_W(gob), GOB_H(gob));
+        break;
 
       case SYM_IMAGE:
         if (GOB_TYPE(gob) == GOBT_IMAGE) {
             assert(rebDid("image?", GOB_CONTENT(gob)));
             return Copy_Cell(out, GOB_CONTENT(gob));
         }
-        return Init_Blank(out);
+        else
+            Init_Nulled(out);
+        break;
 
       case SYM_DRAW:
         if (GOB_TYPE(gob) == GOBT_DRAW) {
             assert(IS_BLOCK(GOB_CONTENT(gob)));
-            return Copy_Cell(out, GOB_CONTENT(gob));
+            Copy_Cell(out, GOB_CONTENT(gob));
         }
-        return Init_Blank(out);
+        else
+            Init_Nulled(out);
+        break;
 
       case SYM_TEXT:
         if (GOB_TYPE(gob) == GOBT_TEXT) {
             assert(IS_BLOCK(GOB_CONTENT(gob)));
-            return Copy_Cell(out, GOB_CONTENT(gob));
+            Copy_Cell(out, GOB_CONTENT(gob));
         }
-        if (GOB_TYPE(gob) == GOBT_STRING) {
+        else if (GOB_TYPE(gob) == GOBT_STRING) {
             assert(IS_TEXT(GOB_CONTENT(gob)));
-            return Copy_Cell(out, GOB_CONTENT(gob));
+            Copy_Cell(out, GOB_CONTENT(gob));
         }
-        return Init_Blank(out);
+        else
+            Init_Nulled(out);
+        break;
 
       case SYM_EFFECT:
         if (GOB_TYPE(gob) == GOBT_EFFECT) {
             assert(IS_BLOCK(GOB_CONTENT(gob)));
-            return Copy_Cell(out, GOB_CONTENT(gob));
+            Copy_Cell(out, GOB_CONTENT(gob));
         }
-        return Init_Blank(out);
+        else
+            Init_Nulled(out);
+        break;
 
       case SYM_COLOR:
         if (GOB_TYPE(gob) == GOBT_COLOR) {
             assert(IS_TUPLE(GOB_CONTENT(gob)));
-            return Copy_Cell(out, GOB_CONTENT(gob));
+            Copy_Cell(out, GOB_CONTENT(gob));
         }
-        return Init_Blank(out);
+        else 
+            Init_Nulled(out);
+        break;
 
       case SYM_ALPHA:
-        return Init_Integer(out, GOB_ALPHA(gob));
+        Init_Integer(out, GOB_ALPHA(gob));
+        break;
 
       case SYM_PANE: {
         REBARR *pane = GOB_PANE(gob);
         if (not pane)
-            return Init_Block(out, Make_Array(0));
-
-        return Init_Block(out, Copy_Array_Shallow(pane, SPECIFIED)); }
+            Init_Block(out, Make_Array(0));
+        else
+            Init_Block(out, Copy_Array_Shallow(pane, SPECIFIED));
+        break; }
 
       case SYM_PARENT:
         if (GOB_PARENT(gob))
-            return Init_Gob(out, GOB_PARENT(gob));
-        return Init_Blank(out);
+            Init_Gob(out, GOB_PARENT(gob));
+        else
+            Init_Nulled(out);
+        break;
 
       case SYM_DATA: {
         enum Reb_Kind kind = VAL_TYPE(GOB_DATA(gob));
@@ -605,17 +625,23 @@ static REBVAL *Get_GOB_Var(
             or kind == REB_BINARY
             or kind == REB_INTEGER
         ){
-            return Copy_Cell(out, GOB_DATA(gob));
+            Copy_Cell(out, GOB_DATA(gob));
         }
-        assert(kind == REB_BLANK);
-        return Init_Blank(out); }
+        else {
+            assert(kind == REB_BLANK);
+            Init_Nulled(out);
+        }
+        break; }
 
       case SYM_FLAGS:
-        return Init_Block(out, Gob_Flags_To_Array(gob));
+        Init_Block(out, Gob_Flags_To_Array(gob));
+        break;
 
       default:
-        return Init_Blank(out);
+        return false;  // unknown GOB! field
     }
+
+    return true;  // known GOB! field
 }
 
 
@@ -698,7 +724,16 @@ static REBARR *Gob_To_Array(REBGOB *gob)
         }
 
         REBVAL *name = Init_Set_Word(Alloc_Tail_Array(arr), Canon(sym));
-        Get_GOB_Var(Alloc_Tail_Array(arr), gob, name); // BLANK! if not set
+        REBVAL *slot = Alloc_Tail_Array(arr);
+        bool known = Did_Get_GOB_Var(slot, gob, name);
+        assert(known);  // should have known that sym
+        UNUSED(known);
+
+        // !!! Can't have nulls in arrays.  Is using BAD-WORD! correct here?
+        // Gobs used none (blank) historically.
+        //
+        if (IS_NULLED(slot))
+            Init_Bad_Word_Core(slot, Canon(SYM_NULL), CELL_MASK_NONE);
     }
 
     return arr;
@@ -809,7 +844,7 @@ REB_R PD_Gob(
 
     if (IS_WORD(picker)) {
         if (not setval) {
-            if (IS_BLANK(Get_GOB_Var(pvs->out, gob, picker)))
+            if (not Did_Get_GOB_Var(pvs->out, gob, picker))
                 return R_UNHANDLED;
 
             // !!! Comment here said: "Check for SIZE/X: types of cases".
@@ -1047,7 +1082,7 @@ REBTYPE(Gob)
         REBVAL *pane = SPECIFIC(ARR_AT(gob, IDX_GOB_PANE));
         return rebValue(
             "applique :take [",
-                "series: at", pane, rebI(index + 1),
+                "series: at", rebQ(pane), rebI(index + 1),
                 "part:", REF(part),
                 "deep:", REF(deep),
                 "last:", REF(last),
