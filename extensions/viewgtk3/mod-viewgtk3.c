@@ -131,8 +131,7 @@ REBNATIVE(gtk_main)
 
     gtk_main();
 
-    // return rebVoid();
-    return Init_Void(D_OUT, SYM_VOID);
+    return rebVoid();
 }
 
 //
@@ -173,8 +172,7 @@ REBNATIVE(gtk_main_quit)
     rebElide("print {Voor gtk_main_quit call}");
     gtk_main_quit();
     rebElide("print {Na gtk_main_quit call}");
-    // return rebVoid();
-    return Init_Void(D_OUT, SYM_VOID);
+    return rebVoid();
 }
 
 // Signal function(s)
@@ -1967,6 +1965,118 @@ REBNATIVE(gtk_widget_destroy)
     GtkWidget *widget = VAL_HANDLE_POINTER(GtkWidget, ARG(widget));
 
     gtk_widget_destroy(widget);
+
+    return rebVoid();
+}
+
+//
+//  export gtk-widget-get-no-show-all: native [
+//
+//      {Returns the current value of the “no-show-all” property, which determines whether calls to gtk_widget_show_all() will affect this widget.}
+//
+//      return: [logic!]
+//      widget [handle!]
+//  ]
+//
+REBNATIVE(gtk_widget_get_no_show_all)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WIDGET_GET_NO_SHOW_ALL;
+
+    GtkWidget *widget = VAL_HANDLE_POINTER(GtkWidget, ARG(widget));
+
+    bool result = gtk_widget_get_no_show_all(widget);
+
+    return rebLogic(result);
+}
+
+//
+//  export gtk-widget-set-no-show-all: native [
+//
+//      {Sets the “no-show-all” property, which determines whether calls to gtk_widget_show_all() will affect this widget.}
+//
+//      return: [void!]
+//      widget [handle!]
+//      no_show_all [logic!]
+//  ]
+//
+REBNATIVE(gtk_widget_set_no_show_all)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WIDGET_SET_NO_SHOW_ALL;
+
+    GtkWidget *widget = VAL_HANDLE_POINTER(GtkWidget, ARG(widget));
+ 
+    bool no_show_all = rebDid(ARG(no_show_all));
+
+    gtk_widget_set_no_show_all(widget, no_show_all);
+
+    return rebVoid();
+}
+
+//
+//  export gtk-widget-get-visible: native [
+//
+//      {Determines whether the widget is visible. If you want to take into account whether 
+// the widget’s parent is also marked as visible, use gtk_widget_is_visible() instead.
+// This function does not check if the widget is obscured in any way.}
+//
+//      return: [logic!]
+//      widget [handle!]
+//  ]
+//
+REBNATIVE(gtk_widget_get_visible)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WIDGET_GET_VISIBLE;
+
+    GtkWidget *widget = VAL_HANDLE_POINTER(GtkWidget, ARG(widget));
+
+    bool result = gtk_widget_get_visible(widget);
+
+    return rebLogic(result);
+}
+
+//
+//  export gtk-widget-is-visible: native [
+//
+//      {Determines whether the widget and all its parents are marked as visible.
+// This function does not check if the widget is obscured in any way.}
+//
+//      return: [logic!]
+//      widget [handle!]
+//  ]
+//
+REBNATIVE(gtk_widget_is_visible)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WIDGET_IS_VISIBLE;
+
+    GtkWidget *widget = VAL_HANDLE_POINTER(GtkWidget, ARG(widget));
+
+    bool result = gtk_widget_is_visible(widget);
+
+    return rebLogic(result);
+}
+
+//
+//  export gtk-widget-set-visible: native [
+//
+//      {Sets the visibility state of widget . Note that setting this to TRUE doesn’t mean the widget is actually 
+// viewable, see gtk_widget_get_visible().
+// This function simply calls gtk_widget_show() or gtk_widget_hide() but is nicer to use when the 
+// visibility of the widget depends on some condition.}
+//
+//      return: [void!]
+//      widget [handle!]
+//      visible [logic!]
+//  ]
+//
+REBNATIVE(gtk_widget_set_visible)
+{
+    VIEWGTK3_INCLUDE_PARAMS_OF_GTK_WIDGET_SET_VISIBLE;
+
+    GtkWidget *widget = VAL_HANDLE_POINTER(GtkWidget, ARG(widget));
+ 
+    bool visible = rebDid(ARG(visible));
+
+    gtk_widget_set_visible(widget, visible);
 
     return rebVoid();
 }
