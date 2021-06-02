@@ -54,7 +54,11 @@ const struct {
 REBINT CT_Gob(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
     UNUSED(strict);
-    return VAL_GOB(a) == VAL_GOB(b) && VAL_GOB_INDEX(a) == VAL_GOB_INDEX(b);
+    if (VAL_GOB(a) != VAL_GOB(b))
+        return VAL_GOB(a) > VAL_GOB(b) ? 1 : -1;  // !!! For sorting?
+    if (VAL_GOB_INDEX(a) != VAL_GOB_INDEX(b))
+        return VAL_GOB_INDEX(a) > VAL_GOB_INDEX(b) ? 1 : -1;
+    return 0;
 }
 
 //
