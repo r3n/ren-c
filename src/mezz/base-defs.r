@@ -290,39 +290,11 @@ pointfree*: func* [
 ;
 ; Note: ENCLOSE is the first wrapped version here; so that the other wrappers
 ; can use it, thus inheriting HELP from their core (*-having) implementations.
-
-inherit-meta: func* [
-    return: "Same as derived (assists in efficient chaining)"
-        [action!]
-    derived [action!]
-    original "Passed as WORD! to use GET to avoid tainting cached label"
-        [word!]
-    /augment "Additional spec information to scan"
-        [block!]
-][
-    original: get original  ; GET so `specialize :foo [...]` keeps label foo
-
-    if let m1: meta-of :original [
-        set-meta :derived let m2: copy :m1  ; shallow copy
-        if select m1 'parameter-notes [  ; shallow copy, but make frame match
-            m2/parameter-notes: make frame! :derived
-            for-each [key value] m1/parameter-notes [
-                if in m2/parameter-notes key [
-                    m2/parameter-notes/(key): get* 'value  ; !!! BAD-WORD!s
-                ]
-            ]
-        ]
-        if select m1 'parameter-types [  ; shallow copy, but make frame match
-            m2/parameter-types: make frame! :derived
-            for-each [key value] m1/parameter-types [
-                if in m2/parameter-types key [
-                    m2/parameter-types/(key): get* 'value  ; !!! BAD-WORD!s
-                ]
-            ]
-        ]
-    ]
-    return get 'derived  ; no :derived name cache
-]
+;
+; (A usermode INHERIT-META existed, but it was very slow.  It was made native.)
+;
+; https://forum.rebol.info/t/performance-of-inherit-meta/1619
+;
 
 enclose: enclose* :enclose* func* [f] [  ; uses low-level ENCLOSE* to make
     let inner: get 'f/inner
