@@ -502,7 +502,7 @@ main-startup: func [
     emit #die-if-error
 
     let is-script-implicit: true
-    let check-encap: false
+    let check-encap: true
 
     while [not tail? argv] [
 
