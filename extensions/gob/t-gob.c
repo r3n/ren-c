@@ -724,7 +724,7 @@ static REBARR *Gob_To_Array(REBGOB *gob)
         }
 
         REBVAL *name = Init_Set_Word(Alloc_Tail_Array(arr), Canon(sym));
-        REBVAL *slot = Alloc_Tail_Array(arr);
+        RELVAL *slot = Alloc_Tail_Array(arr);
         bool known = Did_Get_GOB_Var(slot, gob, name);
         assert(known);  // should have known that sym
         UNUSED(known);
