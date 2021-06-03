@@ -1543,7 +1543,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         //
         assert(NOT_CELL_FLAG(v, ISOTOPE));
 
-        if (VAL_BAD_WORD_ID(v) == REB_NULL) {
+        if (VAL_BAD_WORD_ID(v) == SYM_NULL) {
             //
             // ~null~ evaluating to NULL instead of the isotope form of ~null~
             // is a "twist" but a useful one.

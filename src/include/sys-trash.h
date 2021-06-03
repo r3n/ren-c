@@ -36,14 +36,14 @@
 //
 
 #if !defined(DEBUG_UNREADABLE_TRASH)  // release behavior, just ~trash~
-    inline static REBVAL *Init_Bad_Word_Core(
+    inline static REBVAL *Init_Bad_Word_Untracked(
         RELVAL *out,
         const REBSYM *label,
         REBFLGS flags
     );  // forward decl
 
     #define Init_Trash(v) \
-        Init_Bad_Word_Core((v), PG_Trash_Canon, CELL_MASK_NONE)
+        Init_Bad_Word_Untracked((v), PG_Trash_Canon, CELL_MASK_NONE)
 #else
     inline static REBVAL *Init_Trash_Untracked(RELVAL *out) {
         RESET_VAL_HEADER(out, REB_BAD_WORD, CELL_FLAG_FIRST_IS_NODE);
