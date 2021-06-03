@@ -537,7 +537,7 @@ load-module: func [
 
             ; Return blank if no module of that name found
 
-            tmp: find/skip system/modules source 2 else [
+            tmp: find/skip system/modules ^source 2 else [
                 return blank
             ]
 
