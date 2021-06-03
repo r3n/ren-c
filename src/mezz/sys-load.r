@@ -610,7 +610,7 @@ load-module: func [
             let tmp
             parse source [
                 while [
-                    tmp:
+                    tmp: here
                     set name opt set-word!
                     set mod [
                         word! | module! | file! | url! | text! | binary!
@@ -621,7 +621,6 @@ load-module: func [
                         ]
                     )
                 ]
-                end
             ] else [
                 cause-error 'script 'invalid-arg tmp
             ]
