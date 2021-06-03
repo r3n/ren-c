@@ -502,6 +502,7 @@ main-startup: func [
     emit #die-if-error
 
     let is-script-implicit: true
+    let check-encap: false
 
     while [not tail? argv] [
 
@@ -560,6 +561,10 @@ main-startup: func [
         |
             "--import" end (
                 lib/import local-to-file param-or-die "IMPORT"
+            )
+        |
+            "--no-encap" end (
+                check-encap: false
             )
         |
             ["--quiet" | "-q"] end (
@@ -682,7 +687,7 @@ main-startup: func [
     o/args: argv  ; whatever's left is positional args
 
 
-    let boot-embedded: get-encap system/options/boot
+    let boot-embedded: if check-encap [get-encap system/options/boot]
 
     if any [boot-embedded, o/script] [o/quiet: true]
 
