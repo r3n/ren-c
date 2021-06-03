@@ -21,7 +21,7 @@ spec-of: function [
     meta: try match object! meta-of :action
 
     return collect [
-        keep/line ensure [<opt> text!] select meta 'description
+        keep/line try ensure [<opt> text!] select meta 'description
 
         types: ensure [<opt> frame! object!] select meta 'parameter-types
         notes: ensure [<opt> frame! object!] select meta 'parameter-notes
