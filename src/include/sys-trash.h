@@ -35,13 +35,41 @@
 // later.  The panics help make sure it is never actually read.
 //
 
-#if !defined(DEBUG_UNREADABLE_TRASH)  // release behavior, just ~trash~
-    inline static REBVAL *Init_Bad_Word_Untracked(
-        RELVAL *out,
-        const REBSYM *label,
-        REBFLGS flags
-    );  // forward decl
 
+// !!! Originally this function lived in the %sys-bad-word.h file, and was
+// forward declared only in the !defined(DEBUG_UNREADABLE_TRASH) case.  While
+// this worked most of the time, older MinGW cross compilers seemed to have a
+// problem with that forward inline declaration.  So just define it here.
+// Be sure to re-run the MinGW CI Builds if you rearrange this...
+//
+inline static REBVAL *Init_Bad_Word_Untracked(
+    RELVAL *out,
+    const REBSTR *label,
+    REBFLGS flags
+){
+    RESET_VAL_HEADER(out, REB_BAD_WORD, CELL_FLAG_FIRST_IS_NODE | flags);
+
+    // Due to being evaluator active and not wanting to disrupt the order in
+    // %types.r, bad words claim to be bindable...but set the binding to null.
+    // See %sys-ordered.h for more on all the rules that make this so.
+    //
+    mutable_BINDING(out) = nullptr;
+
+    INIT_VAL_NODE1(out, label);
+  #ifdef ZERO_UNUSED_CELL_FIELDS
+    PAYLOAD(Any, out).second.trash = nullptr;
+  #endif
+    return cast(REBVAL*, out);
+}
+
+
+#if !defined(DEBUG_UNREADABLE_TRASH)  // release behavior, just ~trash~
+    //
+    // Important: This is *not* a CELL_FLAG_ISOTOPE form of ~trash~.  That is
+    // because trash can be put anywhere as an implementation detail--including
+    // array slots which cannot legally hold isotopes.  So if by some chance
+    // that trash leaks, we don't want to further corrupt the state.
+    // 
     #define Init_Trash(v) \
         Init_Bad_Word_Untracked((v), PG_Trash_Canon, CELL_MASK_NONE)
 #else
@@ -51,8 +79,8 @@
 
         // While SYM_UNREADABLE might be nice here, this prevents usage at
         // boot time (e.g. data stack initialization)...and it's a good way
-        // to crash sites that expect normal voids.  It's usually clear
-        // from the assert that it's unreadable, anyway.
+        // to crash sites that might mistake it for a valid bad word.  It's
+        // usually clear from the assert that it's unreadable, anyway.
         //
         INIT_VAL_NODE1(out, nullptr);  // FIRST_IS_NODE needed to do this
         return cast(REBVAL*, out);

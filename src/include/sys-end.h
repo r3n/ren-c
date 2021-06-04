@@ -37,10 +37,10 @@
 //
 //=//// NOTES /////////////////////////////////////////////////////////////=//
 //
-// * There's some crossover in situations where you might use an "unreadable"
+// * There's some crossover in situations where you might use unreadable trash
 //   with when you would use an END.  But there are fewer places where
 //   ends are tolerated by the GC...such as frame output cells.  You can't put
-//   an END in an array, while an unreadable void can go there.
+//   an END in an array, while an unreadable trash can go there.
 //
 // * R3-Alpha terminated all arrays with an END! cell--much the way that
 //   C strings are terminated by '\0'.  This provided a convenient way to

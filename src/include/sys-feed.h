@@ -582,7 +582,7 @@ inline static void Free_Feed(REBFED *feed) {
 // Just to simplify matters, the frame cell is set to a bit pattern the GC
 // will accept.  It would need stack preparation anyway, and this simplifies
 // the invariant so if a recycle happens before Eval_Core() gets to its
-// body, it's always set to something.  Using an unreadable void means we
+// body, it's always set to something.  Using an unreadable trash means we
 // signal to users of the frame that they can't be assured of any particular
 // value between evaluations; it's not cleared.
 //

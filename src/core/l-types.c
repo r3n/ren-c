@@ -31,7 +31,7 @@
 // The scanning code in R3-Alpha used NULL to return failure during the scan
 // of a value, possibly leaving the value itself in an incomplete or invalid
 // state.  Rather than write stray incomplete values into these spots, Ren-C
-// puts "unreadable void"
+// puts "unreadable trash"
 //
 
 #define return_NULL \

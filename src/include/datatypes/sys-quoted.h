@@ -386,7 +386,7 @@ inline static RELVAL *Unliteralize(RELVAL *v) {
 
 
 inline static REBCEL(const*) VAL_UNESCAPED(const RELVAL *v) {
-    if (KIND3Q_BYTE_UNCHECKED(v) != REB_QUOTED)  // allow unreadable voids
+    if (KIND3Q_BYTE_UNCHECKED(v) != REB_QUOTED)  // allow unreadable trash
         return v;  // Note: kind byte may be > 64
 
     // The reason this routine returns `const` is because you can't modify
