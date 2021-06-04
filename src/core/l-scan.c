@@ -1222,7 +1222,7 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
                 ss->end = cp;
                 return TOKEN_VOID;
             }
-            if (IS_LEX_DELIMIT(*cp)) {
+            if (*cp == ':' or IS_LEX_DELIMIT(*cp)) {
                 ss->end = cp;
                 return TOKEN_WORD;  // single `~` is a WORD!
             }
