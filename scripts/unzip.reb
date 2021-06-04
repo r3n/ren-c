@@ -12,9 +12,7 @@ REBOL [
         Original code from %rebzip.r from www.rebol.org
         Public Domain License
     }
-    Notes: {
-        Only DEFLATE and STORE methods are supported.
-
+    Usage: {
         == archiving: zip ==
 
         you can zip a single file:
@@ -48,6 +46,12 @@ REBOL [
             unzip my-block %my-zip-file.zip
 
             my-block == [%file-1.txt #{...} %file-2.exe #{...}]
+    }
+    Notes: {
+        * Only DEFLATE and STORE methods are supported.
+
+        * The Linux `zipinfo` utility with the `-v` switch for verbose output
+          is a VERY useful tool when hacking on code involving zip files!
     }
 ]
 
@@ -335,10 +339,10 @@ ctx-zip: context [
         ; utility rules like this have trouble with name overlap in the
         ; enclosing routine.  To be addressed soon.
         ;
-        uint16-rule: [tmpbin: across 2 skip, (debin [LE + 2] tmpbin)]
-        uint32-rule: [tmpbin: across 4 skip, (debin [LE + 4] tmpbin)]
-        msdos-date-rule: [tmpbin: across 2 skip, (get-msdos-date tmpbin)]
-        msdos-time-rule: [tmpbin: across 2 skip, (get-msdos-time tmpbin)]
+        uint16-rule: [tmpbin: across 2 <any>, (debin [LE + 2] tmpbin)]
+        uint32-rule: [tmpbin: across 4 <any>, (debin [LE + 4] tmpbin)]
+        msdos-date-rule: [tmpbin: across 2 <any>, (get-msdos-date tmpbin)]
+        msdos-time-rule: [tmpbin: across 2 <any>, (get-msdos-time tmpbin)]
 
         ; NOTE: The original rebzip.r did decompression based on the local file
         ; header records in the zip file.  But due to streaming compression
@@ -360,9 +364,9 @@ ctx-zip: context [
         uparse central-end-pos [
             end-of-central-sig  ; by definition (pos matched this)
 
-            2 skip  ; disk_nbr
-            2 skip  ; cd_start_disk
-            2 skip  ; disk_cd_entries
+            2 <any>  ; disk_nbr
+            2 <any>  ; cd_start_disk
+            2 <any>  ; disk_cd_entries
             num-central-entries: uint16-rule
             total-central-directory-size: uint32-rule
             central-directory-offset: uint32-rule
@@ -374,7 +378,9 @@ ctx-zip: context [
             ; contains the end-of-central-sig, which is not formally prohibited
             ; by the spec (though some suggest it should be).
             ;
-            archive-comment-len skip end
+            archive-comment-len <any>
+
+            [<end> | (fail "Extra information at end of ZIP file")]
         ] else [
             fail "Malformed end of central directory record"
         ]
@@ -388,14 +394,14 @@ ctx-zip: context [
         central-directory-entry-rule: [
             [central-file-sig | (fail "CENTRAL-FILE-SIG mismatch")]
 
-            version-created-by: across 2 skip  ; version that made this file
-            version-needed: across 2 skip  ; version needed to extract
-            flags: across 2 skip
+            version-created-by: across 2 <any>  ; version that made this file
+            version-needed: across 2 <any>  ; version needed to extract
+            flags: across 2 <any>
 
             method-number: uint16-rule
             time: msdos-time-rule
             date: msdos-date-rule
-            crc: across 4 skip  ; crc32 little endian, maybe 0 in local header
+            crc: across 4 <any>  ; crc32 little endian, maybe 0 in local header
             compressed-size: uint32-rule  ; maybe 0 in local header
             uncompressed-size: uint32-rule  ; maybe 0 in local header
 
@@ -403,13 +409,13 @@ ctx-zip: context [
             extra-field-length: uint16-rule
             file-comment-length: uint16-rule  ; not in local header
             disk-number-start: uint16-rule  ; not in local header
-            internal-attributes: across 2 skip  ; not in local header
-            external-attributes: across 4 skip  ; not in local header
+            internal-attributes: across 2 <any>  ; not in local header
+            external-attributes: across 4 <any>  ; not in local header
             local-header-offset: uint32-rule  ; (for finding local header)
-            name: [temp: across name-length skip, (to-file temp)]
+            name: [temp: across name-length <any>, (to-file temp)]
 
-            extra-field-length skip  ; !!! Expose "extra" field?
-            file-comment-length skip  ; !!! Expose file comment?
+            extra-field-length <any>  ; !!! Expose "extra" field?
+            file-comment-length <any>  ; !!! Expose file comment?
         ]
 
         ; When it was realized that the old rebzip.r method of relying on the
@@ -422,8 +428,8 @@ ctx-zip: context [
         check-local-directory-entry-rule: [
             [local-file-sig | (fail "LOCAL-FILE-SIG mismatch")]
 
-            x: across 2 skip, (assert [x = version-needed])
-            x: across 2 skip, (assert [x = flags])
+            x: across 2 <any>, (assert [x = version-needed])
+            x: across 2 <any>, (assert [x = flags])
             x: uint16-rule, (assert [x = method-number])
             x: msdos-time-rule, (assert [x = time])
             x: msdos-date-rule, (assert [x = date])
@@ -442,20 +448,29 @@ ctx-zip: context [
                 ; we go with that approach as well, given that there are file
                 ; attributes there not available in the local header anyway.
                 ;
-                x: across 4 skip, (assert [x = #{00000000}])  ; crc
+                x: across 4 <any>, (assert [x = #{00000000}])  ; crc
                 x: uint32-rule, (assert [x = 0])  ; compressed size
                 x: uint32-rule, (assert [x = 0])  ; uncompressed size
             |
-                x: across 4 skip, (assert [x = crc])
+                x: across 4 <any>, (assert [x = crc])
                 x: uint32-rule, (assert [x = compressed-size])
                 x: uint32-rule, (assert [x = uncompressed-size])
             ]
 
             x: uint16-rule, (assert [x = name-length])
-            x: uint16-rule, (assert [x = extra-field-length])
-            x: across name-length skip, (assert [(to-file x) = name])
 
-            extra-field-length skip
+            ; NOTE: It does not appear that the local header's extra field
+            ; intends to be the same size as the central header's extra field.
+            ; At least, the `zip` unix utility (based on "Info-ZIP") makes
+            ; different size information with different contents...for instance
+            ; putting 9 byte timestamps in the global header and 5 byte
+            ; timestamps in the local header.
+            ;
+            local-extra-field-length: uint16-rule
+
+            x: across name-length <any>, (assert [(to-file x) = name])
+
+            local-extra-field-length <any>
         ]
 
         ; While this is by no means broken up perfectly into subrules, it is
@@ -498,7 +513,7 @@ ctx-zip: context [
                 ; We're now right past the local directory entry, where the
                 ; compressed data is stored.
                 ;
-                data: here
+                data: <here>
                 (
                     uncompressed-data: catch [
 
@@ -589,9 +604,9 @@ ctx-zip: context [
             ; We shouldn't just be at *an* end-of-central signature, we should
             ; be at the end record we started the search from.
             ;
-            pos: here, (assert [pos = central-end-pos])
+            pos: <here>, (assert [pos = central-end-pos])
 
-            to end  ; skip to end so parse succeeds (could RETURN TRUE)
+            to <end>  ; jump to end so parse succeeds
         ] else [
             fail "Malformed Zip Archive"
         ]
