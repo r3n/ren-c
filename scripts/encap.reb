@@ -581,7 +581,7 @@ pe-format: context [
             any [
                 find words ^ to word! word
                 find def ^ to set-word! word
-            ] then [
+            ] else [
                 append def ^ to set-word! word
             ]
         ]
@@ -613,10 +613,9 @@ pe-format: context [
             | skip
         ]
 
-        parse rule [while block-rule end]
+        parse rule [while block-rule] else [fail]
 
-        ;dump def
-        set name make object! append def [_]
+        set name make object! append def [~unset~]
         bind rule get name
     ]
 
@@ -1025,7 +1024,12 @@ pe-format: context [
                 target-sec
             ]
             data [
-                copy/part (skip exe-data target-sec.physical-offset) target-sec.physical-size
+                ; !!! physical-size looks to be rounded up, e.g. if you wrote
+                ; 126 bytes in the section you might get 512 bytes.  The
+                ; virtual size looks like what you actually want...but the
+                ; virtual offset isn't right, the physical offset is (?)
+                ;
+                copy/part (skip exe-data target-sec.physical-offset) target-sec.virtual-size
             ]
         ] else [
             reduce [
@@ -1224,7 +1228,7 @@ generic-format: context [
         )
 
         let embed: read/seek/part file (
-            info/size - sig-length - 8 - embed-size
+            info.size - sig-length - 8 - embed-size
         ) embed-size
 
         return embed
@@ -1264,7 +1268,7 @@ encap: func [
     print ["Compressed resource is" length of compressed "bytes long."]
 
     case [
-        parse executable [
+        parse? executable [
             (elf-format.mode: 'read) elf-format.header-rule to end
         ][
             print "ELF format found"
