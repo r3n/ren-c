@@ -1081,14 +1081,14 @@ REB_R TO_Sequence(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
         );
     }
 
-    if (ANY_PATH_KIND(arg_kind)) {  // e.g. `to set-path! 'a/b/c`
-        assert(arg_kind != VAL_TYPE(arg));  // TO should have called COPY
+    if (ANY_SEQUENCE_KIND(arg_kind)) {  // e.g. `to set-path! 'a/b/c`
+        assert(kind != arg_kind);  // TO should have called COPY
 
         // !!! If we don't copy an array, we don't get a new form to use for
         // new bindings in lookups.  Review!
         //
         Copy_Cell(out, arg);
-        mutable_KIND3Q_BYTE(out) = arg_kind;
+        mutable_KIND3Q_BYTE(out) = kind;
         return out;
     }
 
