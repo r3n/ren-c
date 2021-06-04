@@ -149,25 +149,31 @@ odbc-execute: func [
 
     if block? query [
         ;
-        ; REDUCE first, in case code portions took ^xxx as function args
+        ; !!! Previously this code depended on using @xxx which were assumed
+        ; to not evaluate.  It would thus run:
         ;
-        query: spaced map-each item reduce query [
+        ;    query: spaced map-each item reduce query [...]
+        ;
+        ; That was in case there were code portions taking @xxx as function
+        ; arguments, which were thus not counted as part of the dialect.
+        ;
+        ; But the system purposes of @xxx were migrated to what is now known
+        ; as ^xxx, which do have evaluative behavior (adds quote level).  It's
+        ; planned that @xxx will return when there are "enough datatype bits"
+        ;
+        query: spaced map-each item query [
             switch type of item [
                 sym-word! sym-path! [
                     get item
                 ]
                 sym-group! [
-                        reduce as group! item
+                    reduce as group! item
                 ]
             ] then value -> [
                 append parameters :value
                 "?"
             ] else [
-                ; REDUCE may have evaluated items and made WORD!/etc.
-                ; But SPACED reduces implicitly.  So map to a quoted
-                ; version to avoid double-evaluations.
-                ;
-                quote :item
+                :item
             ]
         ]
     ]
