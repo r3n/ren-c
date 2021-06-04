@@ -29,17 +29,17 @@ REBOL [
 
 
 database-prototype: context [
-    henv: _ ; SQLHENV handle!
-    hdbc: _ ; SQLHDBC handle!
-    statements:  [] ; statement objects
+    henv: '  ; SQLHENV handle!
+    hdbc: '  ; SQLHDBC handle!
+    statements: []  ; statement objects
 ]
 
 statement-prototype: context [
-    database: ;
-    hstmt: _ ; SQLHSTMT
+    database: ~
+    hstmt: '  ; SQLHSTMT
     string: _
-    titles: _
-    columns: _
+    titles: ~
+    columns: '
 ]
 
 sys/make-scheme [
@@ -52,18 +52,18 @@ sys/make-scheme [
             port [port!]
                 {WORD! spec then assume DSN, else BLOCK! DSN-less datasource}
         ][
-            port/state: context [
+            port.state: context [
                 access: 'write
                 commit: 'auto
             ]
 
-            port/locals: make database-prototype []
+            port.locals: make database-prototype []
 
-            result: open-connection port/locals case [
-                text? spec: select port/spec 'target [spec]
-                text? spec: select port/spec 'host [unspaced ["dsn=" spec]]
+            result: open-connection port.locals case [
+                text? spec: select port.spec 'target [spec]
+                text? spec: select port.spec 'host [unspaced ["dsn=" spec]]
 
-                cause-error 'access 'invalid-spec port/spec
+                cause-error 'access 'invalid-spec port.spec
             ]
 
             port
@@ -76,24 +76,24 @@ sys/make-scheme [
         ][
             statement: make statement-prototype []
 
-            database: statement/database: port/locals
+            database: statement.database: port.locals
 
             open-statement database statement
 
-            port: lib/open port/spec/ref
-            port/locals: statement
+            port: lib.open port.spec.ref
+            port.locals: statement
 
-            append database/statements port
+            append database.statements port
 
             port
         ]
 
         update: function [port [port!]] [
-            if get in connection: port/locals 'hdbc [
+            if get in connection: port.locals 'hdbc [
                 (update-odbc
                     connection
-                    port/state/access = 'write
-                    port/state/commit = 'auto
+                    port.state.access = 'write
+                    port.state.commit = 'auto
                 )
                 return port
             ]
@@ -104,15 +104,15 @@ sys/make-scheme [
             return: <none>
             port [port!]
         ][
-            if get try in (statement: port/locals) 'hstmt [
-                remove find head statement/database/statements port
+            if get try in (statement: port.locals) 'hstmt [
+                remove find head statement.database.statements port
                 close-statement statement
                 return
             ]
 
-            if get try in (connection: port/locals) 'hdbc [
-                for-each stmt-port connection/statements [close stmt-port]
-                clear connection/statements
+            if get try in (connection: port.locals) 'hdbc [
+                for-each stmt-port connection.statements [close stmt-port]
+                clear connection.statements
                 close-connection connection
                 return
             ]
@@ -123,11 +123,11 @@ sys/make-scheme [
             sql [text! word! block!]
                 {SQL statement or catalog, parameter blocks are reduced first}
         ][
-            insert-odbc port/locals reduce compose [((sql))]
+            insert-odbc port.locals reduce compose [((sql))]
         ]
 
         copy: function [port [port!] /part [integer!]] [
-            copy-odbc/part port/locals part
+            copy-odbc/part port.locals part
         ]
     ]
 ]
@@ -185,4 +185,4 @@ odbc-execute: func [
     insert statement compose [(query) ((parameters))]
 ]
 
-sys/export [odbc-execute]
+sys.export [odbc-execute]

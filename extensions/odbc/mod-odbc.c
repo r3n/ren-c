@@ -8,7 +8,7 @@
 //=////////////////////////////////////////////////////////////////////////=//
 //
 // Copyright 2010-2011 Christian Ensel
-// Copyright 2017-2019 Ren-C Open Source Contributors
+// Copyright 2017-2021 Ren-C Open Source Contributors
 // REBOL is a trademark of REBOL Technologies
 //
 // See README.md and CREDITS.md for more information.
@@ -89,7 +89,7 @@ typedef struct {
 } PARAMETER;  // For binding parameters
 
 typedef struct {
-    REBVAL *title_word;  // a WORD!
+    REBVAL *title;  // a TEXT!
     SQLSMALLINT sql_type;
     SQLSMALLINT c_type;
     SQLULEN column_size;
@@ -285,7 +285,7 @@ REBNATIVE(odbc_set_char_encoding)
     ODBC_INCLUDE_PARAMS_OF_ODBC_SET_CHAR_ENCODING;
 
     char_column_encoding = cast(enum CharColumnEncoding, rebUnboxInteger(
-        "switch", rebQ(ARG(encoding)), "[",
+        "switch @", ARG(encoding), "[",
             "'utf-8 [", rebI(CHAR_COL_UTF8), "]",
             "'ucs-2 [", rebI(CHAR_COL_UTF16), "]",  // TBD: limited codepoints
             "'utf-16 [", rebI(CHAR_COL_UTF16), "]",
@@ -480,7 +480,7 @@ SQLRETURN ODBC_BindParameter(
     //
     // https://forum.rebol.info/t/689/2
     //
-    SQLSMALLINT c_type = rebUnboxInteger("switch type of", rebQ(v), "[",
+    SQLSMALLINT c_type = rebUnboxInteger("switch type of @", v, "[",
         "blank! [", rebI(SQL_C_DEFAULT), "]",
         "logic! [", rebI(SQL_C_BIT), "]",
 
@@ -738,7 +738,7 @@ SQLRETURN ODBC_GetCatalog(
     REBVAL *block
 ){
     int which = rebUnbox(
-        "switch first ensure block!", rebQ(block), "[",
+        "switch first ensure block! @", block, "[",
             "'tables [1]",
             "'columns [2]",
             "'types [3]",
@@ -758,8 +758,8 @@ SQLRETURN ODBC_GetCatalog(
   blockscope {
     int index;
     for (index = 2; index != 6; ++index) {
-        pattern[index - 2] = rebSpellWide(  // gives nullptr if NULL
-            "ensure [<opt> text!]",
+        pattern[index - 2] = rebSpellWide(  // gives nullptr if BLANK!
+            "try ensure [<opt> text!]",
                 "pick ensure block!", block, rebI(index)
         );
     }
@@ -821,7 +821,7 @@ static void cleanup_columns(const REBVAL *v) {
     for (col_num = 0; col_num < num_columns; ++col_num) {
         COLUMN *col = &columns[col_num];
         FREE_N(char, col->buffer_size, cast(char*, col->buffer));
-        rebRelease(col->title_word);
+        rebRelease(col->title);
     }
     free(columns);
 }
@@ -856,10 +856,8 @@ void ODBC_DescribeResults(
         if (not SQL_SUCCEEDED(rc))
             rebJumps ("fail", Error_ODBC_Stmt(hstmt));
 
-        col->title_word = rebValue(
-            "as word!", rebR(rebLengthedTextWide(title, title_length))
-        );
-        rebUnmanage(col->title_word);
+        col->title = rebLengthedTextWide(title, title_length);
+        rebUnmanage(col->title);
 
         // Numeric types may be signed or unsigned, which informs how to
         // interpret the bits that come back when turned into a Rebol value.
@@ -1274,7 +1272,7 @@ REBNATIVE(insert_odbc)
     }
 
     REBVAL *old_columns_value = rebValue(
-        "opt ensure [handle! blank!] pick", statement, "'columns"
+        "ensure [<opt> handle!] pick", statement, "'columns"
     );
     if (old_columns_value) {
         cleanup_columns(old_columns_value);
@@ -1295,7 +1293,7 @@ REBNATIVE(insert_odbc)
     REBVAL *titles = rebValue("make block!", rebI(num_columns));
     SQLSMALLINT column_index;
     for (column_index = 1; column_index <= num_columns; ++column_index)
-        rebElide("append", titles, rebQ(columns[column_index - 1].title_word));
+        rebElide("append", titles, columns[column_index - 1].title);
 
     // remember column titles if next call matches, return them as the result
     //
@@ -1706,18 +1704,18 @@ REBNATIVE(close_statement)
     REBVAL *statement = ARG(statement);
 
     REBVAL *columns_value = rebValue(
-        "opt ensure [handle! blank!] pick", statement, "'columns"
+        "ensure [<opt> handle!] pick", statement, "'columns"
     );
     if (columns_value) {
         cleanup_columns(columns_value);
         SET_HANDLE_CDATA(columns_value, nullptr);  // avoid GC cleanup
-        rebElide("poke", statement, "'columns", "blank");
+        rebElide("poke", statement, "'columns", "null");
 
         rebRelease(columns_value);
     }
 
     REBVAL *hstmt_value = rebValue(
-        "opt ensure [handle! blank!] pick", statement, "'hstmt"
+        "ensure [<opt> handle!] pick", statement, "'hstmt"
     );
     if (hstmt_value) {
         SQLHSTMT hstmt = cast(SQLHSTMT, VAL_HANDLE_VOID_POINTER(hstmt_value));
@@ -1725,12 +1723,12 @@ REBNATIVE(close_statement)
 
         SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
         SET_HANDLE_CDATA(hstmt_value, SQL_NULL_HANDLE);  // avoid GC cleanup
-        rebElide("poke", statement, "'hstmt blank");
+        rebElide("poke", statement, "'hstmt", "null");
 
         rebRelease(hstmt_value);
     }
 
-    return Init_True(D_OUT);
+    return rebLogic(true);
 }
 
 
@@ -1751,7 +1749,7 @@ REBNATIVE(close_connection)
     // connection was opened from the environment.
 
     REBVAL *hdbc_value = rebValue(
-        "opt ensure [handle! blank!] pick", connection, "'hdbc"
+        "ensure [<opt> handle!] pick", connection, "'hdbc"
     );
     if (hdbc_value) {
         SQLHDBC hdbc = cast(SQLHDBC, VAL_HANDLE_VOID_POINTER(hdbc_value));
@@ -1768,7 +1766,7 @@ REBNATIVE(close_connection)
     // Close the environment
     //
     REBVAL *henv_value = rebValue(
-        "opt ensure [handle! blank!] pick", connection, "'henv"
+        "ensure [<opt> handle!] pick", connection, "'henv"
     );
     if (henv_value) {
         SQLHENV henv = cast(SQLHENV, VAL_HANDLE_VOID_POINTER(henv_value));
@@ -1777,7 +1775,7 @@ REBNATIVE(close_connection)
         SQLFreeHandle(SQL_HANDLE_ENV, henv);
         SET_HANDLE_CDATA(henv_value, SQL_NULL_HANDLE);  // avoid GC cleanup
 
-        rebElide("poke", connection, "'henv", "blank");
+        rebElide("poke", connection, "'henv", "null");
         rebRelease(henv_value);
     }
 
