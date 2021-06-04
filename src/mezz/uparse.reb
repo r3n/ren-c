@@ -981,14 +981,14 @@ default-combinators: make map! reduce [
                 ]
             ]
             any-string? input [
-                if find value input.1 [
+                if find value try input.1 [
                     set remainder next input
                     return input.1
                 ]
             ]
             true [
                 assert [binary? input]
-                if find value input.1 [
+                if find value try input.1 [
                     set remainder next input
                     return input.1
                 ]
@@ -1116,7 +1116,7 @@ default-combinators: make map! reduce [
         <local> item error
     ][
         either any-array? input [
-            if not find value (type of input.1) [
+            if not find value try (type of input.1) [
                 return null
             ]
             set remainder next input
