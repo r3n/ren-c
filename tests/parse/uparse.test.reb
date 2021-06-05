@@ -631,6 +631,21 @@
 ]
 
 
+; REPEAT lets you make it more obvious when a rule is being repeated, which is
+; hidden by INTEGER! variables.
+[(
+    var: 3
+    rule: "a"
+    uparse? "aaa" [repeat (var) rule]  ; clearer than [var rule]
+)(
+    var: 3
+    rule: "a"
+    uparse? "aaaaaa" [2 repeat (var) rule]
+)(
+    uparse? ["b" 3 "b" "b" "b"] [rule: <any>, repeat integer! rule]
+)]
+
+
 ; This is a little test made to try adjusting rebol-server's webserver.reb to
 ; use a PARSE rule instead of an "ITERATE".  Since it was written, keep it.
 [

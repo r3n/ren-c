@@ -24,6 +24,11 @@
     true
 )]
 
+(
+    var: 3
+    rule: "a"
+    parse? "aaa" [repeat (var) rule]  ; clearer than [var rule]
+)
 
 ; Don't leak internal detail that BINARY! or ANY-STRING! are 0-terminated
 [

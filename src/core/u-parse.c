@@ -1509,6 +1509,24 @@ REBNATIVE(subparse)
                     "https://forum.rebol.info/t/1540/12"
                 );
 
+              case SYM_REPEAT:
+                if (mincount != maxcount)
+                    fail ("Old PARSE REPEAT does not mix with ranges");
+
+                FETCH_NEXT_RULE(f);
+                if (not IS_GROUP(P_RULE))
+                    fail ("Old PARSE REPEAT requires GROUP! for times count");
+
+                assert(IS_END(D_OUT));
+                if (Eval_Value_Throws(D_OUT, P_RULE, P_RULE_SPECIFIER))
+                    goto return_thrown;
+
+                mincount = maxcount = Int32s(D_OUT, 0) * mincount;
+                SET_END(D_OUT);
+
+                FETCH_NEXT_RULE(f);
+                goto pre_rule;
+
               case SYM_FURTHER:  // require advancement
                 P_FLAGS |= PF_FURTHER;
                 FETCH_NEXT_RULE(f);

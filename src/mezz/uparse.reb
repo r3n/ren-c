@@ -1057,7 +1057,30 @@ default-combinators: make map! reduce [
         <local> result'
     ][
         result': quote null  ; !!! should `0 skip` resolve to ' like this?
-        loop value [
+        repeat value [
+            ([result' input]: ^ parser input) else [
+                return null
+            ]
+        ]
+        set remainder input
+        return unquote result'
+    ]
+
+    'repeat combinator [
+        return: "Last parser result"
+            [<opt> any-value!]
+        times-parser [action!]
+        parser [action!]
+        <local> times' result'
+    ][
+        ([times' input]: ^ times-parser input) else [return null]
+
+        if integer! <> type of unquote times' [
+            fail "REPEAT requires first synthesized argument to be an integer"
+        ]
+
+        result': quote null  ; !!! should `repeat 0 <any>` resolve to '?
+        repeat unquote times' [
             ([result' input]: ^ parser input) else [
                 return null
             ]
