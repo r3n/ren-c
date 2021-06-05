@@ -793,7 +793,7 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
 
 
 //
-//  for: native [
+//  cfor: native [
 //
 //  {Evaluate a block over a range of values. (See also: REPEAT)}
 //
@@ -810,9 +810,9 @@ static REB_R Loop_Each(REBFRM *frame_, LOOP_MODE mode)
 //          "Code to evaluate"
 //  ]
 //
-REBNATIVE(for)
+REBNATIVE(cfor)
 {
-    INCLUDE_PARAMS_OF_FOR;
+    INCLUDE_PARAMS_OF_CFOR;
 
     REBCTX *context;
     Virtual_Bind_Deep_To_New_Context(
@@ -1539,21 +1539,21 @@ REBNATIVE(map_each)
 
 
 //
-//  loop: native [
+//  repeat: native [
 //
-//  "Evaluates a block a specified number of times."
+//  {Evaluates a block a specified number of times}
 //
-//      return: [<opt> any-value!]
-//          {Last body result, or null if BREAK}
-//      count [<blank> any-number! logic!]
-//          "Repetitions (true loops infinitely, false doesn't run)"
-//      body [<const> block! action!]
-//          "Block to evaluate or action to run."
+//      return: "Last body result, or null if BREAK"
+//          [<opt> any-value!]
+//      count "Repetitions (true loops infinitely, false doesn't run)"
+//          [<blank> any-number! logic!]
+//      body "Block to evaluate or action to run"
+//          [<const> block! action!]
 //  ]
 //
-REBNATIVE(loop)
+REBNATIVE(repeat)
 {
-    INCLUDE_PARAMS_OF_LOOP;
+    INCLUDE_PARAMS_OF_REPEAT;
 
     Init_Heavy_Nulled(D_OUT);  // if body never runs, `loop 0 [...]`
 
@@ -1595,32 +1595,55 @@ REBNATIVE(loop)
 
 
 //
-//  repeat: native [
+//  for: native [
 //
-//  {Evaluates a block a number of times or over a series.}
+//  {Evaluates a block a number of times or over a series}
 //
-//      return: [<opt> any-value!]
-//          {Last body result or BREAK value}
-//      'word [word!]
-//          "Word to set each time"
-//      value [<blank> any-number! any-series!]
-//          "Maximum number or series to traverse"
-//      body [<const> block!]
-//          "Block to evaluate each time"
+//      return: "Last body result, or NULL if BREAK"
+//          [<opt> any-value!]
+//      'word "Word to set each time"
+//          [word!]
+//      value "Maximum number or series to traverse"
+//          [<blank> any-number! quoted! block!]
+//      'body "!!! actually just BLOCK!, but quoted to catch legacy uses"
+//          [<const> any-value!]
 //  ]
 //
-REBNATIVE(repeat)
+REBNATIVE(for)
 {
-    INCLUDE_PARAMS_OF_REPEAT;
+    INCLUDE_PARAMS_OF_FOR;
+
+    REBVAL *body = ARG(body);
+
+    if (IS_GROUP(body)) {
+        if (Eval_Value_Throws(D_OUT, body, SPECIFIED))
+            return R_THROWN;
+        Move_Cell(body, D_OUT);
+    }
+
+    if (not IS_BLOCK(body))
+        fail ("FOR has a new syntax, use CFOR for old arity-5 behavior.");
 
     REBVAL *value = ARG(value);
+
+    if (IS_QUOTED(value)) {
+        Unquotify(value, 1);
+
+        if (not ANY_SERIES(value))
+            fail (PAR(value));
+
+        // Delegate to FOR-EACH (note: in the future this will be the other
+        // way around, with FOR-EACH delegating to FOR).
+        //
+        return rebValue(NATIVE_VAL(for_each), rebQ(ARG(word)), value, body);
+    }
 
     if (IS_DECIMAL(value) or IS_PERCENT(value))
         Init_Integer(value, Int64(value));
 
     REBCTX *context;
     Virtual_Bind_Deep_To_New_Context(
-        ARG(body),
+        body,
         &context,
         ARG(word)
     );
@@ -1629,17 +1652,13 @@ REBNATIVE(repeat)
     assert(CTX_LEN(context) == 1);
 
     REBVAL *var = CTX_VAR(context, 1);  // not movable, see #2274
-    if (ANY_SERIES(value))
-        return Loop_Series_Common(
-            D_OUT, var, ARG(body), value, VAL_LEN_HEAD(value) - 1, 1
-        );
 
     REBI64 n = VAL_INT64(value);
     if (n < 1)  // Loop_Integer from 1 to 0 with bump of 1 is infinite
         return Init_Heavy_Nulled(D_OUT);  // if loop condition never runs
 
     return Loop_Integer_Common(
-        D_OUT, var, ARG(body), 1, VAL_INT64(value), 1
+        D_OUT, var, body, 1, VAL_INT64(value), 1
     );
 }
 

@@ -48,7 +48,7 @@
     for-each i [31 325 1] [
         clear main
         recycle
-        loop i [
+        repeat i [
             append main make gob! []
         ]
     ]

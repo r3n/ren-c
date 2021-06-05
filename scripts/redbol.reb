@@ -1028,7 +1028,7 @@ compress: emulate [
             zlib: zdeflate data
 
             length-32bit: modulo (length of data) (to-integer power 2 32)
-            loop 4 [
+            repeat 4 [
                 append zlib modulo (to-integer length-32bit) 256
                 length-32bit: me / 256
             ]
@@ -1109,6 +1109,7 @@ switch: emulate [  ; Ren-C evaluates cases: https://trello.com/c/9ChhSWC4/
     ]
 ]
 
+for: emulate [denuller :cfor]
 
 while: emulate [denuller :while]
 foreach: emulate [
@@ -1153,8 +1154,23 @@ foreach: emulate [
     ]
 ]
 
-loop: emulate [denuller :loop]
-repeat: emulate [denuller :repeat]
+loop: emulate [denuller :repeat]
+
+; REPEAT in Rebol2 with an ANY-SERIES! argument acted like a FOR-EACH on that
+; series.  This is redundant with FOR-EACH.
+;
+; R3-Alpha changed the semantics to be like a FOR-NEXT (e.g. FORALL) where you
+; could specify the loop variable instead of insisting your loop variable be
+; the data you are iterating.
+;
+; Red forbids ANY-SERIES! as the argument of what to iterate over.
+;
+; https://trello.com/c/CjEfA0ef
+;
+; The common denominator here is to act like COUNT-UP.
+;
+repeat: emulate [denuller :count-up]
+
 forall: emulate [denuller :iterate]
 forskip: emulate [denuller :iterate-skip]
 

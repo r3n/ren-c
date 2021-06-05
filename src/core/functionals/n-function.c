@@ -32,7 +32,7 @@
 //            <local> sum
 //        ][
 //            sum: x + y
-//            loop 2 [print ["The sum is" sum]]
+//            repeat 2 [print ["The sum is" sum]]
 //            return sum
 //        ]
 //

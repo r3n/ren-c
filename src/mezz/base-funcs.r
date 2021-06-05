@@ -742,13 +742,13 @@ iterate-back: redescribe [
 count-up: redescribe [
     "Loop the body, setting a word from 1 up to the end value given"
 ](
-    specialize :for [start: 1, bump: 1]
+    specialize :cfor [start: 1, bump: 1]
 )
 
 count-down: redescribe [
     "Loop the body, setting a word from the end value given down to 1"
 ](
-    specialize adapt :for [
+    specialize adapt :cfor [
         start: end
         end: 1
     ][

@@ -257,7 +257,7 @@ inline static const char* Frame_Label_Or_Anonymous_UTF8(REBFRM *f) {
 // This optimization is not necessarily trivial, because freeing even an
 // unmanaged series has cost...in particular with Decay_Series().  Removing
 // it and changing to just use `GC_Kill_Series()` degrades performance on
-// simple examples like `x: 0 loop 1000000 [x: x + 1]` by at least 20%.
+// simple examples like `x: 0 repeat 1000000 [x: x + 1]` by at least 20%.
 // Broader studies might reveal better approaches--but point is, it does at
 // least do *something*.
 

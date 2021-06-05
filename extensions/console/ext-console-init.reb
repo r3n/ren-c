@@ -260,7 +260,7 @@ console!: make object! [
             ; print the first 20 lines of the first 2048 characters of mold
             ;
             let pos: let molded: mold/limit get 'v 2048
-            loop 20 [
+            repeat 20 [
                 pos: next (find pos newline else [break])
             ] then [  ; e.g. didn't break
                 insert clear pos "..."

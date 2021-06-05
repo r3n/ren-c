@@ -100,13 +100,13 @@ array: func [
     block: make block! size
     case [
         block? rest [
-            loop size [append block ^(array/initial rest :initial)]
+            repeat size [append block ^(array/initial rest :initial)]
         ]
         any-series? :initial [
-            loop size [append block ^(copy/deep initial/)]
+            repeat size [append block ^(copy/deep initial/)]
         ]
         action? :initial [
-            loop size [append block ^(initial/)]  ; Called every time
+            repeat size [append block ^(initial/)]  ; Called every time
         ]
     ] else [
         append/dup block ^initial size
@@ -669,7 +669,7 @@ split: function [
             ; INSERT/DUP, because that wouldn't copy the value inserted.
             ;
             if size > length of result [
-                loop (size - length of result) [add-fill-val]
+                repeat (size - length of result) [add-fill-val]
             ]
         ]
     ] else [

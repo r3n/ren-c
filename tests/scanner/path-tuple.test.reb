@@ -102,7 +102,7 @@
         mtype: select/skip mapping (type of get/any 'value) 2
         if mtype [
             value: to mtype collect [
-                for index 1 (length of value) 1 [
+                count-up index (length of value) [
                     keep/only transform pick value index
                 ]
             ]

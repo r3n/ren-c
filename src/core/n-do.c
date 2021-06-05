@@ -339,7 +339,7 @@ REBNATIVE(do)
 
     // If `source` is not const, tweak it to be explicitly mutable--because
     // otherwise, it would wind up inheriting the FEED_MASK_CONST of our
-    // currently executing frame.  That's no good for `loop 2 [do block]`,
+    // currently executing frame.  That's no good for `repeat 2 [do block]`,
     // because we want whatever constness is on block...
     //
     // (Note we *can't* tweak values that are RELVAL in source.  So we either

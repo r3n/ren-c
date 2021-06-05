@@ -95,10 +95,10 @@ if not find system/options/args "nobench" [
     print "(If you're using a debug build, this metric is affected)"
 
     c: delta-time [
-        loop n [c-fib 30]
+        repeat n [c-fib 30]
     ]
     r: delta-time [
-        loop n [rebol-fib 30]
+        repeat n [rebol-fib 30]
     ]
 
     print ["C time:" c]

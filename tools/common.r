@@ -130,7 +130,7 @@ to-c-name: function [
 
     scope: default [#global]
 
-    repeat s string [
+    for-next s string [
         all [
             scope <> #prefixed
             head? s
