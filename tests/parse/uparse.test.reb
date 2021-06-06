@@ -622,9 +622,9 @@
     (0 = uparse* "aaa" [tally "b"])  ; alternately, use non-force-completion
 
     (did all [
-        uparse "<<<stuff>>>" [
-            n: tally "<"
-            inner: between <here> n ">"
+        uparse "(((stuff)))" [
+            n: tally "("
+            inner: between <here> repeat (n) ")"
         ]
         inner = "stuff"
     ])
