@@ -551,7 +551,7 @@ static bool Did_Get_GOB_Var(
       case SYM_IMAGE:
         if (GOB_TYPE(gob) == GOBT_IMAGE) {
             assert(rebDid("image?", GOB_CONTENT(gob)));
-            return Copy_Cell(out, GOB_CONTENT(gob));
+            Copy_Cell(out, GOB_CONTENT(gob));
         }
         else
             Init_Nulled(out);
