@@ -1245,6 +1245,31 @@ default-combinators: make map! reduce [
         ;
     ]
 
+    ; Historically you could use SKIP as part of an assignment, e.g.
+    ; `parse [10] [set x skip]` would give you x as 10.  But "skipping" does
+    ; not seem value-bearing.
+    ;
+    ;    >> uparse [<a> 10] [tag! skip]
+    ;    == 10  ; confusing, I thought you "skipped" it?
+    ;
+    ;    >> uparse [<a> 10] [tag! skip]
+    ;    == <a>  ; maybe this is okay?
+    ;
+    ; It's still a bit jarring to have SKIP mean something that is used as
+    ; a series skipping operation (with a skip count) have completely different
+    ; semantic.  But, this is at least a bit better, and points people to use
+    ; <any> instead if you want to say `parse [10] [x: <any>]` and get x as 10. 
+    ;
+    'skip combinator [
+        {Skip one series element if available}
+        return: "Should be invisible (handling TBD)"
+            [<invisible>]
+    ][
+        if tail? input [return null]
+        set remainder next input
+        return
+    ]
+
     === ACTION! COMBINATOR ===
 
     ; The ACTION! combinator is a new idea of letting you call a normal
@@ -1454,7 +1479,6 @@ default-combinators: make map! reduce [
 
 default-combinators.('here): :default-combinators.<here>
 default-combinators.('end): :default-combinators.<end>
-default-combinators.('skip): :default-combinators.<any>
 
 
 non-comma: func [
