@@ -41,7 +41,7 @@ decode-key-value-text: function [
             #" " to newline while [
                 newline not data-field-name not newline to newline
             ]
-            | while [1 2 newline 2 20 #" " to newline]
+            | while [newline opt newline 2 20 #" " to newline]
         ] eol: (emit-meta) newline
     ]
 
@@ -92,7 +92,7 @@ load-until-blank: function [
 
     rule: [
         some [not terminator rebol-value]
-        opt wsp opt [1 2 newline] position: here to end
+        opt wsp opt [newline opt newline] position: here to end
     ]
 
     parse text rule then [

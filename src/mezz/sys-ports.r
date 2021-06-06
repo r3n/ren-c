@@ -88,7 +88,7 @@ make-port*: function [
 
 *parse-url: make object! [
     digit:       make bitset! "0123456789"
-    digits:      [1 5 digit]
+    digits:      [digit opt repeat (4) digit]  ; 1 to 5 digits
     alpha-num:   make bitset! [#"a" - #"z" #"A" - #"Z" #"0" - #"9"]
     scheme-char: insert copy alpha-num "+-."
     path-char:   complement make bitset! "#"

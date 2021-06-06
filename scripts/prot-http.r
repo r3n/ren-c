@@ -613,7 +613,7 @@ check-data: function [
                 ]
                 else [
                     parse mk1 [
-                        chunk-size skip, mk2: here, crlfbin, to end
+                        repeat (chunk-size) skip, mk2: here, crlfbin, to end
                     ] else [
                         break
                     ]

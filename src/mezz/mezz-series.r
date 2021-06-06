@@ -624,11 +624,19 @@ split: function [
                 if zero? piece-size [piece-size: 1]
 
                 [
-                    count [copy series piece-size skip (keep/only series)]
+                    repeat (count) [
+                        copy series [repeat (piece-size) skip] (
+                            keep/only series
+                        )
+                    ]
                     copy series to end (keep/only series)
                 ]
             ] else [
-                [while [copy series 1 size skip (keep/only series)]]
+                [while [
+                    copy series [skip, repeat (size - 1) opt skip] (
+                        keep/only series
+                    )
+                ]]
             ]
         ]
         block? dlm [
