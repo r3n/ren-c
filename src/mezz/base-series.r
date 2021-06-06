@@ -252,7 +252,7 @@ trim: function [
     ; with leading and trailing whitespace removed.
     ;
     if lines [
-        parse series [while [change [some rule] space skip | skip]]
+        parse series [while [change [some rule] (space) skip | skip]]
         if space = first series [take series]
         if space = last series [take/last series]
         return series
