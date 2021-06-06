@@ -80,7 +80,7 @@
     b = [2 3]
 ])
 
-; SYM-GROUP! can be used to keep material that did not originate from the
+; META-GROUP! can be used to keep material that did not originate from the
 ; input series or a match rule.
 ;
 ; !!! This is extended in UPARSE to the other SYM-XXX! types.

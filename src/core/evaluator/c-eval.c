@@ -186,7 +186,7 @@ inline static bool Rightward_Evaluate_Nonvoid_Into_Out_Throws(
     SET_END(f->out);
 
     if (IS_END(f_next)) {
-        if (IS_LIT(v))  // allow (@), REB_LIT case makes END into ~void~
+        if (IS_META(v))  // allow (@), REB_META case makes END into ~void~
             return false;
 
         // `do [x:]`, `do [o/x:]`, etc. are illegal
@@ -234,7 +234,7 @@ inline static bool Rightward_Evaluate_Nonvoid_Into_Out_Throws(
     }
 
     if (IS_END(f->out)) {
-        if (IS_LIT(v))   // allow (@ comment "hi"), REB_LIT makes ~void~
+        if (IS_META(v))   // allow (@ comment "hi"), REB_META makes ~void~
             return false;
 
         // e.g. `do [x: ()]` or `(x: comment "hi")`.
@@ -740,7 +740,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     //
     // https://forum.rebol.info/t/1301
 
-      case REB_SYM_WORD:
+      case REB_META_WORD:
         STATE_BYTE(f) = ST_EVALUATOR_SYM_WORD;
         goto process_get_word;
 
@@ -816,7 +816,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // result was produced (an output of END) and then re-trigger a step in
     // the parent frame, e.g. to pick up the 3 above.
 
-      case REB_SYM_GROUP:
+      case REB_META_GROUP:
         STATE_BYTE(f) = ST_EVALUATOR_SYM_GROUP;
         goto eval_group;
 
@@ -856,7 +856,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         //    >> 10 ^(comment "hi")
         //    == ~stale~
         //
-        // We thus need to signal staleness in the SYM-GROUP! case.
+        // We thus need to signal staleness in the META-GROUP! case.
         //
         if (STATE_BYTE(f) == ST_EVALUATOR_SYM_GROUP) {
             SET_END(f->out);  // want to avoid UNDO_NOTE_STALE behavior
@@ -1068,8 +1068,8 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // Consistent with GET-WORD!, a GET-PATH! won't allow BAD-WORD! access on
     // the plain (unfriendly) forms.
 
-      case REB_SYM_PATH:
-      case REB_SYM_TUPLE:
+      case REB_META_PATH:
+      case REB_META_TUPLE:
         STATE_BYTE(f) = ST_EVALUATOR_SYM_PATH_OR_SYM_TUPLE;
         goto eval_path_or_tuple;
 
@@ -1216,7 +1216,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     //
     // It supports `_` in slots whose results you don't want to ask for, `#`
     // in slots you want to ask for (but don't want to name), will evaluate
-    // GROUP!s, and also allows sym-word to `@circle` which result you want
+    // GROUP!s, and also allows meta-word to `@circle` which result you want
     // to be the overall result of the expression (defaults to the normal
     // main return value).
 
@@ -1251,19 +1251,19 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         REBSPC *derived = Derive_Specifier(v_specifier, v);
         for (; tail != check; ++check) {
             //
-            // SYM-WORD! or SYM-PATH! are used to mark which result should be
+            // META-WORD! or META-PATH! are used to mark which result should be
             // the overall return of the expression.  But a GROUP! can't
             // resolve to that and make the decision, so handle it up front.
             //
-            if (ANY_SYM_KIND(VAL_TYPE(check))) {
+            if (ANY_META_KIND(VAL_TYPE(check))) {
                 if (circled)
                     fail ("Can't circle more than one multi-return result");
                 circled = true;
             }
             if (
-                IS_SYM_WORD(check)
-                or IS_SYM_PATH(check)
-                or IS_SYM_TUPLE(check)
+                IS_META_WORD(check)
+                or IS_META_PATH(check)
+                or IS_META_TUPLE(check)
             ){
                 Derelativize(DS_PUSH(), check, v_specifier);
                 Plainify(DS_TOP);
@@ -1272,7 +1272,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             }
             const RELVAL *item;
             REBSPC *specifier;
-            if (IS_GROUP(check) or IS_SYM_GROUP(check)) {
+            if (IS_GROUP(check) or IS_META_GROUP(check)) {
                 if (Do_Any_Array_At_Throws(f_spare, check, derived)) {
                     Move_Cell(f->out, f_spare);
                     DS_DROP_TO(f->dsp_orig);
@@ -1297,7 +1297,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
                 // a variable location to write the result to.  For now, just
                 // fabricate a LET variable.
                 //
-                if (DSP == f->dsp_orig or not IS_SYM_GROUP(check))
+                if (DSP == f->dsp_orig or not IS_META_GROUP(check))
                     Init_Blackhole(DS_PUSH());
                 else {
                     REBVAL *let = rebValue("let temp");
@@ -1312,7 +1312,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
             else
                 fail ("SET-BLOCK! elements are WORD/PATH/TUPLE/BLANK/ISSUE");
 
-            if (IS_SYM_GROUP(check))
+            if (IS_META_GROUP(check))
                 SET_CELL_FLAG(DS_TOP, STACK_NOTE_CIRCLED);
         }
 
@@ -1331,7 +1331,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         // to handle the case of `([x]: ^ devoid do code)` because it stays
         // in the same feed.
         //
-        if (IS_LIT(f_next)) {
+        if (IS_META(f_next)) {
             literalize = true;
             Fetch_Next_Forget_Lookback(f);  // pushed all we needed to know
         }
@@ -1426,7 +1426,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
         break; }
 
 
-    //=//// SYM-BLOCK! ////////////////////////////////////////////////////=//
+    //=//// META-BLOCK! ////////////////////////////////////////////////////=//
     //
     // Just produces a quoted version of the block it is given:
     //
@@ -1434,7 +1434,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     //    == '[a b c]
     //
 
-      case REB_SYM_BLOCK:
+      case REB_META_BLOCK:
         Inertly_Derelativize_Inheriting_Const(f->out, v, f->feed);
         mutable_KIND3Q_BYTE(f->out) = REB_BLOCK + REB_64;  // quoted
         mutable_HEART_BYTE(f->out) = REB_BLOCK;
@@ -1447,7 +1447,7 @@ bool Eval_Maybe_Stale_Throws(REBFRM * const f)
     // status of BAD-WORD! arguments.  (QUOTE does not take a `^literal`
     // argument so it cannot detect this distinction.)
 
-      case REB_LIT:
+      case REB_META:
         if (Rightward_Evaluate_Nonvoid_Into_Out_Throws(f, v))  // see notes
             goto return_thrown;
 

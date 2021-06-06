@@ -163,10 +163,10 @@ odbc-execute: func [
         ;
         query: spaced map-each item query [
             switch type of item [
-                sym-word! sym-path! [
+                meta-word! meta-path! [
                     get item
                 ]
-                sym-group! [
+                meta-group! [
                     reduce as group! item
                 ]
             ] then value -> [

@@ -37,7 +37,7 @@
 //
 //     <abc>/(d e f)/[g h i]:   ; a 3-element SET-PATH!
 //     :foo.1.bar               ; a 3-element GET-TUPLE!
-//     @abc.(def)               ; a 2-element SYM-TUPLE!
+//     @abc.(def)               ; a 2-element META-TUPLE!
 //
 // It is also legal to put BLANK! in sequence slots.  They will render
 // invisibly, allowing you to begin or terminate sequences with the delimiter:
@@ -75,12 +75,12 @@
 //   - REB_BLOCK is when the path or tuple are stored as an ordinary array
 //   - REB_WORD is used for the `/` and '.' cases
 //   - REB_GET_WORD is used for the `/a` and `.a` cases
-//   - REB_SYM_WORD is used for the `a/` and `a.` cases
+//   - REB_META_WORD is used for the `a/` and `a.` cases
 //        (REB_SET_WORD is currently avoided due to complications if binding
 //        were to see this "gimmick" as if it were a real SET-WORD! and
 //        treat this binding unusually...review)
-//   - REB_GET_BLOCK and REB_SYM_BLOCK for /[a] .[a] and [a]/ [a].
-//   - REB_GET_GROUP and REB_SYM_GROUP for /(a) .(a) and (a)/ (a).
+//   - REB_GET_BLOCK and REB_META_BLOCK for /[a] .[a] and [a]/ [a].
+//   - REB_GET_GROUP and REB_META_GROUP for /(a) .(a) and (a)/ (a).
 //
 // Beyond that, how creative one gets to using the HEART_BYTE() depends on
 // how much complication you want to bear in code like binding.
@@ -323,7 +323,7 @@ inline static REBVAL *Try_Init_Any_Sequence_Pairlike_Core(
     ){
         Derelativize(out, v1, specifier);
         mutable_KIND3Q_BYTE(out) = kind;
-        mutable_HEART_BYTE(out) = SYMIFY_ANY_PLAIN_KIND(inner);
+        mutable_HEART_BYTE(out) = METAFY_ANY_PLAIN_KIND(inner);
         return cast(REBVAL*, out);
     }
 
@@ -415,8 +415,8 @@ inline static REBVAL *Try_Pop_Sequence_Or_Element_Or_Nulled(
                 Setify(SPECIFIC(out));
             else if (kind == REB_GET_PATH)
                 Getify(SPECIFIC(out));
-            else if (kind == REB_SYM_PATH)
-                Symify(SPECIFIC(out));
+            else if (kind == REB_META_PATH)
+                Metafy(SPECIFIC(out));
         }
 
         return cast(REBVAL*, out);  // valid path element, standing alone
@@ -476,9 +476,9 @@ inline static REBLEN VAL_SEQUENCE_LEN(REBCEL(const*) sequence) {
       case REB_GET_WORD:  // compressed [_ word] sequence (`.foo`, `/foo`)
       case REB_GET_GROUP:
       case REB_GET_BLOCK:
-      case REB_SYM_WORD:  // compressed [word _] sequence (`foo.`, `foo.`)
-      case REB_SYM_GROUP:
-      case REB_SYM_BLOCK:
+      case REB_META_WORD:  // compressed [word _] sequence (`foo.`, `foo.`)
+      case REB_META_GROUP:
+      case REB_META_BLOCK:
         return 2;
 
       case REB_BLOCK: {
@@ -545,9 +545,9 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
             = mutable_HEART_BYTE(store) = PLAINIFY_ANY_GET_KIND(heart);
         return store; }
 
-      case REB_SYM_WORD:  // `a/` or `a.`
-      case REB_SYM_GROUP:  // `(a)/` or `(a).`
-      case REB_SYM_BLOCK: {  // `[a]/` or `[a].`
+      case REB_META_WORD:  // `a/` or `a.`
+      case REB_META_GROUP:  // `(a)/` or `(a).`
+      case REB_META_BLOCK: {  // `[a]/` or `[a].`
         assert(n < 2);
         if (n == 1)
             return BLANK_VALUE;
@@ -558,7 +558,7 @@ inline static const RELVAL *VAL_SEQUENCE_AT(
         if (sequence != store)
             Copy_Cell(store, CELL_TO_VAL(sequence));
         mutable_KIND3Q_BYTE(store)
-            = mutable_HEART_BYTE(store) = PLAINIFY_ANY_SYM_KIND(heart);
+            = mutable_HEART_BYTE(store) = PLAINIFY_ANY_META_KIND(heart);
         return store; }
 
       case REB_BLOCK: {
@@ -601,9 +601,9 @@ inline static REBSPC *VAL_SEQUENCE_SPECIFIER(
       case REB_GET_WORD:
       case REB_GET_GROUP:
       case REB_GET_BLOCK:
-      case REB_SYM_WORD:
-      case REB_SYM_GROUP:
-      case REB_SYM_BLOCK:
+      case REB_META_WORD:
+      case REB_META_GROUP:
+      case REB_META_BLOCK:
         return SPECIFIED;
 
       case REB_BLOCK:

@@ -450,7 +450,7 @@ ext-console-impl: func [
     {Rebol ACTION! that is called from C in a loop to implement the console}
 
     return: "Code for C caller to sandbox, exit status, RESUME code, or hook"
-        [block! group! integer! sym-group! handle!]  ; RETURN is hooked below!
+        [block! group! integer! meta-group! handle!]  ; RETURN is hooked below!
     prior "BLOCK! or GROUP! that last invocation of HOST-CONSOLE requested"
         [blank! block! group!]
     result "Quoted result from evaluating PRIOR, or non-quoted error"
@@ -496,7 +496,7 @@ ext-console-impl: func [
         {Hooked RETURN function which finalizes any gathered EMIT lines}
 
         state "Describes the RESULT that the next call to HOST-CONSOLE gets"
-            [integer! tag! group! datatype! sym-group! handle!]
+            [integer! tag! group! datatype! meta-group! handle!]
         <with> instruction prior
         <local> return-to-c (:return)  ; capture HOST-CONSOLE's RETURN
     ][
@@ -538,7 +538,7 @@ ext-console-impl: func [
                 assert [empty? instruction]
                 state
             ]
-            sym-group! [  ; means "resume instruction"
+            meta-group! [  ; means "resume instruction"
                 state
             ]
             handle! [  ; means "evaluator hook request" (handle is the hook)
@@ -646,7 +646,7 @@ ext-console-impl: func [
         result/id = 'no-catch
         :result/arg2 = :lib/resume  ; throw's /NAME
     ] then [
-        assert [match [sym-group! handle!] :result/arg1]
+        assert [match [meta-group! handle!] :result/arg1]
         if not resumable [
             e: make error! "Can't RESUME top-level CONSOLE (use QUIT to exit)"
             e/near: result/near

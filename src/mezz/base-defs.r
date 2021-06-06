@@ -519,7 +519,7 @@ reeval func* [
     word?:
     set-word?:
     get-word?:
-    sym-word?:
+    meta-word?:
     issue?:
     binary?:
     text?:
@@ -531,15 +531,15 @@ reeval func* [
     path?:
     set-path?:
     get-path?:
-    sym-path?:
+    meta-path?:
     block?:
     set-block?:
     get-block?:
-    sym-block?:
+    meta-block?:
     group?:
     get-group?:
     set-group?:
-    sym-group?:
+    meta-group?:
     map?:
     datatype?:
     typeset?:

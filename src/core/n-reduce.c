@@ -329,8 +329,8 @@ REB_R Compose_To_Stack_Core(
                     Setify(DS_TOP);
                 else if (heart == REB_GET_GROUP)
                     Getify(DS_TOP);
-                else if (heart == REB_SYM_GROUP)
-                    Symify(DS_TOP);
+                else if (heart == REB_META_GROUP)
+                    Metafy(DS_TOP);
                 else
                     assert(heart == REB_GROUP);
 

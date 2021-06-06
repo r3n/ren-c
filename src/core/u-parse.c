@@ -1633,7 +1633,7 @@ REBNATIVE(subparse)
                 // If you say KEEP ^(whatever) then that acts like /ONLY did
                 //
                 bool only;
-                if (ANY_SYM_KIND(VAL_TYPE(rule))) {
+                if (ANY_META_KIND(VAL_TYPE(rule))) {
                     if (rule != P_SAVE) {  // move to mutable location
                         Derelativize(P_SAVE, rule, P_RULE_SPECIFIER);
                         rule = P_SAVE;
@@ -2544,7 +2544,7 @@ REBNATIVE(subparse)
                 // If you say KEEP ^(whatever) then that acts like /ONLY did
                 //
                 bool only;
-                if (ANY_SYM_KIND(VAL_TYPE(rule))) {
+                if (ANY_META_KIND(VAL_TYPE(rule))) {
                     if (rule != P_SAVE) {  // move to mutable location
                         Derelativize(P_SAVE, rule, P_RULE_SPECIFIER);
                         rule = P_SAVE;

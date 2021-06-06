@@ -6,8 +6,8 @@
 ;
 ; Since you can also put BLOCK! and GROUP! in paths:
 ;
-;   * SYM-BLOCK! represents BLOCK!
-;   * SYM-GROUP! represents GROUP!
+;   * META-BLOCK! represents BLOCK!
+;   * META-GROUP! represents GROUP!
 ;
 ; Each test starts with a string to transcode, then `->`, and then the one or
 ; more transformed representations of what the string is expected to load as.
@@ -95,8 +95,8 @@
         <static> mapping (reduce [
             path! block!
             tuple! group!
-            block! sym-block!
-            group! sym-group!
+            block! meta-block!
+            group! meta-group!
         ])
     ][
         mtype: select/skip mapping (type of get/any 'value) 2

@@ -744,7 +744,7 @@ void MF_Array(REB_MOLD *mo, REBCEL(const*) v, bool form)
     }
 
     bool all;
-    if (VAL_INDEX(v) == 0) { // "and VAL_TYPE(v) <= REB_LIT_PATH" commented out
+    if (VAL_INDEX(v) == 0) { // "and VAL_TYPE(v) <= REB_META_PATH" commented out
         //
         // Optimize when no index needed
         //
@@ -772,7 +772,7 @@ void MF_Array(REB_MOLD *mo, REBCEL(const*) v, bool form)
             Append_Codepoint(mo->series, ':');
             goto block;
 
-          case REB_SYM_BLOCK:
+          case REB_META_BLOCK:
             Append_Codepoint(mo->series, '^');
             goto block;
 
@@ -791,7 +791,7 @@ void MF_Array(REB_MOLD *mo, REBCEL(const*) v, bool form)
             Append_Codepoint(mo->series, ':');
             goto group;
 
-          case REB_SYM_GROUP:
+          case REB_META_GROUP:
             Append_Codepoint(mo->series, '^');
             goto group;
 

@@ -1398,7 +1398,7 @@ REBNATIVE(remove_each)
     INCLUDE_PARAMS_OF_REMOVE_EACH;
 
     if (IS_BLOCK(ARG(body)))
-        Symify(ARG(body));  // request that body "branch" not be voidified
+        Metafy(ARG(body));  // request that body "branch" not be voidified
 
     struct Remove_Each_State res;
     res.data = ARG(data);

@@ -1167,9 +1167,9 @@ default-combinators: make map! reduce [
     ;
     ; !!! These follow a simple pattern, could generate at a higher level.
 
-    sym-word! combinator [
+    meta-word! combinator [
         return: "Literalized" [<opt> any-value!]
-        value [sym-word!]
+        value [meta-word!]
         <local> result' parser
     ][
         value: as word! value
@@ -1177,9 +1177,9 @@ default-combinators: make map! reduce [
         ([result' (remainder)]: ^ parser state input value) then [result']
     ]
 
-    sym-tuple! combinator [
+    meta-tuple! combinator [
         return: "Literalized" [<opt> any-value!]
-        value [sym-tuple!]
+        value [meta-tuple!]
         <local> result' parser
     ][
         value: as tuple! value
@@ -1187,9 +1187,9 @@ default-combinators: make map! reduce [
         ([result' (remainder)]: ^ parser state input value) then [result']
     ]
 
-    sym-group! combinator [
+    meta-group! combinator [
         return: "Literalized" [<opt> any-value!]
-        value [sym-group!]
+        value [meta-group!]
         <local> result' parser
     ][
         value: as group! value
@@ -1197,9 +1197,9 @@ default-combinators: make map! reduce [
         ([result' (remainder)]: ^ parser state input value) then [result']
     ]
 
-    sym-block! combinator [
+    meta-block! combinator [
         return: "Literalized" [<opt> any-value!]
-        value [sym-block!]
+        value [meta-block!]
         <local> result' parser
     ][
         value: as block! value
@@ -1279,7 +1279,7 @@ default-combinators: make map! reduce [
         for-each param (parameters of action of f) [
             if not path? param [
                 ensure action! :parsers/1
-                if sym-word? param [
+                if meta-word? param [
                     f.(to word! param): ([# input]: ^ parsers/1 input) else [
                         return null
                     ]

@@ -360,7 +360,7 @@ inline static RELVAL *Isotopic_Unquotify(RELVAL *v, REBLEN depth) {
 // Literalization is almost exactly like isotopic quoting, but it has a twist
 // that NULL does not become a single tick mark (') but rather it stays as
 // NULL.  It also translates emptiness (e.g. an END marker) into an isotope
-// BAD-WORD! of ~void~.  It is done by ^ and the the REB_LIT_XXX family.
+// BAD-WORD! of ~void~.  It is done by ^ and the the REB_META_XXX family.
 
 inline static RELVAL *Literalize(RELVAL *v) {
     if (IS_END(v))
@@ -411,7 +411,7 @@ inline static REBLEN Dequotify(RELVAL *v) {
 }
 
 
-// !!! Temporary workaround for what was IS_LIT_WORD() (now not its own type)
+// !!! Temporary workaround for what was IS_META_WORD() (now not its own type)
 //
 inline static bool IS_QUOTED_WORD(const RELVAL *v) {
     return IS_QUOTED(v)
@@ -419,7 +419,7 @@ inline static bool IS_QUOTED_WORD(const RELVAL *v) {
         and CELL_KIND(VAL_UNESCAPED(v)) == REB_WORD;
 }
 
-// !!! Temporary workaround for what was IS_LIT_PATH() (now not its own type)
+// !!! Temporary workaround for what was IS_META_PATH() (now not its own type)
 //
 inline static bool IS_QUOTED_PATH(const RELVAL *v) {
     return IS_QUOTED(v)
@@ -429,7 +429,7 @@ inline static bool IS_QUOTED_PATH(const RELVAL *v) {
 
 
 inline static REBVAL *Init_Lit(RELVAL *out) {
-    RESET_CELL(out, REB_LIT, CELL_MASK_NONE);
+    RESET_CELL(out, REB_META, CELL_MASK_NONE);
 
     // Although LIT! carries no data, it is not inert.  To make ANY_INERT()
     // fast, it's in the part of the list of bindable evaluative types.

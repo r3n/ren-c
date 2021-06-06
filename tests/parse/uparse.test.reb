@@ -176,7 +176,7 @@
 ]
 
 
-; SYM-BLOCK! runs a rule, but with "literalizing" result semantics.  If it
+; META-BLOCK! runs a rule, but with "literalizing" result semantics.  If it
 ; was invisible, it gives ~void~.  This helps write higher level tools
 ; that might want to know about invisibility status.
 [
@@ -438,7 +438,7 @@
 
 
 ; !!! There was an idea that SOME could be called on generators, when the
-; SYM-GROUP! was used as plain GROUP! is but would fail on NULL, and would
+; META-GROUP! was used as plain GROUP! is but would fail on NULL, and would
 ; be combined with OPT if you wanted it to succeed.  This was changed, so
 ; now the idea doesn't work.  Is it necessary to make a "generator friendly"
 ; NULL-means-stop DO-like operator for PARSE?  It's worth thinking about...

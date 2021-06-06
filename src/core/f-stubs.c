@@ -574,52 +574,52 @@ REBNATIVE(getify)
 
 
 //
-//  Symify: C
+//  Metafy: C
 //
 // Turn a value into its SYM-XXX! equivalent, if possible.  This tries to
-// "be smart" so even a TEXT! can be turned into a SYM-WORD! (just an
+// "be smart" so even a TEXT! can be turned into a META-WORD! (just an
 // unbound one).
 //
-REBVAL *Symify(REBVAL *out) {  // called on stack values; can't call evaluator
+REBVAL *Metafy(REBVAL *out) {  // called on stack values; can't call evaluator
     REBLEN quotes = Dequotify(out);
 
     enum Reb_Kind kind = VAL_TYPE(out);
     if (ANY_WORD_KIND(kind)) {
-        mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_SYM_WORD;
+        mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_META_WORD;
     }
     else if (ANY_PATH_KIND(kind)) {  // Don't change "heart"!
-        mutable_KIND3Q_BYTE(out) = REB_SYM_PATH;
+        mutable_KIND3Q_BYTE(out) = REB_META_PATH;
     }
     else if (ANY_TUPLE_KIND(kind)) {    // Don't change "heart"
-        mutable_KIND3Q_BYTE(out) = REB_SYM_TUPLE;
+        mutable_KIND3Q_BYTE(out) = REB_META_TUPLE;
     }
     else if (ANY_BLOCK_KIND(kind)) {
-        mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_SYM_BLOCK;
+        mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_META_BLOCK;
     }
     else if (ANY_GROUP_KIND(kind)) {
-        mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_SYM_GROUP;
+        mutable_KIND3Q_BYTE(out) = mutable_HEART_BYTE(out) = REB_META_GROUP;
     }
     else
-        fail ("Cannot SYMIFY");
+        fail ("Cannot METAFY");
 
     return Quotify(out, quotes);
 }
 
 
 //
-//  symify: native [
+//  metafy: native [
 //
 //  {If possible, convert a value to a SYM-XXX! representation}
 //
-//      return: [<opt> sym-word! sym-path! sym-tuple! sym-group! sym-block!]
+//      return: [<opt> meta-word! meta-path! meta-tuple! meta-group! meta-block!]
 //      value [<blank> any-value!]
 //  ]
 //
-REBNATIVE(symify)
+REBNATIVE(metafy)
 {
-    INCLUDE_PARAMS_OF_SYMIFY;
+    INCLUDE_PARAMS_OF_METAFY;
 
-    RETURN (Symify(ARG(value)));
+    RETURN (Metafy(ARG(value)));
 }
 
 

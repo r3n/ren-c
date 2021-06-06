@@ -999,7 +999,7 @@ fail: func [
     {Interrupts execution by reporting an error (a TRAP can intercept it).}
 
     'blame "Point to variable or parameter to blame"
-        [<skip> sym-word! sym-path!]
+        [<skip> meta-word! meta-path!]
     reason "ERROR! value, ID, URL, message text, or failure spec"
         [<end> error! word! path! url! text! block!]
     /where "Frame or parameter at which to indicate the error originated"
@@ -1020,7 +1020,7 @@ fail: func [
     ; !!! PATH! doesn't do BINDING OF, and in the general case it couldn't
     ; tell you where it resolved to without evaluating, just do WORD! for now.
     ;
-    let frame: try match frame! binding of try match sym-word! :blame
+    let frame: try match frame! binding of try match meta-word! :blame
 
     let error: switch type of :reason [
         error! [reason]

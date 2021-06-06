@@ -197,12 +197,12 @@ uint32_t Hash_Value(const RELVAL *v)
       case REB_TUPLE:
       case REB_SET_TUPLE:
       case REB_GET_TUPLE:
-      case REB_SYM_TUPLE:
+      case REB_META_TUPLE:
         //
       case REB_PATH:
       case REB_SET_PATH:
       case REB_GET_PATH:
-      case REB_SYM_PATH: {
+      case REB_META_PATH: {
         enum Reb_Kind heart = CELL_HEART(cell);  // use correct hash for heart
         switch (heart) {
           case REB_BYTES:
@@ -214,7 +214,7 @@ uint32_t Hash_Value(const RELVAL *v)
 
           case REB_WORD:
           case REB_GET_WORD:
-          case REB_SYM_WORD:
+          case REB_META_WORD:
             goto hash_any_word;
 
           case REB_BLOCK:
@@ -230,12 +230,12 @@ uint32_t Hash_Value(const RELVAL *v)
       case REB_GROUP:
       case REB_SET_GROUP:
       case REB_GET_GROUP:
-      case REB_SYM_GROUP:
+      case REB_META_GROUP:
         //
       case REB_BLOCK:
       case REB_SET_BLOCK:
       case REB_GET_BLOCK:
-      case REB_SYM_BLOCK:
+      case REB_META_BLOCK:
         //
         // !!! Lame hash just to get it working.  There will be lots of
         // collisions.  Intentionally bad to avoid writing something that
@@ -270,7 +270,7 @@ uint32_t Hash_Value(const RELVAL *v)
       case REB_WORD:
       case REB_SET_WORD:
       case REB_GET_WORD:
-      case REB_SYM_WORD: {
+      case REB_META_WORD: {
         //
         // Note that the canon symbol may change for a group of word synonyms
         // if that canon is GC'd--it picks another synonym.  Thus the pointer

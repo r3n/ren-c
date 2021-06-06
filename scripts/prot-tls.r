@@ -1939,17 +1939,17 @@ sys/make-scheme [
                     either hash-method = 'sha384 ['sha384] ['sha256]
                 ]
 
-                crypt-method: does [first find suite sym-word!]
+                crypt-method: does [first find suite meta-word!]
                 crypt-size: does [
-                    select (ensure block! second find suite sym-word!) 'size
+                    select (ensure block! second find suite meta-word!) 'size
                 ]
                 block-size: does [
                     try select (
-                        ensure block! second find suite sym-word!
+                        ensure block! second find suite meta-word!
                     ) 'block
                 ]
                 iv-size: does [
-                    try select (ensure block! second find suite sym-word!) 'iv
+                    try select (ensure block! second find suite meta-word!) 'iv
                 ]
 
                 client-crypt-key: _

@@ -289,7 +289,7 @@ inline static bool Single_Test_Throws(
                 and VAL_LEN_AT(arg) == VAL_UINT32(test);
         goto return_matched;
 
-      case REB_SYM_WORD: {
+      case REB_META_WORD: {
         matched = Matches_Fake_Type_Constraint(
             arg,
             cast(enum Reb_Symbol_Id, VAL_WORD_ID(test))
@@ -978,7 +978,7 @@ REBNATIVE(switch)
             if (IS_END(f_value))
                 goto reached_end;
 
-            if (IS_BLOCK(f_value) or IS_SYM_BLOCK(f_value)) {
+            if (IS_BLOCK(f_value) or IS_META_BLOCK(f_value)) {
                 //
                 // f_value is RELVAL, can't Do_Branch
                 //
