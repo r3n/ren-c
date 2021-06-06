@@ -629,8 +629,14 @@ ensure: redescribe [
     ]
 )
 
-non: redescribe [
+non*: redescribe [
     {Pass through value if it *doesn't* match test (e.g. MATCH/NOT)}
+](
+    :match*/not
+)
+
+non: redescribe [
+    {Safely pass through value if it *doesn't* match test (e.g. MATCH/NOT)}
 ](
     :match/not
 )

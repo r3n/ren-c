@@ -173,7 +173,7 @@ make-file-tuple-parts: func [
             fail embedded-file-slash-error text
         ]
 
-        keep opt text
+        keep text
 
         if not last? tuple [keep #"."]
     ]]
