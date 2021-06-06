@@ -265,6 +265,13 @@ REB_R Compose_To_Stack_Core(
             }
             CLEAR_CELL_FLAG(out, OUT_NOTE_STALE);
 
+            if (Is_Heavy_Nulled(out)) {
+                Init_Nulled(out);  // treat isotopic nulls as vaporizing
+            }
+            else if (IS_BAD_WORD(out) and GET_CELL_FLAG(out, ISOTOPE)) {
+                fail ("Cannot compose BAD-WORD! isotopes into blocks");
+            }
+
             REBVAL *insert;
             if (
                 predicate
@@ -314,7 +321,7 @@ REB_R Compose_To_Stack_Core(
                 }
             }
             else {
-                // !!! What about VBAD-WORD!s?  REDUCE and other routines have
+                // !!! What about BAD-WORD!s?  REDUCE and other routines have
                 // become more lenient, and let you worry about it later.
 
                 // compose [(1 + 2) inserts as-is] => [3 inserts as-is]

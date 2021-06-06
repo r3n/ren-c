@@ -1,4 +1,5 @@
-; functions/control/compose.r
+; %compose.test.reb
+
 (
     num: 1
     [1 num] = compose [(num) num]
@@ -150,3 +151,11 @@
 ; ([a b c d e f] = compose /identity [([a b c]) (([d e f]))])
 ; ([[a b c] d e f] = compose /enblock [([a b c]) (([d e f]))])
 ; ([-30 70] = compose /negate [(10 + 20) ((30 + 40))])
+
+
+; BAD-WORD! isotopes are not legal in compose, except for the null isotope.
+[
+    ([<a> <b>] = compose [<a> (if true [null]) <b>])
+    (error? trap [compose [<a> (~unset~)]])
+]
+ 
