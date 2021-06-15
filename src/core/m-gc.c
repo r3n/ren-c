@@ -42,7 +42,7 @@
 // structures could quickly wind up overflowing the C stack.  Consider:
 //
 //     a: copy []
-//     loop 200'000 [a: append copy [] ^a]
+//     repeat 200'000 [a: append copy [] ^a]
 //     recycle
 //
 // The simple solution is that when an unmarked array is hit that it is
@@ -120,7 +120,7 @@ inline static void Queue_Mark_Opt_End_Cell_Deep(const RELVAL *v) {
 inline static void Queue_Mark_Value_Deep(const RELVAL *v)
 {
     assert(KIND3Q_BYTE_UNCHECKED(v) != REB_NULL);  // faster than IS_NULLED()
-    Queue_Mark_Opt_Value_Deep(v);  // unreadable void is ok
+    Queue_Mark_Opt_Value_Deep(v);  // unreadable trash is ok
 }
 
 

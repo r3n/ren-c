@@ -231,9 +231,9 @@ void MF_Get_word(REB_MOLD *mo, REBCEL(const*) v, bool form) {
 
 
 //
-//  MF_Sym_word: C
+//  MF_Meta_word: C
 //
-void MF_Sym_word(REB_MOLD *mo, REBCEL(const*) v, bool form) {
+void MF_Meta_word(REB_MOLD *mo, REBCEL(const*) v, bool form) {
     UNUSED(form);
     Append_Codepoint(mo->series, '^');
     Mold_Word(mo, v);

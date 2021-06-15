@@ -380,21 +380,21 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool strict)
       case REB_BLOCK:
       case REB_SET_BLOCK:
       case REB_GET_BLOCK:
-      case REB_SYM_BLOCK:
+      case REB_META_BLOCK:
       case REB_GROUP:
       case REB_SET_GROUP:
       case REB_GET_GROUP:
-      case REB_SYM_GROUP:
+      case REB_META_GROUP:
         return CT_Array(s, t, strict);
 
       case REB_PATH:
       case REB_SET_PATH:
       case REB_GET_PATH:
-      case REB_SYM_PATH:
+      case REB_META_PATH:
       case REB_TUPLE:
       case REB_SET_TUPLE:
       case REB_GET_TUPLE:
-      case REB_SYM_TUPLE:
+      case REB_META_TUPLE:
         return CT_Sequence(s, t, strict);
 
       case REB_MAP:
@@ -420,7 +420,7 @@ REBINT Cmp_Value(const RELVAL *sval, const RELVAL *tval, bool strict)
       case REB_WORD:
       case REB_SET_WORD:
       case REB_GET_WORD:
-      case REB_SYM_WORD:
+      case REB_META_WORD:
         return CT_Word(s, t, strict);
 
       case REB_ERROR:

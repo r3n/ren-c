@@ -66,39 +66,39 @@ elf-format: context [
 
     ; (E)LF overall header properties read or written during parse
 
-    EI_CLASS: _
-    EI_DATA: _
-    EI_VERSION: _
-    bits: _             ; 32 or 64
-    endian: _           ; 'little or 'big
-    e_phoff: _          ; Offset of program header table start.
-    e_phnum: _          ; Number of entries in the section header table.
-    e_phentsize: _      ; Size of a program header table entry.
-    e_shoff: _          ; Offset of section header table start.
-    e_shnum: _          ; Number of entries in the section header table.
-    e_shentsize: _      ; Size of a section header table entry.
-    e_shstrndx: _       ; section header index with section names.
+    EI_CLASS: '
+    EI_DATA: '
+    EI_VERSION: '
+    bits: '             ; 32 or 64
+    endian: '           ; 'little or 'big
+    e_phoff: '          ; Offset of program header table start.
+    e_phnum: '          ; Number of entries in the section header table.
+    e_phentsize: '      ; Size of a program header table entry.
+    e_shoff: '          ; Offset of section header table start.
+    e_shnum: '          ; Number of entries in the section header table.
+    e_shentsize: '      ; Size of a section header table entry.
+    e_shstrndx: '       ; section header index with section names.
 
     ; (P)rogram Header properties read or written during parse
 
-    p_type: _
-    p_offset: _
-    p_filesz: _
+    p_type: '
+    p_offset: '
+    p_filesz: '
 
     ; (S)ection (H)eader properties extracted during parse
 
-    sh_name: _          ; .shstrtab section offset w/this section's name
-    sh_type: _
-    sh_flags: _
-    sh_addr: _
-    sh_offset: _
-    sh_size: _
-    sh_link: _
-    sh_info: _
-    sh_addralign: _
-    sh_entsize: _
+    sh_name: '          ; .shstrtab section offset w/this section's name
+    sh_type: '
+    sh_flags: '
+    sh_addr: '
+    sh_offset: '
+    sh_size: '
+    sh_link: '
+    sh_info: '
+    sh_addralign: '
+    sh_entsize: '
 
-    begin: _            ; Capture position in the series
+    begin: '            ; Capture position in the series
 
     ; When parsing a binary header, the properties are either 'read or 'write
     ; In the current update pattern, a read phase is followed by tweaking
@@ -106,7 +106,7 @@ elf-format: context [
     ; For safety, the mode is reset to blank after each rule, to force being
     ; explicit at the callsites.
     ;
-    mode: _
+    mode: ~
     handler: func [name [word!] num-bytes [integer!]] [
         assert [
             binary? begin, num-bytes <= length of begin,
@@ -237,8 +237,7 @@ elf-format: context [
     ][
         let index: 0
         parse section-headers [
-            (assert [integer? e_shnum])
-            e_shnum [ ; the number of times to apply the rule
+            repeat (e_shnum) [
                 (mode: 'read) section-header-rule
                 (
                     let name-start: skip string-section sh_name
@@ -266,7 +265,7 @@ elf-format: context [
         assert [e_phoff < offset]  ; program headers are before any changes
 
         parse skip executable e_phoff [
-            e_phnum [
+            repeat (e_phnum) [
                 (mode: 'read) let pos: here, program-header-rule
                 (if p_offset >= offset [p_offset: p_offset + delta])
                 (mode: 'write) seek pos, program-header-rule
@@ -280,7 +279,7 @@ elf-format: context [
 
         let pos
         parse skip executable e_shoff [
-            e_shnum [
+            repeat (e_shnum) [
                 (mode: 'read) let pos: here, section-header-rule
                 (if sh_offset >= offset [sh_offset: sh_offset + delta])
                 (mode: 'write) seek pos, section-header-rule
@@ -537,10 +536,10 @@ elf-format: context [
 pe-format: context [
     encap-section-name: ".rebolE"  ; Limited to 8 bytes
 
-    buf: _
-    u16: u32: uintptr: _
-    err: _
-    fail-at: _
+    buf: '
+    u16: u32: uintptr: '
+    err: '
+    fail-at: '
 
     u16-le: [copy buf 2 skip (u16: debin [LE + 2] buf)]
     u32-le: [copy buf 4 skip (u32: debin [LE + 4] buf)]
@@ -581,7 +580,7 @@ pe-format: context [
             any [
                 find words ^ to word! word
                 find def ^ to set-word! word
-            ] then [
+            ] else [
                 append def ^ to set-word! word
             ]
         ]
@@ -613,15 +612,14 @@ pe-format: context [
             | skip
         ]
 
-        parse rule [while block-rule end]
+        parse rule [while block-rule] else [fail]
 
-        ;dump def
-        set name make object! append def [_]
+        set name make object! append def [~unset~]
         bind rule get name
     ]
 
-    DOS-header: _
-    pos: _
+    DOS-header: '
+    pos: '
 
     DOS-header-rule: gen-rule [
         ["MZ" | fail-at: here (err: 'missing-dos-signature) fail]
@@ -649,7 +647,7 @@ pe-format: context [
         "PE" #{0000} | fail-at: here, (err: 'missing-PE-signature) fail
     ]
 
-    COFF-header: _
+    COFF-header: '
     COFF-header-rule: gen-rule/skip [
         and [
             #{4c01} (machine: 'i386)
@@ -676,7 +674,7 @@ pe-format: context [
 
     data-directories: make block! 16
     sections: make block! 8
-    PE-optional-header: _
+    PE-optional-header: '
 
     PE-optional-header-rule: gen-rule [
         and [#{0b01} (signature: 'exe-32)
@@ -739,14 +737,14 @@ pe-format: context [
         u32-le (number-of-RVA-and-sizes: u32)
     ] PE-optional-header
 
-    data-directory: _
+    data-directory: '
     data-directory-rule: gen-rule [
         u32-le (RVA: u32)
         u32-le (size: u32)
         (append data-directories copy data-directory)
     ] data-directory
 
-    section: _
+    section: '
     section-rule: gen-rule [
         copy name [8 skip]  ; 8 bytes
         u32-le (virtual-size: u32)
@@ -758,9 +756,9 @@ pe-format: context [
         (append sections copy section)
     ] section
 
-    garbage: _
-    start-of-section-header: _
-    end-of-section-header: _
+    garbage: '
+    start-of-section-header: '
+    end-of-section-header: '
 
     exe-rule: [
         DOS-header-rule
@@ -802,14 +800,14 @@ pe-format: context [
     ]
 
     reset: does [
-        err: _
-        fail-at: _
-        start-of-section-header:
-        end-of-section-header:
-        garbage: _
-        ;DOS-header: _
-        pos: _
-        ;PE-optional-header: _
+        err: '
+        fail-at: '
+        start-of-section-header: '
+        end-of-section-header: '
+        garbage: '
+        ;DOS-header: '
+        pos: '
+        ;PE-optional-header: '
         clear sections
         clear data-directories
     ]
@@ -1025,7 +1023,12 @@ pe-format: context [
                 target-sec
             ]
             data [
-                copy/part (skip exe-data target-sec.physical-offset) target-sec.physical-size
+                ; !!! physical-size looks to be rounded up, e.g. if you wrote
+                ; 126 bytes in the section you might get 512 bytes.  The
+                ; virtual size looks like what you actually want...but the
+                ; virtual offset isn't right, the physical offset is (?)
+                ;
+                copy/part (skip exe-data target-sec.physical-offset) target-sec.virtual-size
             ]
         ] else [
             reduce [
@@ -1164,8 +1167,8 @@ generic-format: context [
 
     update-embedding: meth [
         return: <none>
-        executable [binary!]
-            {Executable to be mutated to either add or update an embedding}
+        executable "Executable to mutate to either add or update an embedding"
+            [binary!]
         embedding [binary!]
     ][
         let embed-size: length of embedding
@@ -1224,7 +1227,7 @@ generic-format: context [
         )
 
         let embed: read/seek/part file (
-            info/size - sig-length - 8 - embed-size
+            info.size - sig-length - 8 - embed-size
         ) embed-size
 
         return embed
@@ -1264,7 +1267,7 @@ encap: func [
     print ["Compressed resource is" length of compressed "bytes long."]
 
     case [
-        parse executable [
+        parse? executable [
             (elf-format.mode: 'read) elf-format.header-rule to end
         ][
             print "ELF format found"

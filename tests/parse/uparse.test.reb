@@ -176,7 +176,7 @@
 ]
 
 
-; SYM-BLOCK! runs a rule, but with "literalizing" result semantics.  If it
+; META-BLOCK! runs a rule, but with "literalizing" result semantics.  If it
 ; was invisible, it gives ~void~.  This helps write higher level tools
 ; that might want to know about invisibility status.
 [
@@ -438,7 +438,7 @@
 
 
 ; !!! There was an idea that SOME could be called on generators, when the
-; SYM-GROUP! was used as plain GROUP! is but would fail on NULL, and would
+; META-GROUP! was used as plain GROUP! is but would fail on NULL, and would
 ; be combined with OPT if you wanted it to succeed.  This was changed, so
 ; now the idea doesn't work.  Is it necessary to make a "generator friendly"
 ; NULL-means-stop DO-like operator for PARSE?  It's worth thinking about...
@@ -622,13 +622,28 @@
     (0 = uparse* "aaa" [tally "b"])  ; alternately, use non-force-completion
 
     (did all [
-        uparse "<<<stuff>>>" [
-            n: tally "<"
-            inner: between <here> n ">"
+        uparse "(((stuff)))" [
+            n: tally "("
+            inner: between <here> repeat (n) ")"
         ]
         inner = "stuff"
     ])
 ]
+
+
+; REPEAT lets you make it more obvious when a rule is being repeated, which is
+; hidden by INTEGER! variables.
+[(
+    var: 3
+    rule: "a"
+    uparse? "aaa" [repeat (var) rule]  ; clearer than [var rule]
+)(
+    var: 3
+    rule: "a"
+    uparse? "aaaaaa" [2 repeat (var) rule]
+)(
+    uparse? ["b" 3 "b" "b" "b"] [rule: <any>, repeat integer! rule]
+)]
 
 
 ; This is a little test made to try adjusting rebol-server's webserver.reb to
@@ -722,6 +737,13 @@
     ; ELIDE doesn't elide failure...just the result on success.
     ;
     (not uparse? "a" [elide "b"])
+]
+
+
+; SKIP is reimagined as invisible; so <any> should be used to capture a single
+; "anything" value...
+[
+    (<a> == uparse [<a> 10] [tag! skip])  ; why be 10 if it was "skipped"
 ]
 
 

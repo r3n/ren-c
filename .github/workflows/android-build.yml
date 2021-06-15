@@ -555,12 +555,7 @@ jobs:
     # as they are.  They are broken out to make it easier to reuse if the
     # emulator is invoked multiple times.
     #
-    # Currently we are using a patched version of the android emulator runner,
-    # which fixes issues related to quote escaping:
-    #
-    # https://github.com/ReactiveCircus/android-emulator-runner/pull/134
-    #
-    # We also only do the test on the MacOS version, because the Linux version
+    # We only do the test on the MacOS version, because the Linux version
     # has no HAXM acceleration on GitHub.  It boots extremely slowly, and
     # once you wait for it to boot (about 7x as long) it doesn't seem to work:
     #
@@ -570,7 +565,7 @@ jobs:
     # See README: !!! IMPORTANT - Untrusted Actions, Use Audited Hash !!!
     #
     - name: Poke R3 Executable Into Android Emulator And Run Commands
-      uses: hostilefork/android-emulator-runner@dont-wrap-script
+      uses: reactivecircus/android-emulator-runner@226f26251f06f2df1115cdd9620ea6517a46fdc8
       env:
         ADB_R3: adb shell /data/local/tmp/r3  # "Android DeBug" remotely
         TMP: /data/local/tmp

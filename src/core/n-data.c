@@ -346,7 +346,7 @@ bool Did_Get_Binding_Of(REBVAL *out, const REBVAL *v)
     case REB_WORD:
     case REB_SET_WORD:
     case REB_GET_WORD:
-    case REB_SYM_WORD: {
+    case REB_META_WORD: {
         if (IS_WORD_UNBOUND(v))
             return false;
 
@@ -1204,7 +1204,7 @@ REBNATIVE(as)
                 Init_Block(v, a);
                 break; }
 
-              case REB_SYM_WORD: {
+              case REB_META_WORD: {
                 REBARR *a = Make_Array_Core(2, NODE_FLAG_MANAGED);
                 Copy_Cell(ARR_HEAD(a), v);
                 mutable_KIND3Q_BYTE(ARR_HEAD(a)) = REB_WORD;
@@ -1233,11 +1233,11 @@ REBNATIVE(as)
       case REB_TUPLE:
       case REB_GET_TUPLE:
       case REB_SET_TUPLE:
-      case REB_SYM_TUPLE:
+      case REB_META_TUPLE:
       case REB_PATH:
       case REB_GET_PATH:
       case REB_SET_PATH:
-      case REB_SYM_PATH:
+      case REB_META_PATH:
         if (ANY_ARRAY(v)) {
             //
             // Even if we optimize the array, we don't want to give the
@@ -1325,7 +1325,7 @@ REBNATIVE(as)
       case REB_WORD:
       case REB_GET_WORD:
       case REB_SET_WORD:
-      case REB_SYM_WORD: {
+      case REB_META_WORD: {
         if (IS_ISSUE(v)) {
             if (CELL_KIND(cast(REBCEL(const*), v)) == REB_TEXT) {
                 //
@@ -1376,7 +1376,7 @@ REBNATIVE(as)
             if (VAL_INDEX(v) != 0)  // can't reuse non-head series AS WORD!
                 goto intern_utf8;
 
-            if (IS_SYMBOL(s)) {
+            if (IS_METABOL(s)) {
                 //
                 // This string's content was already frozen and checked, e.g.
                 // the string came from something like `as text! 'some-word`
@@ -1408,7 +1408,7 @@ REBNATIVE(as)
                     fail (Error_Alias_Constrains_Raw());
 
             const REBSTR *str;
-            if (IS_SYMBOL(bin))
+            if (IS_METABOL(bin))
                 str = STR(bin);
             else {
                 // !!! There isn't yet a mechanic for interning an existing

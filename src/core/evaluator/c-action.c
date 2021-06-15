@@ -638,6 +638,11 @@ bool Process_Action_Maybe_Stale_Throws(REBFRM * const f)
             }
             break;
 
+          case REB_P_RETURN:  // should not happen!
+            assert(TYPE_CHECK(f->param, REB_TS_REFINEMENT));
+            assert(false);
+            break;
+
           default:
             assert(false);
         }

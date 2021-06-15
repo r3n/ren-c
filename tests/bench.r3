@@ -18,7 +18,7 @@ guess: 0
 count: 1
 while [
 start: now/precise
-loop :count :block
+repeat :count :block
 finish: now/precise
 time: to decimal! difference finish start
 result: time / count

@@ -501,6 +501,8 @@ static const RELVAL *Get_Parse_Value(
             return rule;
 
         Get_Word_May_Fail(cell, rule, specifier);
+        if (IS_INTEGER(cell))
+            fail ("Use REPEAT on integers https://forum.rebol.info/t/1578/6");
         return cell;
     }
 
@@ -1509,6 +1511,26 @@ REBNATIVE(subparse)
                     "https://forum.rebol.info/t/1540/12"
                 );
 
+              case SYM_REPEAT:
+                if (maxcount != 1)
+                    fail ("Old PARSE REPEAT does not mix with ranges");
+
+                FETCH_NEXT_RULE(f);
+                if (not IS_GROUP(P_RULE))
+                    fail ("Old PARSE REPEAT requires GROUP! for times count");
+
+                assert(IS_END(D_OUT));
+                if (Eval_Value_Throws(D_OUT, P_RULE, P_RULE_SPECIFIER))
+                    goto return_thrown;
+
+                if (mincount != 0)
+                    mincount = Int32s(D_OUT, 0);
+                maxcount = Int32s(D_OUT, 0);
+                SET_END(D_OUT);
+
+                FETCH_NEXT_RULE(f);
+                goto pre_rule;
+
               case SYM_FURTHER:  // require advancement
                 P_FLAGS |= PF_FURTHER;
                 FETCH_NEXT_RULE(f);
@@ -1615,7 +1637,7 @@ REBNATIVE(subparse)
                 // If you say KEEP ^(whatever) then that acts like /ONLY did
                 //
                 bool only;
-                if (ANY_SYM_KIND(VAL_TYPE(rule))) {
+                if (ANY_META_KIND(VAL_TYPE(rule))) {
                     if (rule != P_SAVE) {  // move to mutable location
                         Derelativize(P_SAVE, rule, P_RULE_SPECIFIER);
                         rule = P_SAVE;
@@ -1931,7 +1953,7 @@ REBNATIVE(subparse)
                 assert(IS_WORD(rule));  // word - some other variable
 
                 if (rule != P_SAVE) {
-                    Get_Word_May_Fail(P_SAVE, rule, P_RULE_SPECIFIER);
+                    Get_Parse_Value(P_SAVE, rule, P_RULE_SPECIFIER);
                     rule = P_SAVE;
                 }
             }
@@ -1988,7 +2010,7 @@ REBNATIVE(subparse)
         Init_Nulled(ARG(position));  // not found
         goto post_match_processing;
 
-      case REB_INTEGER:  // Specify count or range count, 1 or 2 integers
+      case REB_INTEGER:  // Specify repeat count
         mincount = maxcount = Int32s(rule, 0);
 
         FETCH_NEXT_RULE(f);
@@ -1997,22 +2019,8 @@ REBNATIVE(subparse)
 
         rule = Get_Parse_Value(P_SAVE, P_RULE, P_RULE_SPECIFIER);
 
-        if (IS_INTEGER(rule)) {
-            maxcount = Int32s(rule, 0);
-
-            FETCH_NEXT_RULE(f);
-            if (IS_END(P_RULE))
-                fail (Error_Parse_End());
-
-            rule = Get_Parse_Value(P_SAVE, P_RULE, P_RULE_SPECIFIER);
-        }
-
-        if (IS_INTEGER(rule)) {
-            //
-            // `parse [1 1] [1 3 1]` must be `parse [1 1] [1 3 just 1]`
-            //
-            fail ("For matching, INTEGER!s must be literal with JUST");
-        }
+        if (IS_INTEGER(rule))
+            fail ("[1 2 rule] now illegal https://forum.rebol.info/t/1578/6");
         break;
 
       default:;
@@ -2526,7 +2534,7 @@ REBNATIVE(subparse)
                 // If you say KEEP ^(whatever) then that acts like /ONLY did
                 //
                 bool only;
-                if (ANY_SYM_KIND(VAL_TYPE(rule))) {
+                if (ANY_META_KIND(VAL_TYPE(rule))) {
                     if (rule != P_SAVE) {  // move to mutable location
                         Derelativize(P_SAVE, rule, P_RULE_SPECIFIER);
                         rule = P_SAVE;

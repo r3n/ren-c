@@ -13,7 +13,7 @@
 
 [#206 (
     any-char: complement charset ""
-    repeat n 512 [
+    count-up n 512 [
         if n = 1 [continue]
 
         if not parse? (append copy "" make char! n - 1) [set c any-char end] [
@@ -24,6 +24,11 @@
     true
 )]
 
+(
+    var: 3
+    rule: "a"
+    parse? "aaa" [repeat (var) rule]  ; clearer than [var rule]
+)
 
 ; Don't leak internal detail that BINARY! or ANY-STRING! are 0-terminated
 [
@@ -421,7 +426,7 @@
 [https://github.com/metaeducation/ren-c/issues/1032 (
     s: {abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ}
     t: {----------------------------------------------------}
-    for n 2 50 1 [
+    cfor n 2 50 1 [
         sub: copy/part s n
         parse sub [while [
             remove skip

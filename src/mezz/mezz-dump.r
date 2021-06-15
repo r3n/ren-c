@@ -40,8 +40,8 @@ dump: function [
         ] else [
             trunc: '~void~
             append (
-                mold/limit/truncated :val system/options/dump-size 'trunc
-            ) if trunc ["..."]
+                mold/limit/truncated :val system.options.dump-size 'trunc
+            ) try if trunc ["..."]
         ]
     ]
 
@@ -51,7 +51,7 @@ dump: function [
             text! [  ; good for longer labeling when you need spaces/etc.
                 print unspaced [
                     elide trunc: '~void~
-                    mold/limit/truncated item system/options/dump-size 'trunc
+                    mold/limit/truncated item system.options.dump-size 'trunc
                     if trunc ["..."]
                 ]
             ]
@@ -60,6 +60,10 @@ dump: function [
                 print [to set-word! item, val-to-text get item]
             ]
 
+            tuple! [
+                print [to set-tuple! item, val-to-text reduce item]
+            ]
+            
             path! [
                 print [to set-path! item, val-to-text reduce item]
             ]
@@ -73,7 +77,7 @@ dump: function [
             ]
 
             fail ^value [
-                "Item not TEXT!, INTEGER!, WORD!, PATH!, GROUP!:" :item
+                "Item not TEXT!, INTEGER!, WORD!, TUPLE!, PATH!, GROUP!:" :item
             ]
         ]
     ]

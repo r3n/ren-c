@@ -402,6 +402,8 @@ inline static bool Eval_Value_Maybe_Stale_Throws(
     const RELVAL *value,  // e.g. a BLOCK! here would just evaluate to itself!
     REBSPC *specifier
 ){
+    assert(out != value);
+
     if (ANY_INERT(value)) {
         Derelativize(out, value, specifier);
         return false;  // fast things that don't need frames (should inline)
@@ -439,6 +441,8 @@ inline static bool Eval_Value_Throws(
     const RELVAL *value,  // note this is not `unstable`, direct pointer used
     REBSPC *specifier
 ){
+    assert(out != value);
+
     SET_END(out);
     if (Eval_Value_Maybe_Stale_Throws(out, value, specifier))
         return true;

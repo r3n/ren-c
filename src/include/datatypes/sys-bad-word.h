@@ -1,5 +1,5 @@
 //
-//  File: %sys-void.h
+//  File: %sys-bad-word.h
 //  Summary: "BAD-WORD! Datatype Header"
 //  Project: "Rebol 3 Interpreter and Run-time (Ren-C branch)"
 //  Homepage: https://github.com/metaeducation/ren-c/
@@ -20,44 +20,63 @@
 //
 //=////////////////////////////////////////////////////////////////////////=//
 //
-// "BAD-WORD! is a means of giving a hot potato back that is a warning of
-//  something, but you don't want to force an error 'in the moment'...
-//  in case the returned information wasn't going to be used anyway."
+// BAD-WORD!s carry symbols like WORD!s do, but are rendered like ~void~ or
+// ~unset~.  They are designed to cover some edge cases in representation, and
+// are ordinarily considered neither true nor false:
 //
-// https://forum.rebol.info/t/947
+//     >> if (first [~foo~]) [print "This won't work."]
+//     ** Script Error: BAD-WORD! values aren't conditionally true or false
 //
-// BAD-WORD!s are the default return values for things like `do []`, or
-// `print "Hello"`.  Unlike NULL, a bad word *is* a value...however a somewhat
-// unfriendly one.  While NULLs are falsey, bad words are *neither* truthy nor
-// falsey.  Though a bad-word! can be put in an array (a NULL can't), the
-// baseline access through a word! or path! access will error.
+// But there's an additional twist on bad words, which is that when they are
+// put into a variable they can be stored in either a normal state or an
+// "isotope" state.  They are transitioned into the isotope state by evaluation
+// which leads to "pricklier" behaviors...such as not being able to be
+// retrieved through ordinary WORD! fetches.
+//
+//     >> nice: first [~foo~]
+//     == ~foo~
+//
+//     >> nice
+//     == ~foo~
+//
+//     >> mean: ~foo~
+//     == ~foo~  ; isotope
+//
+//     >> mean
+//     ** Script Error: mean is ~foo~ isotope (see ^(...) and GET/ANY)
+//
+// With the use of the `^xxx` family of types and the `^` operator, it is
+// possible to leverage a form of quoting to transition isotopes to normal, and
+// normal bad words to quoted:
+//
+//     >> ^nice
+//     == '~foo~
+//
+//     >> ^mean
+//     == ~foo~
+//
+// This enables shifting into a kind of "meta" domain, where whatever "weird"
+// condition the isotope was attempting to capture and warn about can be
+// handled literally.  Code that isn't expecting such strange circumstances
+// can error if they ever happen, while more sensitive code can be adapted to
+// cleanly handle the intents that they care about.
 //
 //=//// NOTES //////////////////////////////////////////////////////////////=//
+//
+// * The isotope states of several BAD-WORD!s have specific meaning to the
+//   system...such as ~unset~, ~void~, ~stale~, and ~null~.  Each are described
+//   in sections below.
+//
+// * While normal BAD-WORD!s are neither true nor false, this may vary for the
+//   isotope forms.  (For instance the ~null~ isotope is falsey!)
 //
 // * See %sys-trash.h for a special case of a cell that will trigger panics
 //   if it is ever read in the debug build, but is just an ordinary BAD-WORD!
 //   of ~trash~ in the release build.
 //
 
-inline static REBVAL *Init_Bad_Word_Untracked(
-    RELVAL *out,
-    const REBSTR *label,
-    REBFLGS flags
-){
-    RESET_VAL_HEADER(out, REB_BAD_WORD, CELL_FLAG_FIRST_IS_NODE | flags);
 
-    // Due to being evaluator active and not wanting to disrupt the order in
-    // %types.r, voids claim to be bindable...and just set the binding to null.
-    // See %sys-ordered.h for more on all the rules that make this so.
-    //
-    mutable_BINDING(out) = nullptr;
-
-    INIT_VAL_NODE1(out, label);
-  #ifdef ZERO_UNUSED_CELL_FIELDS
-    PAYLOAD(Any, out).second.trash = nullptr;
-  #endif
-    return cast(REBVAL*, out);
-}
+// Note: definition of Init_Bad_Word_Untracked() is in %sys-trash.h
 
 #define Init_Bad_Word_Core(out,label,flags) \
     Init_Bad_Word_Untracked(TRACK_CELL_IF_DEBUG(out), (label), (flags))
@@ -189,9 +208,9 @@ inline static RELVAL *Isotopify_If_Nulled(RELVAL *v) {
     return v;
 }
 
-// When a parameter is "normal" then it is willing to turn the unfriendly form
-// of ~null~ into a regular null.  This is leveraged by the API in order to
-// make some common forms of null handling work more smoothly.
+// When a parameter is "normal" then it is willing to turn the ~null~ isotope
+// into a regular null.  This is leveraged by the API in order to make some
+// common forms of null handling work more smoothly.
 
 inline static REBVAL *Normalize(REBVAL *v) {
     Decay_If_Nulled(v);
@@ -204,7 +223,7 @@ inline static REBVAL *Normalize(REBVAL *v) {
 // Moving a cell invalidates the old location.  This idea is a potential
 // prelude to being able to do some sort of reference counting on series based
 // on the cells that refer to them tracking when they are overwritten.  In
-// the meantime, setting to unreadable void helps see when a value that isn't
+// the meantime, setting to unreadable trash helps see when a value that isn't
 // thought to be used any more is still being used.
 //
 // (It basically would involve setting the old cell to trash, so the functions

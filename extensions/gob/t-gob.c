@@ -551,7 +551,7 @@ static bool Did_Get_GOB_Var(
       case SYM_IMAGE:
         if (GOB_TYPE(gob) == GOBT_IMAGE) {
             assert(rebDid("image?", GOB_CONTENT(gob)));
-            return Copy_Cell(out, GOB_CONTENT(gob));
+            Copy_Cell(out, GOB_CONTENT(gob));
         }
         else
             Init_Nulled(out);
@@ -724,7 +724,7 @@ static REBARR *Gob_To_Array(REBGOB *gob)
         }
 
         REBVAL *name = Init_Set_Word(Alloc_Tail_Array(arr), Canon(sym));
-        REBVAL *slot = Alloc_Tail_Array(arr);
+        RELVAL *slot = Alloc_Tail_Array(arr);
         bool known = Did_Get_GOB_Var(slot, gob, name);
         assert(known);  // should have known that sym
         UNUSED(known);

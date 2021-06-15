@@ -216,7 +216,7 @@ static void Startup_Fake_Type_Constraint(SYMID sym)
 //
 //  Matches_Fake_Type_Constraint: C
 //
-// Called on SYM-WORD!s by PARSE and MATCH.
+// Called on META-WORD!s by PARSE and MATCH.
 //
 bool Matches_Fake_Type_Constraint(const RELVAL *v, enum Reb_Symbol_Id sym) {
     switch (sym) {

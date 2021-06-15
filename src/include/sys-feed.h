@@ -488,10 +488,10 @@ inline static const RELVAL *Lookback_While_Fetching_Next(REBFRM *f) {
 
 // This code is shared by Literal_Next_In_Feed(), and used without a feed
 // advancement in the inert branch of the evaluator.  So for something like
-// `loop 2 [append [] 10]`, the steps are:
+// `repeat 2 [append [] 10]`, the steps are:
 //
-//    1. loop defines its body parameter as <const>
-//    2. When LOOP runs Do_Any_Array_At_Throws() on the const ARG(body), the
+//    1. REPEAT defines its body parameter as <const>
+//    2. When REPEAT runs Do_Any_Array_At_Throws() on the const ARG(body), the
 //       frame gets FEED_FLAG_CONST due to the CELL_FLAG_CONST.
 //    3. The argument to append is handled by the inert processing branch
 //       which moves the value here.  If the block wasn't made explicitly
@@ -582,7 +582,7 @@ inline static void Free_Feed(REBFED *feed) {
 // Just to simplify matters, the frame cell is set to a bit pattern the GC
 // will accept.  It would need stack preparation anyway, and this simplifies
 // the invariant so if a recycle happens before Eval_Core() gets to its
-// body, it's always set to something.  Using an unreadable void means we
+// body, it's always set to something.  Using an unreadable trash means we
 // signal to users of the frame that they can't be assured of any particular
 // value between evaluations; it's not cleared.
 //

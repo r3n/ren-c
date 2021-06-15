@@ -33,7 +33,7 @@
 void Startup_Data_Stack(REBLEN capacity)
 {
     // Start the data stack out with just one element in it, and make it an
-    // unreadable void in the debug build.  This helps avoid accidental
+    // unreadable trash in the debug build.  This helps avoid accidental
     // reads and is easy to notice when it is overwritten.  It also means
     // that indices into the data stack can be unsigned (no need for -1 to
     // mean empty, because 0 can)

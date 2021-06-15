@@ -59,7 +59,7 @@ static bool Params_Of_Hook(
             break;
 
           case REB_P_LITERAL:
-            Symify(DS_TOP);
+            Metafy(DS_TOP);
             break;
 
           case REB_P_SOFT:
@@ -373,7 +373,7 @@ void Push_Paramlist_Triads_May_Fail(
                     else
                         pclass = REB_P_NORMAL;
                 }
-                else if (kind == REB_SYM_WORD) {
+                else if (kind == REB_META_WORD) {
                     if (not quoted)
                         pclass = REB_P_LITERAL;
                 }

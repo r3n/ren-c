@@ -205,6 +205,7 @@ if  ; deprecated: https://forum.rebol.info/t/968/7
 fail
 reject
 while
+repeat
 limit
 seek  ; Ren-C addition
 here  ; Ren-C addition

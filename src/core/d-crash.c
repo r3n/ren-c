@@ -256,7 +256,7 @@ REBNATIVE(panic)
 //
 //  {Early-boot version of FAIL (overridden by more complex usermode version)}
 //
-//      'blame [<skip> sym-word! sym-path!]
+//      'blame [<skip> meta-word! meta-path!]
 //       reason [<end> <opt> any-value!]  ; permissive to avoid callsite error
 //       /where [frame! any-word!]
 //   ]

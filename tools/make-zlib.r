@@ -2,7 +2,7 @@ REBOL [
     System: "REBOL [R3] Language Interpreter and Run-time Environment"
     Title: "Make sys-zlib.h and u-zlib.c"
     Rights: {
-        Copyright 2012-2018 Ren-C Open Source Contributors
+        Copyright 2012-2021 Ren-C Open Source Contributors
         REBOL is a trademark of REBOL Technologies
     }
     License: {
@@ -54,9 +54,9 @@ path-zlib: https://raw.githubusercontent.com/madler/zlib/master/
 ;
 disable-user-includes: function [
     return: <none>
-    lines [block!] {Block of strings}
-    /inline [block!] {Block of filenames to inline if seen}
-    /stdio {Disable stdio.h}
+    lines [block!] "Block of strings"
+    /inline [block!] "Block of filenames to inline if seen"
+    /stdio "Disable stdio.h"
     <local> name line-iter line pos
     <static>
     open-include (charset {"<})
@@ -64,9 +64,9 @@ disable-user-includes: function [
 ] [
     include-rule: compose [
         ((if stdio [
-            [open-include copy name "stdio.h" close-include |]
+            [open-include name: across "stdio.h" close-include |]
         ]))
-        {"} copy name to {"}
+        {"} name: across to {"}
     ]
 
     for-next line-iter lines [
@@ -149,42 +149,40 @@ fix-kr: function [
     "Fix K&R style C function definition"
     source
 ][
-    single-param: bind [
-        identifier ;(part of)type
+    single-param: bind copy/deep [
+        identifier  ; (part of)type
         some [
             while white-space
-            while [#"*" any white-space]
+            while ["*" while white-space]
 
             ; It could get here even after last identifier, so this tmp-start
             ; is not the begining of the name, but the last one is...
             ;
-            tmp-start: copy name:
-            identifier (
+            tmp-start: here, name: across identifier (
                 name-start: tmp-start
             )
             while white-space
-            while [#"*" any white-space]
+            while ["*" while white-space]
         ]
-    ] c-lexical/grammar
+    ] c-lexical.grammar
 
-    parse source bind [
+    parse source bind copy/deep [
         while [
-            copy fn: identifier
-            any white-space
-            #"(" open-paren: to #")" close-paren: #")"
-            param-ser: copy param-spec: [
+            fn: across identifier
+            while white-space
+            "(" [open-paren: here] to ")" [close-paren: here] ")"
+            param-ser: here, param-spec: across [
                 some [
-                    some [while white-space, while [#"*" any white-space]
-                        identifier any white-space opt #","
-                        while [#"*" any white-space]
-                    ] #";"
+                    some [while white-space, while ["*" while white-space]
+                        identifier while white-space opt ","
+                        while ["*" while white-space]
+                    ] ";"
                 ]
-                any white-space
+                while white-space
             ]
-            #"^{" check-point: (
-                ;print ["func:" to text! fn]
+            "{" check-point: here (
                 remove/part param-ser length of param-spec
-                insert param-ser "^/"
+                insert param-ser newline
                 length-diff: 1 - (length of param-spec)
 
                 param-len: (index of close-paren) - (index of open-paren)
@@ -192,45 +190,41 @@ fix-kr: function [
                 remove/part open-paren param-len
                 length-diff: length-diff - param-len
 
-
                 param-block: make block! 8
                 parse params [
                     while white-space
-                    copy name: identifier (
+                    name: across identifier (
                         append param-block reduce [name _]
                     )
                     while [
                         while white-space
-                        #","
+                        ","
                         while white-space
-                        copy name: identifier (
+                        name: across identifier (
                             append param-block reduce [name _]
                         )
                     ]
-                    end
+                    end | (fail)
                 ]
-
-                ;dump param-block
 
                 ; a param spec could be in the form of:
                 ; 1) "int i;" or
                 ; 2) "int i, *j, **k;"
-                ;dump param-spec
+
                 parse param-spec [
                     while white-space
                     some [
                         (typed?: true)
-                        single-param-start: single-param (
+                        single-param-start: here, single-param (
                             spec-type: (
                                 copy/part single-param-start
                                     (index of name-start)
                                     - (index of single-param-start)
                             )
-                           ;dump spec-type
                        )
                        while [
-                           while white-space
-                           param-end: #"," (
+                           while white-space, param-end: here
+                           "," (
                                 ; case 2)
                                 ; spec-type should be "int "
                                 ; name should be "i"
@@ -254,11 +248,11 @@ fix-kr: function [
                            )
                            single-param-start: here
                            while white-space
-                           while [#"*" any white-space]
-                           copy name identifier
+                           while ["*" while white-space]
+                           name: across identifier
                         ]
-                        any white-space
-                        param-end: #";"
+                        while white-space
+                        [param-end: here] ";"
                         (
                            poke (find/skip param-block name 2) 2
                                either typed? [
@@ -269,19 +263,17 @@ fix-kr: function [
                                ][
                                    ; handling "k" in case 2)
                                    unspaced [
-                                       spec-type    ; "int "
+                                       spec-type  ; "int "
                                        (copy/part single-param-start
                                             (index of param-end)
                                             - (index of single-param-start)
-                                       ) ; " **k"
+                                       )  ; " **k"
                                    ]
                                 ]
                             )
                         while white-space
                     ]
                 ]
-
-                ;dump param-block
 
                 insert open-paren new-param: delimit ",^/    " (
                     extract/index param-block 2 2
@@ -292,11 +284,11 @@ fix-kr: function [
 
                 check-point: skip check-point length-diff
             )
-            :check-point
+            seek :check-point
             | skip
         ]
-        end
-    ] c-lexical/grammar
+        end | (fail)
+    ] c-lexical.grammar
 
     source
 ]
@@ -304,16 +296,16 @@ fix-kr: function [
 fix-const-char: func [
     source
 ][
-    parse source bind [
+    parse source bind copy/deep [
         while [
-            "strm" any white-space "->" any white-space
-            "msg" any white-space "=" any white-space
-            "(" any white-space change "char" "z_const char"
-                any white-space "*" any white-space ")"
+            "strm" while white-space "->" while white-space
+            "msg" while white-space "=" while white-space
+            "(" while white-space change "char" ("z_const char")
+                while white-space "*" while white-space ")"
             | skip
         ]
-        end
-    ] c-lexical/grammar
+        end | (fail)
+    ] c-lexical.grammar
     source
 ]
 

@@ -451,14 +451,14 @@ bool Eval_Path_Throws_Core(
         //
         goto handle_word;
 
-      case REB_SYM_WORD:  // get or set `foo/` or `foo.`
+      case REB_META_WORD:  // get or set `foo/` or `foo.`
       handle_word: {
         if (setval) {  // nullptr is GET (note IS_NULLED() to set NULLED)
             //
             // This is the SET case, which means the `foo.:` and `foo/:`
             // forms pre-check the action status of the value being assigned.
             //
-            if (heart == REB_SYM_WORD) {
+            if (heart == REB_META_WORD) {
                 if (ANY_TUPLE_KIND(VAL_TYPE(sequence))) {
                     if (IS_ACTION(unwrap(setval)))
                         fail (Error_Action_With_Dotted_Raw());
@@ -477,7 +477,7 @@ bool Eval_Path_Throws_Core(
         else {
             Get_Word_May_Fail(out, sequence, sequence_specifier);
 
-            if (heart == REB_SYM_WORD) {
+            if (heart == REB_META_WORD) {
                 if (ANY_TUPLE_KIND(VAL_TYPE(sequence))) {
                     if (IS_ACTION(out))
                         fail (Error_Action_With_Dotted_Raw());
@@ -1081,14 +1081,14 @@ REB_R TO_Sequence(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg) {
         );
     }
 
-    if (ANY_PATH_KIND(arg_kind)) {  // e.g. `to set-path! 'a/b/c`
-        assert(arg_kind != VAL_TYPE(arg));  // TO should have called COPY
+    if (ANY_SEQUENCE_KIND(arg_kind)) {  // e.g. `to set-path! 'a/b/c`
+        assert(kind != arg_kind);  // TO should have called COPY
 
         // !!! If we don't copy an array, we don't get a new form to use for
         // new bindings in lookups.  Review!
         //
         Copy_Cell(out, arg);
-        mutable_KIND3Q_BYTE(out) = arg_kind;
+        mutable_KIND3Q_BYTE(out) = kind;
         return out;
     }
 
@@ -1184,7 +1184,7 @@ REBINT CT_Sequence(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 
       case REB_WORD:  // `/` or `.`
       case REB_GET_WORD:  // `/foo` or `.foo`
-      case REB_SYM_WORD:  // `foo/ or `foo.`
+      case REB_META_WORD:  // `foo/ or `foo.`
         return CT_Word(a, b, strict);
 
       case REB_BLOCK:

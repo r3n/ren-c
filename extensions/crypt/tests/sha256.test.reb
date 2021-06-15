@@ -68,14 +68,14 @@
     ]
 
     random/seed "Deterministic Behavior Desired"
-    loop 100 [
+    repeat 100 [
         data-len: random 1024
         data: make binary! data-len
-        loop data-len [append data (random 256) - 1]
+        repeat data-len [append data (random 256) - 1]
 
         key-len: random 512
         key: make binary! key-len
-        loop key-len [append data (random 256) - 1]
+        repeat key-len [append data (random 256) - 1]
 
         a: hmac-sha256 data key
         b: checksum/key 'sha256 data key

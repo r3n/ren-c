@@ -36,6 +36,8 @@ REBOL [
 here: []
 seek: []
 
+for: func [] [fail "FOR DEPRECATED, USE CFOR"]
+
 ; The snapshotted Ren-C existed right before <blank> was legal to mark an
 ; argument as meaning a function returns null if that argument is blank.
 ; See if this causes an error, and if so assume it's the old Ren-C, not a
@@ -71,6 +73,8 @@ trap [
     ;
     if undefined? 'the [
         the: :literal
+
+        repeat: :loop
 
         ; Workaround the <void> => <none> spec change, for same version
 
@@ -144,6 +148,8 @@ trap [
 load-value: :load
 load-all: :load/all
 
+repeat: :loop
+loop: func [] [fail "Use REPEAT not LOOP"]
 
 any-inert!: make typeset! [text! tag! issue! binary! char! object! file!]
 

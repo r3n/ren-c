@@ -629,8 +629,14 @@ ensure: redescribe [
     ]
 )
 
-non: redescribe [
+non*: redescribe [
     {Pass through value if it *doesn't* match test (e.g. MATCH/NOT)}
+](
+    :match*/not
+)
+
+non: redescribe [
+    {Safely pass through value if it *doesn't* match test (e.g. MATCH/NOT)}
 ](
     :match/not
 )
@@ -742,13 +748,13 @@ iterate-back: redescribe [
 count-up: redescribe [
     "Loop the body, setting a word from 1 up to the end value given"
 ](
-    specialize :for [start: 1, bump: 1]
+    specialize :cfor [start: 1, bump: 1]
 )
 
 count-down: redescribe [
     "Loop the body, setting a word from the end value given down to 1"
 ](
-    specialize adapt :for [
+    specialize adapt :cfor [
         start: end
         end: 1
     ][
@@ -999,7 +1005,7 @@ fail: func [
     {Interrupts execution by reporting an error (a TRAP can intercept it).}
 
     'blame "Point to variable or parameter to blame"
-        [<skip> sym-word! sym-path!]
+        [<skip> meta-word! meta-path!]
     reason "ERROR! value, ID, URL, message text, or failure spec"
         [<end> error! word! path! url! text! block!]
     /where "Frame or parameter at which to indicate the error originated"
@@ -1020,7 +1026,7 @@ fail: func [
     ; !!! PATH! doesn't do BINDING OF, and in the general case it couldn't
     ; tell you where it resolved to without evaluating, just do WORD! for now.
     ;
-    let frame: try match frame! binding of try match sym-word! :blame
+    let frame: try match frame! binding of try match meta-word! :blame
 
     let error: switch type of :reason [
         error! [reason]

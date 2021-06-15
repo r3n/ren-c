@@ -32,7 +32,6 @@ REBOL [
 ; lib: mid-level lib context:
 [
     %mezz-types.r
-    %mezz-func.r
     %mezz-debug.r
     %mezz-dump.r
     %mezz-control.r

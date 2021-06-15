@@ -524,7 +524,7 @@ REBINT Compare_Modify_Values(RELVAL *a, RELVAL *b, bool strict)
           case REB_WORD:
           case REB_SET_WORD:
           case REB_GET_WORD:
-          case REB_SYM_WORD:
+          case REB_META_WORD:
             if (ANY_WORD(b)) goto compare;
             break;
 

@@ -453,7 +453,7 @@ inline static void SET_SIGNAL(REBFLGS f) { // used in %sys-series.h
 #include "datatypes/sys-string.h"  // SYMID needed for typesets
 
 #include "sys-symbol.h"
-#include "datatypes/sys-void.h"  // SYMID needed
+#include "datatypes/sys-bad-word.h"  // SYMID needed
 
 #include "datatypes/sys-logic.h"  // ~null~ BAD-WORD! is falsey
 

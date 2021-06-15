@@ -247,7 +247,7 @@ inline static enum Reb_Kind TUPLIFY_ANY_PATH_KIND(REBYTE k) {
 
 inline static bool ANY_BLOCK_KIND(REBYTE k)
     { return k == REB_BLOCK or k == REB_GET_BLOCK
-        or k == REB_SET_BLOCK or k == REB_SYM_BLOCK; }
+        or k == REB_SET_BLOCK or k == REB_META_BLOCK; }
 
 #define ANY_BLOCK(v) \
     ANY_BLOCK_KIND(KIND3Q_BYTE(v))
@@ -255,7 +255,7 @@ inline static bool ANY_BLOCK_KIND(REBYTE k)
 
 inline static bool ANY_GROUP_KIND(REBYTE k)
     { return k == REB_GROUP or k == REB_GET_GROUP
-        or k == REB_SET_GROUP or k == REB_SYM_GROUP; }
+        or k == REB_SET_GROUP or k == REB_META_GROUP; }
 
 #define ANY_GROUP(v) \
     ANY_GROUP_KIND(KIND3Q_BYTE(v))
@@ -284,8 +284,8 @@ inline static bool ANY_NUMBER_KIND(REBYTE k)
 inline static bool ANY_PLAIN_KIND(REBYTE k)
   { return k >= REB_BLOCK and k <= REB_WORD; }
 
-inline static bool ANY_SYM_KIND(REBYTE k)
-  { return k >= REB_SYM_BLOCK and k <= REB_SYM_WORD; }
+inline static bool ANY_META_KIND(REBYTE k)
+  { return k >= REB_META_BLOCK and k <= REB_META_WORD; }
 
 inline static bool ANY_SET_KIND(REBYTE k)
   { return k >= REB_SET_BLOCK and k <= REB_SET_WORD; }
@@ -303,8 +303,8 @@ inline static enum Reb_Kind PLAINIFY_ANY_SET_KIND(REBYTE k) {
     return cast(enum Reb_Kind, k - 5);
 }
 
-inline static enum Reb_Kind PLAINIFY_ANY_SYM_KIND(REBYTE k) {
-    assert(ANY_SYM_KIND(k));
+inline static enum Reb_Kind PLAINIFY_ANY_META_KIND(REBYTE k) {
+    assert(ANY_META_KIND(k));
     return cast(enum Reb_Kind, k - 15);
 }
 
@@ -318,7 +318,7 @@ inline static enum Reb_Kind GETIFY_ANY_PLAIN_KIND(REBYTE k) {
     return cast(enum Reb_Kind, k + 10);
 }
 
-inline static enum Reb_Kind SYMIFY_ANY_PLAIN_KIND(REBYTE k) {
+inline static enum Reb_Kind METAFY_ANY_PLAIN_KIND(REBYTE k) {
     assert(ANY_PLAIN_KIND(k));
     return cast(enum Reb_Kind, k + 15);
 }
@@ -326,7 +326,7 @@ inline static enum Reb_Kind SYMIFY_ANY_PLAIN_KIND(REBYTE k) {
 
 inline static bool IS_ANY_SIGIL_KIND(REBYTE k) {
     assert(k < REB_64);  // can't do `@''x`
-    return k >= REB_SET_BLOCK and k <= REB_SYM_WORD;
+    return k >= REB_SET_BLOCK and k <= REB_META_WORD;
 }
 
 
