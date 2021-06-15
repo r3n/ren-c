@@ -433,9 +433,9 @@ REBNATIVE(dequote)
 
 
 //
-//  MF_Lit: C
+//  MF_Meta: C
 //
-void MF_Lit(REB_MOLD *mo, REBCEL(const*) v, bool form)
+void MF_Meta(REB_MOLD *mo, REBCEL(const*) v, bool form)
 {
     UNUSED(form);
     UNUSED(v);
@@ -445,12 +445,12 @@ void MF_Lit(REB_MOLD *mo, REBCEL(const*) v, bool form)
 
 
 //
-//  CT_Lit: C
+//  CT_Meta: C
 //
 // Must have a comparison function, otherwise SORT would not work on arrays
 // with ^ in them.
 //
-REBINT CT_Lit(REBCEL(const*) a, REBCEL(const*) b, bool strict)
+REBINT CT_Meta(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 {
     UNUSED(strict);  // no strict form of comparison
     UNUSED(a);
@@ -463,7 +463,7 @@ REBINT CT_Lit(REBCEL(const*) a, REBCEL(const*) b, bool strict)
 //
 //  REBTYPE: C
 //
-REBTYPE(Lit)
+REBTYPE(Meta)
 {
     switch (VAL_WORD_ID(verb)) {
       case SYM_REFLECT: {

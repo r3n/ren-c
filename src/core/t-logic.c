@@ -132,7 +132,7 @@ REBNATIVE(_not_)  // see TO-C-NAME
 //      return: [logic!]
 //      left [<opt> any-value!]
 //      'right "Right is evaluated if left is true, or if GET-GROUP!"
-//          [group! get-group! sym-path! sym-word!]
+//          [group! get-group! meta-path! meta-word!]
 //  ]
 //
 REBNATIVE(_and_)  // see TO-C-NAME
@@ -143,7 +143,7 @@ REBNATIVE(_and_)  // see TO-C-NAME
     REBVAL *right = ARG(right);
 
     if (GET_CELL_FLAG(left, UNEVALUATED))
-        if (IS_BLOCK(left) or ANY_SYM_KIND(VAL_TYPE(left)))
+        if (IS_BLOCK(left) or ANY_META_KIND(VAL_TYPE(left)))
             fail (Error_Unintended_Literal_Raw(left));
 
     if (IS_FALSEY(left)) {
@@ -155,7 +155,7 @@ REBNATIVE(_and_)  // see TO-C-NAME
     }
 
     if (IS_GROUP(right) or IS_GET_GROUP(right))  // don't double execute
-        mutable_KIND3Q_BYTE(right) = mutable_HEART_BYTE(right) = REB_SYM_BLOCK;
+        mutable_KIND3Q_BYTE(right) = mutable_HEART_BYTE(right) = REB_META_BLOCK;
 
     if (Do_Branch_With_Throws(D_OUT, right, left))
         return R_THROWN;
@@ -171,7 +171,7 @@ REBNATIVE(_and_)  // see TO-C-NAME
 //      return: [logic!]
 //      left [<opt> any-value!]
 //      'right "Right is evaluated if left is false, or if GET-GROUP!"
-//          [group! get-group! sym-path! sym-word!]
+//          [group! get-group! meta-path! meta-word!]
 //  ]
 //
 REBNATIVE(_or_)  // see TO-C-NAME
@@ -182,7 +182,7 @@ REBNATIVE(_or_)  // see TO-C-NAME
     REBVAL *right = ARG(right);
 
     if (GET_CELL_FLAG(left, UNEVALUATED))
-        if (IS_BLOCK(left) or ANY_SYM_KIND(VAL_TYPE(left)))
+        if (IS_BLOCK(left) or ANY_META_KIND(VAL_TYPE(left)))
             fail (Error_Unintended_Literal_Raw(left));
 
     if (IS_TRUTHY(left)) {
@@ -194,7 +194,7 @@ REBNATIVE(_or_)  // see TO-C-NAME
     }
 
     if (IS_GROUP(right) or IS_GET_GROUP(right))  // don't double execute
-        mutable_KIND3Q_BYTE(right) = mutable_HEART_BYTE(right) = REB_SYM_BLOCK;
+        mutable_KIND3Q_BYTE(right) = mutable_HEART_BYTE(right) = REB_META_BLOCK;
 
     if (Do_Branch_With_Throws(D_OUT, right, left))
         return R_THROWN;
@@ -211,7 +211,7 @@ REBNATIVE(_or_)  // see TO-C-NAME
 //      return: [logic!]
 //      left [<opt> any-value!]
 //      'right "Always evaluated, but is a GROUP! for consistency with AND/OR"
-//          [group! get-group! sym-path! sym-word!]
+//          [group! get-group! meta-path! meta-word!]
 //  ]
 //
 REBNATIVE(_xor_)  // see TO-C-NAME
@@ -222,11 +222,11 @@ REBNATIVE(_xor_)  // see TO-C-NAME
     REBVAL *right = ARG(right);
 
     if (GET_CELL_FLAG(left, UNEVALUATED))
-        if (IS_BLOCK(left) or ANY_SYM_KIND(VAL_TYPE(left)))
+        if (IS_BLOCK(left) or ANY_META_KIND(VAL_TYPE(left)))
             fail (Error_Unintended_Literal_Raw(left));
 
     if (IS_GROUP(right) or IS_GET_GROUP(right))  // don't double execute
-        mutable_KIND3Q_BYTE(right) = mutable_HEART_BYTE(right) = REB_SYM_BLOCK;
+        mutable_KIND3Q_BYTE(right) = mutable_HEART_BYTE(right) = REB_META_BLOCK;
 
     if (Do_Branch_With_Throws(D_OUT, right, left))
         return R_THROWN;

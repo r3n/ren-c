@@ -487,6 +487,12 @@ inline static REB_R Run_Generic_Dispatch(
         // will just say "cannot use verb with CUSTOM!", regardless of if it
         // is an IMAGE! or VECTOR! or GOB!...)
         //
+        if (VAL_TYPE(first_arg) == REB_CUSTOM)
+            fail (Error_Cannot_Use_Raw(
+                verb,
+                rebText("custom!")
+            ));
+
         fail (Error_Cannot_Use_Raw(
             verb,
             Datatype_From_Kind(VAL_TYPE(first_arg))

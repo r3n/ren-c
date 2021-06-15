@@ -59,10 +59,10 @@
 %datatypes/set-group.test.reb
 %datatypes/set-path.test.reb
 %datatypes/set-word.test.reb
-%datatypes/sym-block.test.reb
-%datatypes/sym-group.test.reb
-%datatypes/sym-path.test.reb
-%datatypes/sym-word.test.reb
+%datatypes/meta-block.test.reb
+%datatypes/meta-group.test.reb
+%datatypes/meta-path.test.reb
+%datatypes/meta-word.test.reb
 %datatypes/string.test.reb
 %datatypes/tag.test.reb
 %datatypes/time.test.reb

@@ -31,7 +31,7 @@
 // The scanning code in R3-Alpha used NULL to return failure during the scan
 // of a value, possibly leaving the value itself in an incomplete or invalid
 // state.  Rather than write stray incomplete values into these spots, Ren-C
-// puts "unreadable void"
+// puts "unreadable trash"
 //
 
 #define return_NULL \
@@ -87,7 +87,7 @@ REB_R MAKE_Unhooked(
 //
 //      return: [<opt> any-value!]
 //          "Constructed value, or null if BLANK! input"
-//      type [<blank> sym-word! any-value!]
+//      type [<blank> meta-word! any-value!]
 //          {The datatype or parent value to construct from}
 //      def [<blank> any-value!]
 //          {Definition or size of the new value (binding may be modified)}
@@ -100,7 +100,7 @@ REBNATIVE(make)
     REBVAL *type = ARG(type);
     REBVAL *arg = ARG(def);
 
-    if (IS_SYM_WORD(type)) {  // hack for MAKE CHAR! 0
+    if (IS_META_WORD(type)) {  // hack for MAKE CHAR! 0
         switch (VAL_WORD_ID(type)) {
           case SYM_CHAR_X:
             Copy_Cell(type, Datatype_From_Kind(REB_ISSUE));
@@ -185,7 +185,7 @@ REB_R TO_Unhooked(REBVAL *out, enum Reb_Kind kind, const REBVAL *arg)
 //
 //      return: "VALUE converted to TYPE, null if type or value are blank"
 //          [<opt> any-value!]
-//      type [<blank> datatype! sym-word!]
+//      type [<blank> datatype! meta-word!]
 //      value [<blank> any-value!]
 //  ]
 //
@@ -196,7 +196,7 @@ REBNATIVE(to)
     REBVAL *v = ARG(value);
     REBVAL *type = ARG(type);
 
-    if (IS_SYM_WORD(type)) {  // hack for TO CHAR! XXX
+    if (IS_META_WORD(type)) {  // hack for TO CHAR! XXX
         switch (VAL_WORD_ID(type)) {
           case SYM_CHAR_X:
             fail ("Convert INTEGER! to codepoint with MAKE ISSUE!, not TO");

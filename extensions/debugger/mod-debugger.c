@@ -94,7 +94,7 @@ bool Do_Breakpoint_Throws(
     // the console's sandbox and return its result.  It's possible to use
     // quoting to return simple values, like ^('x)
 
-    assert(IS_SYM_GROUP(inst));
+    assert(IS_META_GROUP(inst));
 
     bool threw = Do_Any_Array_At_Throws(out, inst, SPECIFIED);
 
@@ -198,10 +198,10 @@ REBNATIVE(resume)
 
     REBVAL *expr = ARG(expression);
     if (IS_NULLED(expr))  // e.g. <end> (actuall null not legal)
-        Init_Any_Array(expr, REB_SYM_GROUP, EMPTY_ARRAY);
+        Init_Any_Array(expr, REB_META_GROUP, EMPTY_ARRAY);
     else {
         assert(IS_BLOCK(expr));
-        mutable_KIND3Q_BYTE(expr) = mutable_HEART_BYTE(expr) = REB_SYM_GROUP;
+        mutable_KIND3Q_BYTE(expr) = mutable_HEART_BYTE(expr) = REB_META_GROUP;
     }
 
     // We throw with /NAME as identity of the RESUME function.  (Note: there

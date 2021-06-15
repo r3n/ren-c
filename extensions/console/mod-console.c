@@ -231,10 +231,10 @@ static REBVAL *Run_Sandboxed_Group(REBVAL *group) {
 //  {Runs customizable Read-Eval-Print Loop, may "provoke" code before input}
 //
 //      return: "Exit code, RESUME instruction, or handle to evaluator hook"
-//          [integer! sym-group! handle!]
+//          [integer! meta-group! handle!]
 //      /provoke "Block must return a console state, group is cancellable"
 //          [block! group!]
-//      /resumable "Allow RESUME instruction (will return a SYM-GROUP!)"
+//      /resumable "Allow RESUME instruction (will return a META-GROUP!)"
 //      /skin "File containing console skin, or MAKE CONSOLE! derived object"
 //          [file! object!]
 //  ]
@@ -355,7 +355,7 @@ REBNATIVE(console)
         if (rebDid("integer? @", code))
             break;  // when HOST-CONSOLE returns INTEGER! it means exit code
 
-        if (rebDid("match [sym-group! handle!] @", code)) {
+        if (rebDid("match [meta-group! handle!] @", code)) {
             assert(REF(resumable));
             break;
         }

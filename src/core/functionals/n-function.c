@@ -32,7 +32,7 @@
 //            <local> sum
 //        ][
 //            sum: x + y
-//            loop 2 [print ["The sum is" sum]]
+//            repeat 2 [print ["The sum is" sum]]
 //            return sum
 //        ]
 //
@@ -705,4 +705,89 @@ REBNATIVE(return)
 
     return Init_Thrown_With_Label(D_OUT, v, D_OUT);  // preserves UNEVALUATED
   }
+}
+
+
+//
+//  inherit-meta: native [
+//
+//  {Copy help information from the original function to the derived function}
+//
+//      return: "Same as derived (assists in efficient chaining)"
+//          [action!]
+//      derived [action!]
+//      original "Passed as WORD! to use GET to avoid tainting cached label"
+//          [word!]
+//      /augment "Additional spec information to scan"
+//          [block!]
+//  ]
+//
+REBNATIVE(inherit_meta)
+{
+    INCLUDE_PARAMS_OF_INHERIT_META;
+
+    REBVAL *derived = ARG(derived);
+
+    const REBVAL *original = Lookup_Word_May_Fail(ARG(original), SPECIFIED);
+    if (not IS_ACTION(original))
+        fail (PAR(original));
+
+    UNUSED(ARG(augment));  // !!! not yet implemented
+
+    REBCTX *m1 = ACT_META(VAL_ACTION(original));
+    if (not m1)  // nothing to copy
+        RETURN (ARG(derived));
+
+    REBCTX *m2 = Copy_Context_Shallow_Managed(m1);
+
+    REBLEN which = 0;
+    SYMID syms[] = {SYM_PARAMETER_NOTES, SYM_PARAMETER_TYPES, SYM_0};
+
+    for (; syms[which] != SYM_0; ++which) {
+        REBVAL *val1 = Select_Symbol_In_Context(
+            CTX_ARCHETYPE(m1),
+            Canon(syms[which])
+        );
+        if (not val1 or IS_FALSEY(val1))
+            continue;
+        if (not ANY_CONTEXT(val1))
+            fail ("Expected context in meta information");
+        
+        REBCTX *ctx1 = VAL_CONTEXT(val1);
+
+        REBCTX *ctx2 = Make_Context_For_Action(
+            derived,  // the action
+            DSP,  // will weave in any refinements pushed (none apply)
+            nullptr  // !!! review, use fast map from names to indices
+        );
+
+        const REBKEY *key_tail;
+        const REBKEY *key = CTX_KEYS(&key_tail, ctx1);
+        REBPAR *param = ACT_PARAMS_HEAD(VAL_ACTION(original));
+        REBVAR *var = CTX_VARS_HEAD(ctx1);
+        for (; key != key_tail; ++key, ++param, ++var) {
+            if (Is_Param_Hidden(param))
+                continue;  // e.g. locals
+
+            REBVAL *slot = Select_Symbol_In_Context(
+                CTX_ARCHETYPE(ctx2),
+                KEY_SYMBOL(key)
+            );
+            if (slot)
+                Copy_Cell(slot, var);
+        }
+
+        Init_Frame(
+            Select_Symbol_In_Context(
+                CTX_ARCHETYPE(m2),
+                Canon(syms[which])
+            ),
+            ctx2,
+            ANONYMOUS
+        );
+    }
+
+    mutable_ACT_META(VAL_ACTION(derived)) = m2;
+
+    RETURN (ARG(derived));
 }

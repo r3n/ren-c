@@ -1,7 +1,7 @@
 ; Elliptic curve cryptography
 
 (
-    loop 32 [
+    repeat 32 [
         for-each group [secp256r1 curve25519] [
             a: ecc-generate-keypair group
             b: ecc-generate-keypair group

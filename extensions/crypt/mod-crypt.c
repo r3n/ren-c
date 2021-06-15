@@ -457,7 +457,6 @@ static int Mpi_From_Binary(mbedtls_mpi* X, const REBVAL *binary)
 //      data [binary!]
 //      key-object [object!]
 //      /decrypt "Decrypts the data (default is to encrypt)"
-//      /private "Uses an RSA private key (default is a public key)"
 //  ]
 //
 REBNATIVE(rsa)
@@ -490,7 +489,7 @@ REBNATIVE(rsa)
     rebRelease(n);
     rebRelease(e);
 
-    if (REF(private)) {
+    if (REF(decrypt)) {  // implies private
         REBVAL *d = rebValue("ensure binary! pick", obj, "'d");
 
         if (not d)
@@ -553,7 +552,6 @@ REBNATIVE(rsa)
             &ctx,
             &get_random,
             nullptr,
-            REF(private) ? MBEDTLS_RSA_PRIVATE : MBEDTLS_RSA_PUBLIC,
             &olen,
             dataBuffer,
             crypted,
@@ -566,7 +564,6 @@ REBNATIVE(rsa)
             &ctx,
             &get_random,
             nullptr,
-            REF(private) ? MBEDTLS_RSA_PRIVATE : MBEDTLS_RSA_PUBLIC,
             data_len,
             dataBuffer,
             crypted

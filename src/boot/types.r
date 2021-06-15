@@ -275,31 +275,31 @@ get-word    "the value of a word (variable)"
 ; ANY_WORD()...due to those being less common than testing for ANY_INERT().
 ; Review the decision.
 
-; <ANY-SYM> (order matters, see UNSETIFY_ANY_XXX_KIND())
+; <ANY-META> (order matters, see UNSETIFY_ANY_XXX_KIND())
 
-sym-block   "alternative form of block (that also doesn't evaluate)"
+meta-block  "block that evaluates to produce a quoted block"
             array       *       *       *       [block array series branch]
 
-sym-group   "symbolic form of group! that does not evaluate"
+meta-group  "group that quotes its product or removes isotope status"
             array       *       *       *       [group array series branch]
 
-sym-path    "symbolic form of path! that does not evaluate"
+meta-path   "path that quotes its product or removes isotope status"
             sequence    *       *       *       [path sequence branch]
 
-sym-tuple   "symbolic form of tuple! that does not evaluate"
+meta-tuple  "tuple that quotes its product or removes isotope status"
             sequence    *       *       *       [tuple sequence branch]
 
-sym-word    "symbolic form of word! that does not evaluate"
+meta-word   "word that quotes its product or removes isotope status"
             word        -       *       +       [word branch]
 
-; <ANY-SYM> (order matters, see UNSETIFY_ANY_XXX_KIND())
+; <ANY-META> (order matters, see UNSETIFY_ANY_XXX_KIND())
 
 
-; LIT! is just the lone ^ symbol, which acts like QUOTE, but with the ability
-; to pick up on the NULL-2 and invisible distinctions.
+; META! is just the lone ^ symbol, which acts like QUOTE, but with the ability
+; to pick up on the isotope/invisible distinctions.
 
-lit         "quoting operator which distinguishes NULL and BAD-WORD! isotopes"
-            lit         -       -       +       [unit]
+meta        "quoting operator which distinguishes NULL and BAD-WORD! isotopes"
+            meta        -       -       +       [unit]
 
 
 ; THE! is the lone @ symbol, which acts like THE.  It's particularly nice to
@@ -328,7 +328,7 @@ action      "an invokable Rebol subroutine"
 ;
 ; !!! Because it does not have a binding, it is not an actual WORD!.  There
 ; could be questions about whether it should be more wordlike, or if there
-; should be BAD-BLOCK! ~[]~ and it should fit into a system of
+; should be BAD-BLOCK! ~[]~ and it should fit into a bigger set of types :-/
 
 bad-word    "value which evaluates to a form that triggers errors on access"
             bad-word     -       +       +       []

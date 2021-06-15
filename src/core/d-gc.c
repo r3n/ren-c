@@ -62,7 +62,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
     if (
         IS_BINDABLE_KIND(heart)
         and (binding = BINDING(v))
-        and not IS_SYMBOL(binding)
+        and not IS_METABOL(binding)
         and NOT_SERIES_FLAG(binding, INACCESSIBLE)
     ){
         if (not IS_SER_ARRAY(binding))
@@ -98,7 +98,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_BAD_WORD:
       case REB_BLANK:
       case REB_COMMA:
-      case REB_LIT:
+      case REB_META:
       case REB_THE:
         break;
 
@@ -291,11 +291,11 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_BLOCK:
       case REB_SET_BLOCK:
       case REB_GET_BLOCK:
-      case REB_SYM_BLOCK:
+      case REB_META_BLOCK:
       case REB_GROUP:
       case REB_SET_GROUP:
       case REB_GET_GROUP:
-      case REB_SYM_GROUP: {
+      case REB_META_GROUP: {
         REBARR *a = ARR(VAL_NODE1(v));
         if (GET_SERIES_FLAG(a, INACCESSIBLE))
             break;
@@ -309,13 +309,13 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_TUPLE:
       case REB_SET_TUPLE:
       case REB_GET_TUPLE:
-      case REB_SYM_TUPLE:
+      case REB_META_TUPLE:
         goto any_sequence;
 
       case REB_PATH:
       case REB_SET_PATH:
       case REB_GET_PATH:
-      case REB_SYM_PATH:
+      case REB_META_PATH:
         goto any_sequence;
 
       any_sequence: {
@@ -344,7 +344,7 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_WORD:
       case REB_SET_WORD:
       case REB_GET_WORD:
-      case REB_SYM_WORD: {
+      case REB_META_WORD: {
         assert(GET_CELL_FLAG(v, FIRST_IS_NODE));
 
         const REBSTR *spelling = VAL_WORD_SYMBOL(v);
@@ -407,20 +407,20 @@ void Assert_Cell_Marked_Correctly(const RELVAL *v)
       case REB_TUPLE:
       case REB_SET_TUPLE:
       case REB_GET_TUPLE:
-      case REB_SYM_TUPLE:
+      case REB_META_TUPLE:
       case REB_PATH:
       case REB_SET_PATH:
       case REB_GET_PATH:
-      case REB_SYM_PATH:
+      case REB_META_PATH:
          assert(
             heart == REB_BYTES
             or heart == REB_WORD
             or heart == REB_GET_WORD
             or heart == REB_GET_GROUP
             or heart == REB_GET_BLOCK
-            or heart == REB_SYM_WORD
-            or heart == REB_SYM_GROUP
-            or heart == REB_SYM_BLOCK
+            or heart == REB_META_WORD
+            or heart == REB_META_GROUP
+            or heart == REB_META_BLOCK
             or heart == REB_BLOCK
          );
          break;

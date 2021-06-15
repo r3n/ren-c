@@ -1222,7 +1222,7 @@ static enum Reb_Token Locate_Token_May_Push_Mold(
                 ss->end = cp;
                 return TOKEN_VOID;
             }
-            if (IS_LEX_DELIMIT(*cp)) {
+            if (*cp == ':' or IS_LEX_DELIMIT(*cp)) {
                 ss->end = cp;
                 return TOKEN_WORD;  // single `~` is a WORD!
             }
@@ -2700,9 +2700,9 @@ REBVAL *Scan_To_Stack(SCAN_LEVEL *level) {
             break;
 
           case TOKEN_CARET:
-            mutable_KIND3Q_BYTE(DS_TOP) = SYMIFY_ANY_PLAIN_KIND(kind);
+            mutable_KIND3Q_BYTE(DS_TOP) = METAFY_ANY_PLAIN_KIND(kind);
             if (kind != REB_PATH and kind != REB_TUPLE)  // keep "heart" as is
-                mutable_HEART_BYTE(DS_TOP) = SYMIFY_ANY_PLAIN_KIND(kind);
+                mutable_HEART_BYTE(DS_TOP) = METAFY_ANY_PLAIN_KIND(kind);
             break;
 
           default:

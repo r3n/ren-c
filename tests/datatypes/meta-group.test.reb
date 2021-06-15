@@ -1,6 +1,6 @@
-; The SYM-GROUP! type is new and needs testing.
+; The META-GROUP! type is new and needs testing.
 
-(sym-group! = type of '^(a b c))
+(meta-group! = type of '^(a b c))
 
 ; ENDs make unfriendly voids when literalized, that if you further literalize
 ; will make friendly ones.

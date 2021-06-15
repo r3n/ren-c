@@ -302,10 +302,10 @@ bool Do_Frame_Maybe_Stale_Throws(REBVAL *out, REBVAL *frame) {
 //          <blank>  ; opts out of the DO, returns null
 //          block!  ; source code in block form
 //          get-block!  ; same
-//          sym-block!  ; same
+//          meta-block!  ; same
 //          group!  ; same
 //          get-group!  ; same
-//          sym-group!  ; same
+//          meta-group!  ; same
 //          text!  ; source code in text form
 //          binary!  ; treated as UTF-8
 //          url!  ; load code from URL via protocol
@@ -339,7 +339,7 @@ REBNATIVE(do)
 
     // If `source` is not const, tweak it to be explicitly mutable--because
     // otherwise, it would wind up inheriting the FEED_MASK_CONST of our
-    // currently executing frame.  That's no good for `loop 2 [do block]`,
+    // currently executing frame.  That's no good for `repeat 2 [do block]`,
     // because we want whatever constness is on block...
     //
     // (Note we *can't* tweak values that are RELVAL in source.  So we either
@@ -355,10 +355,10 @@ REBNATIVE(do)
 
     switch (VAL_TYPE(source)) {
       case REB_BLOCK:
-      case REB_SYM_BLOCK:
+      case REB_META_BLOCK:
       case REB_GET_BLOCK:
       case REB_GROUP:
-      case REB_SYM_GROUP:
+      case REB_META_GROUP:
       case REB_GET_GROUP: {
         DECLARE_FEED_AT_CORE (feed, source, SPECIFIED);
         if (Do_Feed_To_End_Maybe_Stale_Throws(

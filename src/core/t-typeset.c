@@ -214,7 +214,7 @@ bool Add_Typeset_Bits_Core(
             VAL_TYPESET_LOW_BITS(typeset) |= VAL_TYPESET_LOW_BITS(item);
             VAL_TYPESET_HIGH_BITS(typeset) |= VAL_TYPESET_HIGH_BITS(item);
         }
-        else if (IS_SYM_WORD(item)) {  // see Startup_Fake_Type_Constraint()
+        else if (IS_META_WORD(item)) {  // see Startup_Fake_Type_Constraint()
             switch (VAL_WORD_ID(item)) {
               case SYM_CHAR_X:
               case SYM_BLACKHOLE_X:

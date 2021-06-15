@@ -25,7 +25,7 @@
     233    239    241    251]
 
     random/seed "Deterministic!"
-    loop 1000 [
+    repeat 1000 [
         until [
             g: random/only byte-primes
             p: random/only byte-primes
@@ -39,7 +39,7 @@
         modulus: enbin [be + 1] p
         base: enbin [be + 1] g
 
-        loop 1 [
+        repeat 1 [
             mine: dh-generate-keypair/insecure modulus base
             mine/modulus = modulus
             (length of modulus) = length of mine/public-key

@@ -183,7 +183,7 @@
 )
 ; BREAK stops evaluation
 (
-    null? loop 1 [
+    null? repeat 1 [
         do [
             break
             2

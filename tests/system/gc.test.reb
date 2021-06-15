@@ -2,12 +2,12 @@
 
 [#1776 #2072 (
     a: copy []
-    loop 200'000 [a: append/only copy [] a]
+    repeat 200'000 [a: append/only copy [] a]
     recycle
     true
 )]
 [#1989 (
-    loop ([comment 30000000] 300) [make gob! []]
+    repeat ([comment 30000000] 300) [make gob! []]
     true
 )]
 

@@ -13,7 +13,7 @@
     ]
 )(
     sum: 0
-    loop 5 code: [
+    repeat 5 code: [
         ()
         append code/1 sum: sum + 1
     ]
@@ -24,7 +24,7 @@
 )(
     sum: 0
     e: trap [
-        loop 5 code: const [
+        repeat 5 code: const [
             ()
             append code/1 sum: sum + 1
         ]
@@ -32,7 +32,7 @@
     e/id = 'const-value
 )(
     sum: 0
-    loop 5 code: const [
+    repeat 5 code: const [
         ()
         append mutable code/1 sum: sum + 1
     ]
@@ -46,14 +46,14 @@
 ; DO should be neutral...if the value it gets in is const, it should run that
 ; as const...it shouldn't be inheriting a "wave of constness" otherwise.
 (
-    e: trap [loop 2 [do [append d: [] <item>]]]
+    e: trap [repeat 2 [do [append d: [] <item>]]]
     e/id = 'const-value
 )(
     block: [append d: [] <item>]
-    [<item> <item>] = loop 2 [do block]
+    [<item> <item>] = repeat 2 [do block]
 )(
     block: [append d: [] <item>]
-    e: trap [loop 2 [do const block]]
+    e: trap [repeat 2 [do const block]]
     e/id = 'const-value
 )
 
@@ -63,16 +63,16 @@
 ; do a COMPOSE then it looks the same from the evaluator's point of view.
 ; Hence, if you want to modify composed-in blocks, use explicit mutability.
 (
-    [<legal> <legal>] = do compose [loop 2 [append mutable [] <legal>]]
+    [<legal> <legal>] = do compose [repeat 2 [append mutable [] <legal>]]
 )(
     block: []
     e: trap [
-        do compose/deep [loop 2 [append (block) <fail>]]
+        do compose/deep [repeat 2 [append (block) <fail>]]
     ]
     e/id = 'const-value
 )(
     block: mutable []
-    do compose/deep [loop 2 [append (block) <legal>]]
+    do compose/deep [repeat 2 [append (block) <legal>]]
     block = [<legal> <legal>]
 )
 
@@ -81,7 +81,7 @@
 ; only make the outermost level mutable...referenced series will be const
 ; if they weren't copied (and weren't mutable explicitly)
 (
-    loop 1 [data: copy [a [b [c]]]]
+    repeat 1 [data: copy [a [b [c]]]]
     append data <success>
     e2: trap [append data/2 <fail>]
     e22: trap [append data/2/2 <fail>]
@@ -91,13 +91,13 @@
         e22/id = 'const-value
     ]
 )(
-    loop 1 [data: copy/deep [a [b [c]]]]
+    repeat 1 [data: copy/deep [a [b [c]]]]
     append data <success>
     append data/2 <success>
     append data/2/2 <success>
     data = [a [b [c <success>] <success>] <success>]
 )(
-    loop 1 [sub: copy/deep [b [c]]]
+    repeat 1 [sub: copy/deep [b [c]]]
     data: copy compose [a (sub)]
     append data <success>
     append data/2 <success>
@@ -106,7 +106,7 @@
 )
 
 [https://github.com/metaeducation/ren-c/issues/633 (
-    e: trap [repeat x 1 [append foo: [] x]]
+    e: trap [count-up x 1 [append foo: [] x]]
     e/id = 'const-value
 )]
 
@@ -148,10 +148,10 @@
 
 ; COMPOSE should splice with awareness of const/mutability
 (
-    e: trap [loop 2 compose [append ([1 2 3]) <bad>]]
+    e: trap [repeat 2 compose [append ([1 2 3]) <bad>]]
     e/id = 'const-value
 )(
-    block: loop 2 compose [append (mutable [1 2 3]) <legal>]
+    block: repeat 2 compose [append (mutable [1 2 3]) <legal>]
     block = [1 2 3 <legal> <legal>]
 )
 
@@ -159,6 +159,6 @@
 ; If soft-quoted branches are allowed to exist, they should not allow
 ; breaking of rules that would apply to values in a block-based branch.
 (
-    e: trap [loop 2 [append if true '{y} {z}]]
+    e: trap [repeat 2 [append if true '{y} {z}]]
     e/id = 'const-value
 )

@@ -135,7 +135,7 @@
 )
 
 
-; SYM-WORD! and SYM-PATH! are allowed as the right hand side of AND/OR, as
+; META-WORD! and META-PATH! are allowed as the right hand side of AND/OR, as
 ; a synonym for that word or path in a GROUP.
 
 [

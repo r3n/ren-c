@@ -981,14 +981,14 @@ default-combinators: make map! reduce [
                 ]
             ]
             any-string? input [
-                if find value input.1 [
+                if find value try input.1 [
                     set remainder next input
                     return input.1
                 ]
             ]
             true [
                 assert [binary? input]
-                if find value input.1 [
+                if find value try input.1 [
                     set remainder next input
                     return input.1
                 ]
@@ -1057,7 +1057,30 @@ default-combinators: make map! reduce [
         <local> result'
     ][
         result': quote null  ; !!! should `0 skip` resolve to ' like this?
-        loop value [
+        repeat value [
+            ([result' input]: ^ parser input) else [
+                return null
+            ]
+        ]
+        set remainder input
+        return unquote result'
+    ]
+
+    'repeat combinator [
+        return: "Last parser result"
+            [<opt> any-value!]
+        times-parser [action!]
+        parser [action!]
+        <local> times' result'
+    ][
+        ([times' input]: ^ times-parser input) else [return null]
+
+        if integer! <> type of unquote times' [
+            fail "REPEAT requires first synthesized argument to be an integer"
+        ]
+
+        result': quote null  ; !!! should `repeat 0 <any>` resolve to '?
+        repeat unquote times' [
             ([result' input]: ^ parser input) else [
                 return null
             ]
@@ -1116,7 +1139,7 @@ default-combinators: make map! reduce [
         <local> item error
     ][
         either any-array? input [
-            if not find value (type of input.1) [
+            if not find value try (type of input.1) [
                 return null
             ]
             set remainder next input
@@ -1144,9 +1167,9 @@ default-combinators: make map! reduce [
     ;
     ; !!! These follow a simple pattern, could generate at a higher level.
 
-    sym-word! combinator [
+    meta-word! combinator [
         return: "Literalized" [<opt> any-value!]
-        value [sym-word!]
+        value [meta-word!]
         <local> result' parser
     ][
         value: as word! value
@@ -1154,9 +1177,9 @@ default-combinators: make map! reduce [
         ([result' (remainder)]: ^ parser state input value) then [result']
     ]
 
-    sym-tuple! combinator [
+    meta-tuple! combinator [
         return: "Literalized" [<opt> any-value!]
-        value [sym-tuple!]
+        value [meta-tuple!]
         <local> result' parser
     ][
         value: as tuple! value
@@ -1164,9 +1187,9 @@ default-combinators: make map! reduce [
         ([result' (remainder)]: ^ parser state input value) then [result']
     ]
 
-    sym-group! combinator [
+    meta-group! combinator [
         return: "Literalized" [<opt> any-value!]
-        value [sym-group!]
+        value [meta-group!]
         <local> result' parser
     ][
         value: as group! value
@@ -1174,9 +1197,9 @@ default-combinators: make map! reduce [
         ([result' (remainder)]: ^ parser state input value) then [result']
     ]
 
-    sym-block! combinator [
+    meta-block! combinator [
         return: "Literalized" [<opt> any-value!]
-        value [sym-block!]
+        value [meta-block!]
         <local> result' parser
     ][
         value: as block! value
@@ -1222,6 +1245,31 @@ default-combinators: make map! reduce [
         ;
     ]
 
+    ; Historically you could use SKIP as part of an assignment, e.g.
+    ; `parse [10] [set x skip]` would give you x as 10.  But "skipping" does
+    ; not seem value-bearing.
+    ;
+    ;    >> uparse [<a> 10] [tag! skip]
+    ;    == 10  ; confusing, I thought you "skipped" it?
+    ;
+    ;    >> uparse [<a> 10] [tag! skip]
+    ;    == <a>  ; maybe this is okay?
+    ;
+    ; It's still a bit jarring to have SKIP mean something that is used as
+    ; a series skipping operation (with a skip count) have completely different
+    ; semantic.  But, this is at least a bit better, and points people to use
+    ; <any> instead if you want to say `parse [10] [x: <any>]` and get x as 10. 
+    ;
+    'skip combinator [
+        {Skip one series element if available}
+        return: "Should be invisible (handling TBD)"
+            [<invisible>]
+    ][
+        if tail? input [return null]
+        set remainder next input
+        return
+    ]
+
     === ACTION! COMBINATOR ===
 
     ; The ACTION! combinator is a new idea of letting you call a normal
@@ -1256,7 +1304,7 @@ default-combinators: make map! reduce [
         for-each param (parameters of action of f) [
             if not path? param [
                 ensure action! :parsers/1
-                if sym-word? param [
+                if meta-word? param [
                     f.(to word! param): ([# input]: ^ parsers/1 input) else [
                         return null
                     ]
@@ -1431,7 +1479,6 @@ default-combinators: make map! reduce [
 
 default-combinators.('here): :default-combinators.<here>
 default-combinators.('end): :default-combinators.<end>
-default-combinators.('skip): :default-combinators.<any>
 
 
 non-comma: func [
